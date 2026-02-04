@@ -10,6 +10,9 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - sqlc config at sqlc.yaml uses pgx/v5 driver with custom type overrides for timestamptz and nullable text
 - Build with `go build ./...` to verify no compilation errors
 - Makefile `db/models.go` target runs `go tool sqlc generate` when query or schema files change
+- Use `sqlc.arg(name)` for named parameters in sqlc queries to get clean Go struct field names
+- JSONB containment search: `WHERE data @> $1` with `@>` operator
+- PostgreSQL TEXT[] maps to Go `[]string` in sqlc without needing a custom override
 
 ---
 
@@ -74,4 +77,57 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - The log_config table is the simplest schema table (no foreign keys, no timestamps) since it's pure configuration
   - All five database schema tables (events, subscribers, subscriptions, delivery_attempts, log_config) are now complete
   - Next stories (US-006 through US-009) will create sqlc query files in queries/ directory
+---
+
+## 2026-02-04 16:22 MST - US-006
+- Created sqlc query file: queries/events.sql with 8 query definitions
+- Queries: InsertEvent, GetEventByID, ListEvents (paginated), SearchEventsBySubject, SearchEventsByDateRange, SearchEventsByDeliveryStatus, SearchEventsByDataContent (jsonb @> containment), UpdateEventDeliveryStatus
+- Generated code: db/events.sql.go (307 lines) and db/models.go (59 lines with all 5 table models)
+- Files changed: queries/events.sql, db/events.sql.go, db/models.go
+- **Learnings for future iterations:**
+  - sqlc uses `sqlc.arg(name)` syntax for named parameters — use this to get clean Go struct field names instead of auto-generated ones like `Timestamp_2`
+  - JSONB containment search uses `@>` operator: `WHERE data @> $1` — caller passes a JSON byte slice to match against
+  - sqlc generates a `models.go` file with Go structs for ALL tables in the schema, even those without queries yet
+  - The querier.go interface is currently empty — it will be populated as more query files are added
+  - `go tool sqlc generate` is the correct invocation (not just `sqlc generate`)
+  - Generated files go to db/ directory as configured in sqlc.yaml
+---
+
+## 2026-02-04 16:28 MST - US-007
+- Created sqlc query file: queries/subscribers.sql with 9 query definitions
+- Subscriber queries: UpsertSubscriber (ON CONFLICT by endpoint_url), GetSubscriberByID, GetSubscriberByEndpointURL, ListSubscribers, DeleteSubscriber
+- Subscription queries: CreateSubscription, ListSubscriptionsForSubscriber, DeleteSubscriptionsForSubscriber, GetSubscriptionsMatchingSubject
+- GetSubscriptionsMatchingSubject uses SQL LIKE with replace() to convert glob patterns (* → %, ? → _) for delivery routing
+- Generated code: db/subscribers.sql.go (240 lines)
+- Files changed: queries/subscribers.sql, db/subscribers.sql.go
+- **Learnings for future iterations:**
+  - PostgreSQL ON CONFLICT DO UPDATE uses EXCLUDED.column_name to reference the values that would have been inserted
+  - The upsert pattern returns the full row via RETURNING * regardless of whether it was an insert or update
+  - For glob/wildcard matching in SQL, use replace() to convert * to % and ? to _ with LIKE operator
+  - Only new files were created — existing db/models.go, db/db.go, db/querier.go, db/events.sql.go were unchanged by sqlc generate
+  - sqlc correctly generates separate .sql.go files per query source file (events.sql.go, subscribers.sql.go)
+---
+
+## 2026-02-04 16:30 MST - US-008
+- Created sqlc query file: queries/delivery_attempts.sql with 4 query definitions
+- Queries: InsertDeliveryAttempt (all 10 columns), ListDeliveryAttemptsForEvent (ordered by attempted_at), ListDeliveryAttemptsForSubscriber (ordered by attempted_at), UpdateDeliveryAttemptStatus (updates status, response_status_code, response_headers, response_body)
+- Generated code: db/delivery_attempts.sql.go (167 lines)
+- Files changed: queries/delivery_attempts.sql, db/delivery_attempts.sql.go
+- **Learnings for future iterations:**
+  - The UpdateDeliveryAttemptStatus query updates response fields alongside status because in the delivery engine flow, a delivery attempt is first inserted with status 'pending' and then updated with the response data after the HTTP call completes
+  - The InsertDeliveryAttempt params struct uses pgtype.Timestamptz for attempted_at (via sqlc override) and pgtype.Int4 for nullable response_status_code
+  - JSONB columns (request_headers, response_headers) map to []byte in Go — caller is responsible for marshaling/unmarshaling JSON
+  - Nullable text column (response_body) maps to string due to sqlc.yaml override for pg_catalog.text nullable
+---
+
+## 2026-02-04 16:34 MST - US-009
+- Created sqlc query file: queries/log_config.sql with 4 query definitions
+- Queries: UpsertLogConfig (ON CONFLICT by subject, updates log_properties), GetLogConfigBySubject, ListLogConfigs (ordered alphabetically by subject), DeleteLogConfigForSubject
+- Generated code: db/log_config.sql.go (78 lines)
+- Files changed: queries/log_config.sql, db/log_config.sql.go
+- **Learnings for future iterations:**
+  - PostgreSQL TEXT[] maps to Go []string in sqlc — no special override needed
+  - The log_config upsert only updates log_properties on conflict (not id) since subject is the unique key used for lookups
+  - All four sqlc query file stories (US-006 through US-009) are now complete, covering events, subscribers/subscriptions, delivery_attempts, and log_config
+  - The sqlc query layer is fully implemented — next stories (US-010+) move to REST API endpoint implementation
 ---
