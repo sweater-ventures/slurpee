@@ -7,6 +7,5 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #60 | 2:33 PM | 🔵 | View Route Registration Pattern | ~315 |
-| #49 | 2:32 PM | 🔵 | View Registration Pattern Using init() Functions | ~335 |
+| #47 | 2:31 PM | 🔵 | API Route Registration and Handler Pattern | ~327 |
 </claude-mem-context>

@@ -7,6 +7,6 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #60 | 2:33 PM | 🔵 | View Route Registration Pattern | ~315 |
-| #49 | 2:32 PM | 🔵 | View Registration Pattern Using init() Functions | ~335 |
+| #54 | 2:32 PM | 🔵 | HTTP Logging Middleware with Timing Metrics | ~352 |
+| #52 | " | 🔵 | Request Context Logger Middleware with Request ID Tracking | ~313 |
 </claude-mem-context>

@@ -7,6 +7,5 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #60 | 2:33 PM | 🔵 | View Route Registration Pattern | ~315 |
-| #49 | 2:32 PM | 🔵 | View Registration Pattern Using init() Functions | ~335 |
+| #51 | 2:32 PM | 🔵 | Configuration Management via Environment Variables and CLI Flags | ~364 |
 </claude-mem-context>

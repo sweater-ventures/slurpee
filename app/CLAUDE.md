@@ -7,6 +7,6 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #60 | 2:33 PM | 🔵 | View Route Registration Pattern | ~315 |
-| #49 | 2:32 PM | 🔵 | View Registration Pattern Using init() Functions | ~335 |
+| #50 | 2:32 PM | 🔵 | Application Structure and Database Initialization | ~345 |
+| #48 | " | 🔵 | Database Connection Pool Configuration | ~282 |
 </claude-mem-context>
