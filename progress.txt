@@ -106,3 +106,15 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - Only new files were created — existing db/models.go, db/db.go, db/querier.go, db/events.sql.go were unchanged by sqlc generate
   - sqlc correctly generates separate .sql.go files per query source file (events.sql.go, subscribers.sql.go)
 ---
+
+## 2026-02-04 16:30 MST - US-008
+- Created sqlc query file: queries/delivery_attempts.sql with 4 query definitions
+- Queries: InsertDeliveryAttempt (all 10 columns), ListDeliveryAttemptsForEvent (ordered by attempted_at), ListDeliveryAttemptsForSubscriber (ordered by attempted_at), UpdateDeliveryAttemptStatus (updates status, response_status_code, response_headers, response_body)
+- Generated code: db/delivery_attempts.sql.go (167 lines)
+- Files changed: queries/delivery_attempts.sql, db/delivery_attempts.sql.go
+- **Learnings for future iterations:**
+  - The UpdateDeliveryAttemptStatus query updates response fields alongside status because in the delivery engine flow, a delivery attempt is first inserted with status 'pending' and then updated with the response data after the HTTP call completes
+  - The InsertDeliveryAttempt params struct uses pgtype.Timestamptz for attempted_at (via sqlc override) and pgtype.Int4 for nullable response_status_code
+  - JSONB columns (request_headers, response_headers) map to []byte in Go — caller is responsible for marshaling/unmarshaling JSON
+  - Nullable text column (response_body) maps to string due to sqlc.yaml override for pg_catalog.text nullable
+---
