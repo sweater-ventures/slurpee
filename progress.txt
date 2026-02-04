@@ -1,0 +1,27 @@
+# Ralph Progress Log
+Started: Wed Feb  4 15:46:59 MST 2026
+
+## Codebase Patterns
+- Use `IF NOT EXISTS` for all CREATE TABLE and CREATE INDEX statements in migrations
+- sql-migrate uses `-- +migrate Up` and `-- +migrate Down` comment markers
+- Source .env before running sql-migrate: `set -a && source .env && set +a && sql-migrate up`
+- dbconfig.yml uses `host=${DB_HOST} dbname=${DB_NAME} user=${DB_ADMIN_USERNAME} password=${DB_ADMIN_PASSWORD} sslmode=disable` format
+- DB admin credentials are in .env as DB_ADMIN_USERNAME/DB_ADMIN_PASSWORD; app credentials as DB_USERNAME/DB_PASSWORD
+- sqlc config at sqlc.yaml uses pgx/v5 driver with custom type overrides for timestamptz and nullable text
+- Build with `go build ./...` to verify no compilation errors
+- Makefile `db/models.go` target runs `go tool sqlc generate` when query or schema files change
+
+---
+
+## 2026-02-04 15:48 MST - US-001
+- Created events table migration: schema/20260204154757-create-events-table.sql
+- Table has 8 columns: id (UUID PK), subject, timestamp, trace_id, data (JSONB), retry_count, delivery_status, status_updated_at
+- Three indexes: subject, timestamp, delivery_status
+- Migration applies cleanly via sql-migrate up
+- Files changed: schema/20260204154757-create-events-table.sql
+- **Learnings for future iterations:**
+  - The database was already provisioned via Docker with slurpee_admin and slurpee roles
+  - gorp_migrations table tracks applied migrations (used by sql-migrate)
+  - Previous session work wasn't on a persisted branch, so had to recreate from scratch
+  - Always verify migration status with `sql-migrate status` after applying
+---
