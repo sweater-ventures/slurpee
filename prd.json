@@ -1,0 +1,449 @@
+{
+  "project": "Slurpee Event Broker",
+  "branchName": "ralph/slurpee-event-broker",
+  "description": "Implement the remaining features of the Slurpee Event Broker: database schema, sqlc queries, REST API endpoints, async delivery engine with retry, and web UI for events, subscribers, and logging config.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create events database table",
+      "description": "As a developer, I need an events table so that published events can be stored durably.",
+      "acceptanceCriteria": [
+        "Migration file in schema/ creates events table",
+        "Columns: id (UUID, primary key, no default), subject (text, not null), timestamp (timestamptz, not null), trace_id (UUID, nullable), data (jsonb, not null), retry_count (integer, default 0), delivery_status (text, default 'pending'), status_updated_at (timestamptz)",
+        "Index on subject",
+        "Index on timestamp",
+        "Index on delivery_status",
+        "Migration applies cleanly via sql-migrate up"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Create subscribers database table",
+      "description": "As a developer, I need a subscribers table so that subscriber registrations can be stored.",
+      "acceptanceCriteria": [
+        "Migration file in schema/ creates subscribers table",
+        "Columns: id (UUID, primary key, no default), name (text, not null), endpoint_url (text, not null, unique), auth_secret (text, not null), max_parallel (integer, default 1), created_at (timestamptz, default now), updated_at (timestamptz, default now)",
+        "Unique constraint on endpoint_url",
+        "Migration applies cleanly via sql-migrate up"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Create subscriptions database table",
+      "description": "As a developer, I need a subscriptions table to store which subjects a subscriber listens to and optional filtering rules.",
+      "acceptanceCriteria": [
+        "Migration file in schema/ creates subscriptions table",
+        "Columns: id (UUID, primary key, no default), subscriber_id (UUID, foreign key to subscribers), subject_pattern (text, not null), filter (jsonb, nullable), max_retries (integer, nullable — per-subscription override of global max retries), created_at (timestamptz, default now), updated_at (timestamptz, default now)",
+        "Foreign key constraint with cascade delete on subscriber removal",
+        "Index on subject_pattern",
+        "Migration applies cleanly via sql-migrate up"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Create delivery_attempts database table",
+      "description": "As a developer, I need a delivery_attempts table to record each attempt to deliver an event to a subscriber.",
+      "acceptanceCriteria": [
+        "Migration file in schema/ creates delivery_attempts table",
+        "Columns: id (UUID, primary key, no default), event_id (UUID, foreign key to events), subscriber_id (UUID, foreign key to subscribers), endpoint_url (text, not null), attempted_at (timestamptz, not null, default now), request_headers (jsonb), response_status_code (integer, nullable), response_headers (jsonb, nullable), response_body (text, nullable), status (text, not null — 'succeeded', 'failed', 'pending')",
+        "Foreign key constraints to events and subscribers",
+        "Index on event_id",
+        "Index on subscriber_id",
+        "Index on status",
+        "Migration applies cleanly via sql-migrate up"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Create log_config database table",
+      "description": "As a developer, I need a log_config table to store which event data properties should be logged for each subject.",
+      "acceptanceCriteria": [
+        "Migration file in schema/ creates log_config table",
+        "Columns: id (UUID, primary key, no default), subject (text, not null, unique), log_properties (text array, not null — list of JSON property paths to log from event data)",
+        "Unique constraint on subject",
+        "Migration applies cleanly via sql-migrate up"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Write sqlc queries for events",
+      "description": "As a developer, I need sqlc query definitions for event CRUD operations so that Go code is generated for database access.",
+      "acceptanceCriteria": [
+        "Query file in queries/ with: insert event, get event by ID, list events (paginated with offset/limit), search events by subject, search events by date range, search events by delivery status, search events by data content (jsonb), update event delivery status and retry count",
+        "sqlc generate runs without errors",
+        "Generated code appears in db/"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Write sqlc queries for subscribers and subscriptions",
+      "description": "As a developer, I need sqlc query definitions for subscriber and subscription CRUD operations.",
+      "acceptanceCriteria": [
+        "Query file in queries/ with: upsert subscriber by endpoint_url, get subscriber by ID, get subscriber by endpoint_url, list all subscribers, delete subscriber, create subscription, list subscriptions for subscriber, delete subscriptions for subscriber, get all subscriptions matching a subject (for delivery routing)",
+        "sqlc generate runs without errors",
+        "Generated code appears in db/"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Write sqlc queries for delivery attempts",
+      "description": "As a developer, I need sqlc query definitions for delivery attempt operations.",
+      "acceptanceCriteria": [
+        "Query file in queries/ with: insert delivery attempt, list delivery attempts for an event (ordered by attempted_at), list delivery attempts for a subscriber, update delivery attempt status",
+        "sqlc generate runs without errors",
+        "Generated code appears in db/"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Write sqlc queries for log config",
+      "description": "As a developer, I need sqlc query definitions for log configuration operations.",
+      "acceptanceCriteria": [
+        "Query file in queries/ with: upsert log config for subject, get log config by subject, list all log configs, delete log config for subject",
+        "sqlc generate runs without errors",
+        "Generated code appears in db/"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Implement POST /api/events endpoint",
+      "description": "As an API client, I want to publish events via HTTP POST so they are stored and can later be delivered to subscribers.",
+      "acceptanceCriteria": [
+        "POST /api/events accepts JSON body with fields: subject (required), data (required, JSON object), id (optional UUID — auto-generated v7 if not provided), timestamp (optional — auto-assigned to now if not provided), trace_id (optional UUID)",
+        "Returns 201 with the created event as JSON (including the assigned id and timestamp)",
+        "Returns 400 with error details if subject or data is missing",
+        "Returns 400 if data is not a valid JSON object",
+        "Event is persisted to the database before returning the response",
+        "Event subject and ID are logged on receipt using slog",
+        "Follows existing API handler pattern (routeHandler, writeJsonResponse) in api/ package using init() route registration",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Implement POST /api/subscribers endpoint",
+      "description": "As an API client, I want to register or update a subscriber so it receives events matching its subscriptions.",
+      "acceptanceCriteria": [
+        "POST /api/subscribers accepts JSON body with fields: name (required), endpoint_url (required), auth_secret (required), max_parallel (optional, default 1), subscriptions (required, array of objects with subject_pattern (required) and filter (optional jsonb))",
+        "Request must include the global preshared secret in the X-Slurpee-Admin-Secret header; returns 401 if missing or incorrect",
+        "Add ADMIN_SECRET field to AppConfig in config/configuration.go (env var ADMIN_SECRET)",
+        "If a subscriber with the same endpoint_url already exists, update its name, auth_secret, max_parallel, and replace its subscriptions (idempotent)",
+        "If the subscriber is new, create it along with its subscriptions",
+        "Update subscription updated_at timestamps on changes",
+        "Returns 200 with the subscriber and its subscriptions as JSON",
+        "Returns 400 with error details for missing required fields",
+        "Follows existing API handler pattern in api/ package using init() route registration",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Implement GET /api/events/{id} endpoint",
+      "description": "As an API client, I want to retrieve a single event by ID so I can inspect its details programmatically.",
+      "acceptanceCriteria": [
+        "GET /api/events/{id} returns the event as JSON including all fields: id, subject, timestamp, trace_id, data, retry_count, delivery_status, status_updated_at",
+        "Returns 404 with error message if the event ID does not exist",
+        "Returns 400 if the ID is not a valid UUID",
+        "Follows existing API handler pattern (routeHandler, writeJsonResponse) in api/ package using init() route registration",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Implement GET /api/subscribers endpoint",
+      "description": "As an API client, I want to list all registered subscribers so I can inspect the current subscriber state programmatically.",
+      "acceptanceCriteria": [
+        "GET /api/subscribers returns a JSON array of all subscribers, each including: id, name, endpoint_url, max_parallel, created_at, updated_at, and their subscriptions (subject_pattern, filter, max_retries)",
+        "Request must include the global preshared secret in the X-Slurpee-Admin-Secret header; returns 401 if missing or incorrect",
+        "Returns an empty array if no subscribers are registered",
+        "Follows existing API handler pattern (routeHandler, writeJsonResponse) in api/ package using init() route registration",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Implement event delivery engine",
+      "description": "As the system, I want to deliver events to matching subscribers asynchronously so that subscribers receive data without blocking publishers.",
+      "acceptanceCriteria": [
+        "After an event is stored via POST /api/events, trigger delivery asynchronously in a background goroutine",
+        "Find all subscriptions whose subject_pattern matches the event subject using glob/wildcard matching (e.g., order.* matches order.created; * matches all subjects)",
+        "For each matching subscriber, send an HTTP POST to the subscriber endpoint_url with the event data as JSON body",
+        "Include the subscriber auth_secret in a X-Slurpee-Secret request header",
+        "Respect each subscriber max_parallel setting — use a semaphore to limit concurrent deliveries per subscriber",
+        "Record each delivery attempt in the delivery_attempts table (request headers, response status, response headers, response body, status)",
+        "Mark delivery attempt as succeeded on 2xx response, failed otherwise",
+        "Update event delivery_status after all attempts complete: delivered (all succeeded), failed (any failed), pending (in progress)",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Implement delivery retry with exponential backoff",
+      "description": "As the system, I want to retry failed deliveries with exponential backoff so transient failures are recovered automatically.",
+      "acceptanceCriteria": [
+        "When a delivery attempt fails (non-2xx or network error), schedule a retry",
+        "Retry delay uses exponential backoff (e.g., 1s, 2s, 4s, 8s, 16s, ... capped at max interval)",
+        "Increment retry_count on the event for each retry cycle",
+        "Add MAX_RETRIES and MAX_BACKOFF_SECONDS environment variable config fields to AppConfig in config/configuration.go",
+        "Per-subscription max_retries override takes precedence over the global default when set",
+        "Stop retrying after the applicable maximum number of attempts is reached",
+        "Update event delivery_status to reflect current state: pending, partial (some succeeded some retrying), delivered (all succeeded), failed (max retries exhausted)",
+        "Update status_updated_at on each status change",
+        "Each retry attempt is recorded as a new row in delivery_attempts",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Apply subscription filters to event delivery",
+      "description": "As a subscriber, I want to define optional JSON filters on my subscriptions so I only receive events whose data matches my criteria.",
+      "acceptanceCriteria": [
+        "When a subscription has a non-null filter field, evaluate it against the event data before delivering",
+        "Filter is a JSON object of key-value pairs; all pairs must match (AND logic) against top-level keys in event data",
+        "If the filter does not match, skip delivery for that subscription (no delivery attempt recorded)",
+        "If the filter is null, deliver all events matching the subject pattern",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Implement configurable event data logging",
+      "description": "As the system, I want to log configured properties from event data when events are received, so operators can see relevant data in logs.",
+      "acceptanceCriteria": [
+        "When an event is received via POST /api/events, look up the log_config for the event subject from the database",
+        "If a log_config exists, extract the listed property paths from the event data and include them as structured slog fields",
+        "Event ID and subject are always logged regardless of log_config",
+        "If no log_config exists for the subject, only log event ID and subject",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Build sidebar navigation component",
+      "description": "As a user, I want a sidebar navigation so I can move between the main sections of the web interface.",
+      "acceptanceCriteria": [
+        "Templ component in components/ renders a sidebar with navigation links",
+        "Links to: Events (/events), Subscribers (/subscribers), Logging Config (/logging)",
+        "Current page is visually highlighted based on the current URL path",
+        "Uses DaisyUI menu/sidebar styling with dark theme",
+        "Integrated into SimplePage layout (components/simple-page.templ) so it appears on all pages",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Update root redirect to events page",
+      "description": "As a user, I want the root URL to redirect to the events list since that is the primary view.",
+      "acceptanceCriteria": [
+        "GET / redirects to /events instead of /welcome",
+        "Update the root redirect in views/ package (currently in not_found.go or routes setup)",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Build events list page",
+      "description": "As a user, I want to see a paginated list of events so I can browse what has been published.",
+      "acceptanceCriteria": [
+        "View at /events renders a table of events showing: subject, event ID (truncated), timestamp, delivery status",
+        "Paginated (50 per page) with next/previous controls",
+        "Rows are clickable, linking to the event detail page at /events/{id}",
+        "Delivery status shown as a colored badge (DaisyUI badge component)",
+        "Most recent events shown first",
+        "Templ template in views/, handler follows existing pattern (init() route registration, routeHandler wrapper)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Build event search and filtering",
+      "description": "As a user, I want to search and filter events by subject, date range, delivery status, and content so I can find specific events.",
+      "acceptanceCriteria": [
+        "Filter bar above the events table with inputs for: subject (text), date range (start/end date inputs), delivery status (dropdown), content search (text — searches within event JSON data)",
+        "Filters update the event list via HTMX (hx-get with hx-target, no full page reload)",
+        "Multiple filters can be combined (AND logic)",
+        "Clearing filters returns to the full event list",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Build event detail page",
+      "description": "As a user, I want to view full details of a single event including its data and delivery history.",
+      "acceptanceCriteria": [
+        "View at /events/{id} shows: event ID, subject, timestamp, trace ID, delivery status, retry count, full JSON data (formatted/pretty-printed)",
+        "Below the event details, show a list of delivery attempts: subscriber endpoint, attempted at, response status code, status (succeeded/failed/pending)",
+        "Each delivery attempt row is expandable (DaisyUI collapse or details element) to show full request/response details (headers, body)",
+        "Templ template in views/, handler follows existing pattern",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Build event creation page",
+      "description": "As a user, I want to create events from the web interface for testing and manual publishing.",
+      "acceptanceCriteria": [
+        "View at /events/new with a form: subject (text input, required), data (textarea for JSON, required), trace ID (text input, optional)",
+        "Submit button posts to POST /api/events and redirects to the newly created event detail page on success",
+        "Displays validation errors inline if subject or data is missing, or if data is not valid JSON",
+        "Uses DaisyUI form components (input, textarea, button)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Build event delivery replay",
+      "description": "As a user, I want to replay delivery of a specific event so that failed deliveries can be retried manually.",
+      "acceptanceCriteria": [
+        "Replay All button on the event detail page re-triggers delivery to all matching subscribers",
+        "Per-subscriber Replay button next to each delivery attempt re-triggers delivery to that single subscriber only",
+        "Replay resets the event delivery_status to pending and records new delivery attempts",
+        "Buttons use HTMX to trigger replay without full page reload",
+        "Shows confirmation dialog (DaisyUI modal) before replaying",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "Build subscribers list page",
+      "description": "As a user, I want to see a list of all registered subscribers so I can manage them.",
+      "acceptanceCriteria": [
+        "View at /subscribers renders a table of subscribers: name, endpoint URL, max parallel, number of subscriptions, created at",
+        "Rows are clickable, linking to the subscriber detail page at /subscribers/{id}",
+        "Templ template in views/, handler follows existing pattern (init() route registration, routeHandler wrapper)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Build subscriber detail page",
+      "description": "As a user, I want to view a subscriber's configuration and its subscriptions.",
+      "acceptanceCriteria": [
+        "View at /subscribers/{id} shows subscriber details: name, endpoint URL, auth secret (masked with reveal toggle), max parallel, created/updated timestamps",
+        "Lists all subscriptions for the subscriber in a table: subject pattern, filter (if any), max_retries",
+        "Templ template in views/, handler follows existing pattern",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": "Read-only detail view. Edit functionality is in a separate story."
+    },
+    {
+      "id": "US-027",
+      "title": "Build subscriber edit functionality",
+      "description": "As a user, I want to edit a subscriber's configuration and manage its subscriptions from the detail page.",
+      "acceptanceCriteria": [
+        "On the subscriber detail page (/subscribers/{id}), editable fields: name, auth secret, max parallel using DaisyUI form inputs",
+        "Can add new subscriptions (subject pattern + optional filter JSON + optional max_retries)",
+        "Can remove existing subscriptions with a delete button per row",
+        "Save button persists all changes via HTMX (no full page reload)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 27,
+      "passes": false,
+      "notes": "Adds edit forms and save logic to the detail page built in US-026."
+    },
+    {
+      "id": "US-028",
+      "title": "Build logging configuration page",
+      "description": "As a user, I want to configure which event data properties are logged for each subject so I can control log verbosity.",
+      "acceptanceCriteria": [
+        "View at /logging shows a table of log configurations: subject, logged properties",
+        "Can add a new log config: subject (text input), properties (comma-separated text input for JSON property paths)",
+        "Can edit existing log config to change the logged properties",
+        "Can delete a log config with a delete button per row",
+        "Changes saved via HTMX (no full page reload)",
+        "Uses DaisyUI form/table components",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 28,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
