@@ -1,0 +1,77 @@
+# Ralph Progress Log
+Started: Wed Feb  4 15:46:59 MST 2026
+
+## Codebase Patterns
+- Use `IF NOT EXISTS` for all CREATE TABLE and CREATE INDEX statements in migrations
+- sql-migrate uses `-- +migrate Up` and `-- +migrate Down` comment markers
+- Source .env before running sql-migrate: `set -a && source .env && set +a && sql-migrate up`
+- dbconfig.yml uses `host=${DB_HOST} dbname=${DB_NAME} user=${DB_ADMIN_USERNAME} password=${DB_ADMIN_PASSWORD} sslmode=disable` format
+- DB admin credentials are in .env as DB_ADMIN_USERNAME/DB_ADMIN_PASSWORD; app credentials as DB_USERNAME/DB_PASSWORD
+- sqlc config at sqlc.yaml uses pgx/v5 driver with custom type overrides for timestamptz and nullable text
+- Build with `go build ./...` to verify no compilation errors
+- Makefile `db/models.go` target runs `go tool sqlc generate` when query or schema files change
+
+---
+
+## 2026-02-04 15:48 MST - US-001
+- Created events table migration: schema/20260204154757-create-events-table.sql
+- Table has 8 columns: id (UUID PK), subject, timestamp, trace_id, data (JSONB), retry_count, delivery_status, status_updated_at
+- Three indexes: subject, timestamp, delivery_status
+- Migration applies cleanly via sql-migrate up
+- Files changed: schema/20260204154757-create-events-table.sql
+- **Learnings for future iterations:**
+  - The database was already provisioned via Docker with slurpee_admin and slurpee roles
+  - gorp_migrations table tracks applied migrations (used by sql-migrate)
+  - Previous session work wasn't on a persisted branch, so had to recreate from scratch
+  - Always verify migration status with `sql-migrate status` after applying
+---
+
+## 2026-02-04 15:56 MST - US-002
+- Created subscribers table migration: schema/20260204155540-create-subscribers-table.sql
+- Table has 7 columns: id (UUID PK), name, endpoint_url (unique), auth_secret, max_parallel (default 1), created_at (default now), updated_at (default now)
+- Unique constraint on endpoint_url enforced via UNIQUE keyword in column definition
+- Migration applies cleanly, build passes
+- Files changed: schema/20260204155540-create-subscribers-table.sql
+- **Learnings for future iterations:**
+  - UNIQUE keyword on column definition creates both a unique constraint and implicit unique index (no separate CREATE INDEX needed)
+  - Following the same migration pattern as US-001 (IF NOT EXISTS, consistent formatting) works well
+---
+
+## 2026-02-04 16:01 MST - US-003
+- Created subscriptions table migration: schema/20260204160051-create-subscriptions-table.sql
+- Table has 7 columns: id (UUID PK), subscriber_id (UUID FK to subscribers with CASCADE DELETE), subject_pattern, filter (JSONB nullable), max_retries (integer nullable), created_at (default now), updated_at (default now)
+- Index on subject_pattern for delivery routing lookups
+- Foreign key constraint ensures subscriptions are deleted when parent subscriber is removed
+- Migration applies cleanly, build passes
+- Files changed: schema/20260204160051-create-subscriptions-table.sql
+- **Learnings for future iterations:**
+  - Foreign key with CASCADE DELETE syntax: `REFERENCES table(column) ON DELETE CASCADE` inline with column definition
+  - Nullable columns simply omit NOT NULL (no special syntax needed for JSONB or INTEGER nullable fields)
+  - The subscriptions table links subscribers to subject patterns — this is the many-to-many relationship that will be used for delivery routing
+---
+
+## 2026-02-04 16:03 MST - US-004
+- Created delivery_attempts table migration: schema/20260204160332-create-delivery-attempts-table.sql
+- Table has 10 columns: id (UUID PK), event_id (UUID FK to events), subscriber_id (UUID FK to subscribers), endpoint_url (text), attempted_at (timestamptz default now), request_headers (jsonb nullable), response_status_code (integer nullable), response_headers (jsonb nullable), response_body (text nullable), status (text not null)
+- Foreign key constraints to both events and subscribers tables (no CASCADE DELETE — delivery history should be preserved)
+- Three indexes: event_id, subscriber_id, status
+- Migration applies cleanly, build passes
+- Files changed: schema/20260204160332-create-delivery-attempts-table.sql
+- **Learnings for future iterations:**
+  - Foreign keys without CASCADE DELETE are the default — simply use REFERENCES table(column) without ON DELETE clause
+  - delivery_attempts does NOT use CASCADE DELETE because delivery history should be preserved even if subscribers are removed (unlike subscriptions which are config data)
+  - Status values will be 'succeeded', 'failed', 'pending' — enforced by application logic, not DB constraint
+---
+
+## 2026-02-04 16:15 MST - US-005
+- Created log_config table migration: schema/20260204161528-create-log-config-table.sql
+- Table has 3 columns: id (UUID PK), subject (text, not null, unique), log_properties (text array, not null)
+- Unique constraint on subject enforced via UNIQUE keyword (creates implicit unique index, no separate CREATE INDEX needed)
+- Migration applies cleanly, build passes
+- Files changed: schema/20260204161528-create-log-config-table.sql
+- **Learnings for future iterations:**
+  - PostgreSQL TEXT[] type is used for text arrays — stores a list of JSON property paths
+  - The log_config table is the simplest schema table (no foreign keys, no timestamps) since it's pure configuration
+  - All five database schema tables (events, subscribers, subscriptions, delivery_attempts, log_config) are now complete
+  - Next stories (US-006 through US-009) will create sqlc query files in queries/ directory
+---
