@@ -16,6 +16,8 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - Go 1.22+ method routing: use `"POST /events"` pattern in ServeMux for method-restricted routes
 - API routes register under `/events` (not `/api/events`) — the `/api` prefix is stripped by AddApis()
 - Use `pgtype.UUID{Valid: false}` for nullable UUID columns (SQL NULL); `json.RawMessage` for JSONB round-tripping
+- Admin-protected endpoints validate `X-Slurpee-Admin-Secret` header against `app.Config.AdminSecret`
+- Idempotent subscriber registration: upsert by endpoint_url, then delete + recreate subscriptions
 
 ---
 
@@ -153,4 +155,22 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - json.RawMessage preserves raw JSON for request parsing and response serialization (no double-encoding)
   - The api/ package routes are stripped of `/api` prefix by AddApis(), so register as `/events` not `/api/events`
   - uuid.Must(uuid.NewV7()) generates time-ordered UUIDs for natural chronological ordering
+---
+
+## 2026-02-04 16:48 MST - US-011
+- Implemented POST /api/subscribers endpoint in api/subscribers.go
+- Added ADMIN_SECRET field to AppConfig in config/configuration.go (env var ADMIN_SECRET)
+- Accepts JSON body with name (required), endpoint_url (required), auth_secret (required), max_parallel (optional, default 1), subscriptions (required array with subject_pattern + optional filter/max_retries)
+- Validates X-Slurpee-Admin-Secret header against app.Config.AdminSecret; returns 401 if invalid
+- Upserts subscriber by endpoint_url (creates new or updates existing with same endpoint)
+- On upsert, deletes existing subscriptions and recreates them (idempotent replace)
+- Returns 200 with full subscriber and subscriptions as JSON
+- Returns 400 for missing required fields
+- Files changed: api/subscribers.go (new), config/configuration.go (added AdminSecret field)
+- **Learnings for future iterations:**
+  - Admin-protected endpoints check X-Slurpee-Admin-Secret header against app.Config.AdminSecret
+  - The upsert + delete-and-recreate pattern for subscriptions ensures idempotent replacement: subscriber is upserted by endpoint_url, then all subscriptions are deleted and recreated fresh
+  - pgtype.Int4{Int32: value, Valid: true} for nullable integer columns, pgtype.Int4{} (zero value) for NULL
+  - json.RawMessage works for optional JSONB filter fields — check for nil/null before passing to DB as []byte
+  - AppConfig uses go-arg library with struct tags for env var binding: `arg:"--flag,env:ENV_VAR" default:"value"`
 ---
