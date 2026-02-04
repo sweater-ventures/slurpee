@@ -18,6 +18,7 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - Use `pgtype.UUID{Valid: false}` for nullable UUID columns (SQL NULL); `json.RawMessage` for JSONB round-tripping
 - Admin-protected endpoints validate `X-Slurpee-Admin-Secret` header against `app.Config.AdminSecret`
 - Idempotent subscriber registration: upsert by endpoint_url, then delete + recreate subscriptions
+- Path parameters: `"GET /events/{id}"` route pattern + `r.PathValue("id")` to extract; use `pgx.ErrNoRows` with `errors.Is()` for 404
 
 ---
 
@@ -173,4 +174,18 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - pgtype.Int4{Int32: value, Valid: true} for nullable integer columns, pgtype.Int4{} (zero value) for NULL
   - json.RawMessage works for optional JSONB filter fields — check for nil/null before passing to DB as []byte
   - AppConfig uses go-arg library with struct tags for env var binding: `arg:"--flag,env:ENV_VAR" default:"value"`
+---
+
+## 2026-02-04 16:55 MST - US-012
+- Implemented GET /api/events/{id} endpoint in api/events.go (added to existing file)
+- Parses {id} path parameter using r.PathValue("id") (Go 1.22+ ServeMux feature)
+- Validates UUID format, returns 400 if invalid
+- Calls app.DB.GetEventByID, returns 404 if not found (checks errors.Is(err, pgx.ErrNoRows))
+- Returns 200 with full event JSON using existing eventToResponse() helper
+- Registered via init() alongside existing POST /events route
+- Files changed: api/events.go (added getEventHandler, new imports for errors and pgx)
+- **Learnings for future iterations:**
+  - Go 1.22+ path parameters: use `{name}` in route pattern and `r.PathValue("name")` to extract — no external router needed
+  - pgx.ErrNoRows sentinel error with errors.Is() for detecting "not found" from :one queries
+  - Multiple routes can be registered in the same init() block by calling router.Handle multiple times
 ---
