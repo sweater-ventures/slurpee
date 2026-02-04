@@ -10,6 +10,7 @@ import (
 	"github.com/vearutop/statigz"
 	"github.com/vearutop/statigz/zstd"
 
+	"github.com/sweater-ventures/slurpee/api"
 	"github.com/sweater-ventures/slurpee/app"
 	"github.com/sweater-ventures/slurpee/config"
 	"github.com/sweater-ventures/slurpee/middleware"
@@ -48,6 +49,7 @@ func main() {
 		router.Handle("/static/", statigz.FileServer(static, zstd.AddEncoding))
 	}
 	views.AddViews(app, router)
+	api.AddApis(app, router)
 
 	slog.Info("Starting Slurpee", "port", appConfig.Port)
 	err = http.ListenAndServe(fmt.Sprintf(":%d", appConfig.Port), middleware.AllStandardMiddleware(router))

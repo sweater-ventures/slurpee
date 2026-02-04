@@ -9,7 +9,7 @@ import (
 
 func init() {
 	registerRoute(func(app *app.Application, router *http.ServeMux) {
-		router.Handle("/version", routeHandler(app, versionApiHandler))
+		router.Handle("/version", routeHandler(app, versionAPIHandler))
 	})
 }
 
@@ -18,7 +18,7 @@ type VersionResponse struct {
 	Version string `json:"version"`
 }
 
-func versionApiHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func versionAPIHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
 	// write (using JSON) the version response
 	writeJsonResponse(w, http.StatusOK, VersionResponse{
 		App:     "slurpee",
