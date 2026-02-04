@@ -62,3 +62,16 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - delivery_attempts does NOT use CASCADE DELETE because delivery history should be preserved even if subscribers are removed (unlike subscriptions which are config data)
   - Status values will be 'succeeded', 'failed', 'pending' — enforced by application logic, not DB constraint
 ---
+
+## 2026-02-04 16:15 MST - US-005
+- Created log_config table migration: schema/20260204161528-create-log-config-table.sql
+- Table has 3 columns: id (UUID PK), subject (text, not null, unique), log_properties (text array, not null)
+- Unique constraint on subject enforced via UNIQUE keyword (creates implicit unique index, no separate CREATE INDEX needed)
+- Migration applies cleanly, build passes
+- Files changed: schema/20260204161528-create-log-config-table.sql
+- **Learnings for future iterations:**
+  - PostgreSQL TEXT[] type is used for text arrays — stores a list of JSON property paths
+  - The log_config table is the simplest schema table (no foreign keys, no timestamps) since it's pure configuration
+  - All five database schema tables (events, subscribers, subscriptions, delivery_attempts, log_config) are now complete
+  - Next stories (US-006 through US-009) will create sqlc query files in queries/ directory
+---
