@@ -163,6 +163,7 @@ The project scaffolding is complete — config loading, database connection pool
 **Acceptance Criteria:**
 
 - [ ] `POST /api/subscribers` accepts JSON body with fields: `name` (required), `endpoint_url` (required), `auth_secret` (required), `max_parallel` (optional, default 1), `subscriptions` (required, array of objects with `subject_pattern` (required) and `filter` (optional jsonb))
+- [ ] Request must include the global preshared secret in the `X-Slurpee-Admin-Secret` header; returns 401 if missing or incorrect
 - [ ] If a subscriber with the same `endpoint_url` already exists, update its name, auth_secret, max_parallel, and replace its subscriptions (idempotent registration)
 - [ ] If the subscriber is new, create it along with its subscriptions
 - [ ] Returns 200 with the subscriber and its subscriptions as JSON
@@ -400,6 +401,7 @@ The project scaffolding is complete — config loading, database connection pool
 **Acceptance Criteria:**
 
 - [ ] `GET /api/subscribers` returns a JSON array of all subscribers, each including: id, name, endpoint_url, max_parallel, created_at, updated_at, and their subscriptions (subject_pattern, filter, max_retries)
+- [ ] Request must include the global preshared secret in the `X-Slurpee-Admin-Secret` header; returns 401 if missing or incorrect
 - [ ] Returns an empty array if no subscribers are registered
 - [ ] Follows existing API handler pattern (`routeHandler`, `writeJsonResponse`)
 - [ ] Typecheck passes
@@ -441,6 +443,7 @@ The project scaffolding is complete — config loading, database connection pool
 - FR-21: `GET /api/events/{id}` returns a single event by ID
 - FR-22: `GET /api/subscribers` returns the list of all registered subscribers with their subscriptions
 - FR-23: Delivery replay supports both all-subscribers and individual-subscriber modes
+- FR-24: The subscribers API (`POST /api/subscribers`, `GET /api/subscribers`) is protected by a global preshared secret sent via `X-Slurpee-Admin-Secret` header, configured via environment variable
 
 ## Non-Goals
 
@@ -469,6 +472,7 @@ The project scaffolding is complete — config loading, database connection pool
 - **sqlc v1.30** is configured with pgx/v5 and prepared queries — all queries in `queries/` generate Go code in `db/`
 - **sql-migrate v1.8.1** manages schema — migrations go in `schema/` directory
 - **UUID v7** for event IDs — use a Go library like `github.com/google/uuid` (v7 support) or `github.com/gofrs/uuid`
+- **Admin secret** — global preshared secret configured via environment variable (`ADMIN_SECRET`); used to authenticate subscriber API requests via `X-Slurpee-Admin-Secret` header
 - **Exponential backoff** — implement with a goroutine-based worker or use a simple ticker; no external job queue; global max retries and backoff cap configured via environment variables (`MAX_RETRIES`, `MAX_BACKOFF_SECONDS`), with per-subscription override via `subscriptions.max_retries`
 - **Delivery concurrency** — use a semaphore or worker pool per subscriber, bounded by `max_parallel`
 - **Subject pattern matching** — use glob/wildcard syntax (e.g., `order.*` matches `order.created`); Go's `path.Match` or a similar glob library can be used
