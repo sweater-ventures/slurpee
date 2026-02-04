@@ -14,6 +14,7 @@ import (
 func init() {
 	registerRoute(func(app *app.Application, router *http.ServeMux) {
 		router.Handle("POST /subscribers", routeHandler(app, createSubscriberHandler))
+		router.Handle("GET /subscribers", routeHandler(app, listSubscribersHandler))
 	})
 }
 
@@ -170,6 +171,45 @@ func subscriberToResponse(s db.Subscriber, subs []SubscriptionResponse) Subscrib
 		UpdatedAt:     s.UpdatedAt.Time,
 		Subscriptions: subs,
 	}
+}
+
+func listSubscribersHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+	// Verify admin secret
+	adminSecret := r.Header.Get("X-Slurpee-Admin-Secret")
+	if app.Config.AdminSecret == "" || adminSecret != app.Config.AdminSecret {
+		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Invalid or missing admin secret"})
+		return
+	}
+
+	subscribers, err := app.DB.ListSubscribers(r.Context())
+	if err != nil {
+		log(r.Context()).Error("Failed to list subscribers", "error", err)
+		writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to list subscribers"})
+		return
+	}
+
+	var response []SubscriberResponse
+	for _, sub := range subscribers {
+		subs, err := app.DB.ListSubscriptionsForSubscriber(r.Context(), sub.ID)
+		if err != nil {
+			log(r.Context()).Error("Failed to list subscriptions for subscriber", "error", err, "subscriber_id", uuidToString(sub.ID))
+			writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to list subscriptions"})
+			return
+		}
+
+		var subResponses []SubscriptionResponse
+		for _, s := range subs {
+			subResponses = append(subResponses, subscriptionToResponse(s))
+		}
+
+		response = append(response, subscriberToResponse(sub, subResponses))
+	}
+
+	if response == nil {
+		response = []SubscriberResponse{}
+	}
+
+	writeJsonResponse(w, http.StatusOK, response)
 }
 
 func subscriptionToResponse(s db.Subscription) SubscriptionResponse {
