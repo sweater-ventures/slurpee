@@ -189,3 +189,17 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - pgx.ErrNoRows sentinel error with errors.Is() for detecting "not found" from :one queries
   - Multiple routes can be registered in the same init() block by calling router.Handle multiple times
 ---
+
+## 2026-02-04 16:57 MST - US-013
+- Implemented GET /api/subscribers endpoint in api/subscribers.go (added to existing file)
+- Lists all subscribers with their subscriptions as a JSON array
+- Validates X-Slurpee-Admin-Secret header (401 if missing/incorrect)
+- Returns empty array [] if no subscribers registered
+- For each subscriber, fetches subscriptions via ListSubscriptionsForSubscriber and converts using existing helper functions
+- Registered via init() alongside existing POST /subscribers route
+- Files changed: api/subscribers.go (added listSubscribersHandler, +40 lines)
+- **Learnings for future iterations:**
+  - Reuse existing response type structs and converter functions (subscriberToResponse, subscriptionToResponse) — no new types needed for GET list endpoints
+  - Admin auth pattern is duplicated per handler — a middleware would reduce duplication if more admin endpoints are added
+  - Initialize nil slices to empty (`[]Type{}`) before JSON serialization to return `[]` instead of `null`
+---
