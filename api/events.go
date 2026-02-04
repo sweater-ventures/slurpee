@@ -2,10 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sweater-ventures/slurpee/app"
 	"github.com/sweater-ventures/slurpee/db"
@@ -14,6 +16,7 @@ import (
 func init() {
 	registerRoute(func(app *app.Application, router *http.ServeMux) {
 		router.Handle("POST /events", routeHandler(app, createEventHandler))
+		router.Handle("GET /events/{id}", routeHandler(app, getEventHandler))
 	})
 }
 
@@ -111,6 +114,28 @@ func createEventHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 	log(r.Context()).Info("Event received", "event_id", uuidToString(event.ID), "subject", event.Subject)
 
 	writeJsonResponse(w, http.StatusCreated, eventToResponse(event))
+}
+
+func getEventHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	parsed, err := uuid.Parse(idStr)
+	if err != nil {
+		writeJsonResponse(w, http.StatusBadRequest, map[string]string{"error": "id must be a valid UUID"})
+		return
+	}
+
+	event, err := app.DB.GetEventByID(r.Context(), pgtype.UUID{Bytes: parsed, Valid: true})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeJsonResponse(w, http.StatusNotFound, map[string]string{"error": "event not found"})
+			return
+		}
+		log(r.Context()).Error("Failed to get event", "error", err)
+		writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve event"})
+		return
+	}
+
+	writeJsonResponse(w, http.StatusOK, eventToResponse(event))
 }
 
 func eventToResponse(e db.Event) EventResponse {
