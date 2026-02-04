@@ -25,3 +25,14 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - Previous session work wasn't on a persisted branch, so had to recreate from scratch
   - Always verify migration status with `sql-migrate status` after applying
 ---
+
+## 2026-02-04 15:56 MST - US-002
+- Created subscribers table migration: schema/20260204155540-create-subscribers-table.sql
+- Table has 7 columns: id (UUID PK), name, endpoint_url (unique), auth_secret, max_parallel (default 1), created_at (default now), updated_at (default now)
+- Unique constraint on endpoint_url enforced via UNIQUE keyword in column definition
+- Migration applies cleanly, build passes
+- Files changed: schema/20260204155540-create-subscribers-table.sql
+- **Learnings for future iterations:**
+  - UNIQUE keyword on column definition creates both a unique constraint and implicit unique index (no separate CREATE INDEX needed)
+  - Following the same migration pattern as US-001 (IF NOT EXISTS, consistent formatting) works well
+---
