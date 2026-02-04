@@ -1,0 +1,11 @@
+node_modules/
+build/
+.env
+.env.*
+
+# project binary
+slurpee
+
+# compressed files
+*.zst
+*.gz

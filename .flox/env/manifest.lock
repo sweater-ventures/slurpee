@@ -1,0 +1,778 @@
+{
+  "lockfile-version": 1,
+  "manifest": {
+    "version": 1,
+    "install": {
+      "gnumake": {
+        "pkg-path": "gnumake"
+      },
+      "gzip": {
+        "pkg-path": "gzip"
+      },
+      "sql-migrate": {
+        "pkg-path": "sql-migrate"
+      },
+      "sqlc": {
+        "pkg-path": "sqlc"
+      },
+      "templ": {
+        "pkg-path": "templ"
+      },
+      "zstd": {
+        "pkg-path": "zstd"
+      }
+    },
+    "hook": {},
+    "profile": {},
+    "options": {}
+  },
+  "packages": [
+    {
+      "attr_path": "gnumake",
+      "broken": false,
+      "derivation": "/nix/store/2x0iq3b0ldv411ld1i6a9ma8dh182h14-gnumake-4.4.1.drv",
+      "description": "Tool to control the generation of non-source files from sources",
+      "install_id": "gnumake",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "gnumake-4.4.1",
+      "pname": "gnumake",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T04:35:57.404357Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "4.4.1",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/8cnmyqhnlxpl7k9z15cridfdd9kka64b-gnumake-4.4.1-doc",
+        "info": "/nix/store/jar06k1k53zsig2iah8vaw1y9r0wxa55-gnumake-4.4.1-info",
+        "man": "/nix/store/2cd4idcvj4fnn4ss1ffz9fqagfhvjpy1-gnumake-4.4.1-man",
+        "out": "/nix/store/cz4rjcd28s9qqk2zcnn9d8pgs5l6qqy9-gnumake-4.4.1"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gnumake",
+      "broken": false,
+      "derivation": "/nix/store/n3nk5kyi8ckasq265skqni13m34d2v20-gnumake-4.4.1.drv",
+      "description": "Tool to control the generation of non-source files from sources",
+      "install_id": "gnumake",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "gnumake-4.4.1",
+      "pname": "gnumake",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:05:35.651710Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "4.4.1",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/4wnafz38wr2jld58vr5j41b6mc4n26r6-gnumake-4.4.1-debug",
+        "doc": "/nix/store/15r3aanv0lh7mqi1gm3l8blpcnp05qzy-gnumake-4.4.1-doc",
+        "info": "/nix/store/gjd78rqz1k94n1c2s2kip126f8gjbb6g-gnumake-4.4.1-info",
+        "man": "/nix/store/i0rnnv9fm87c0228z34pgvk24ifqn6bm-gnumake-4.4.1-man",
+        "out": "/nix/store/z9wllcd2plhx8863ka0zfh0mffxm6jir-gnumake-4.4.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gnumake",
+      "broken": false,
+      "derivation": "/nix/store/dhwc8f7yshq6m26lfn8sdsw9crnzfzkk-gnumake-4.4.1.drv",
+      "description": "Tool to control the generation of non-source files from sources",
+      "install_id": "gnumake",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "gnumake-4.4.1",
+      "pname": "gnumake",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:33:58.908246Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "4.4.1",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/2kpsfrqzyr0kzckkdjbqnsdcz2d719lk-gnumake-4.4.1-doc",
+        "info": "/nix/store/jlb9r2mzq8660lhn9my1pgri15jiqljq-gnumake-4.4.1-info",
+        "man": "/nix/store/x7p2q0wx9828p9n8r3pisbijncsfphvr-gnumake-4.4.1-man",
+        "out": "/nix/store/sqp22z2pm7s7n0wb3al4c3h47shw5aic-gnumake-4.4.1"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gnumake",
+      "broken": false,
+      "derivation": "/nix/store/cy06y5fkvbiif016ab9icsj7vqyyiky1-gnumake-4.4.1.drv",
+      "description": "Tool to control the generation of non-source files from sources",
+      "install_id": "gnumake",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "gnumake-4.4.1",
+      "pname": "gnumake",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T06:07:09.785681Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "4.4.1",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/fa0f3msdrc5il96nn5qvrbhf6779vvh1-gnumake-4.4.1-debug",
+        "doc": "/nix/store/j2vz6gm38023yfg359cnawzvabqc0w9v-gnumake-4.4.1-doc",
+        "info": "/nix/store/2pqq9mdchp0s0cgl1qqql38v502kbdi1-gnumake-4.4.1-info",
+        "man": "/nix/store/an38a5jy0ivp1504yjbzgl4prvhjnix7-gnumake-4.4.1-man",
+        "out": "/nix/store/5lyy21zm97pj8l67r2xapdkxpxb6v6y0-gnumake-4.4.1"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gzip",
+      "broken": false,
+      "derivation": "/nix/store/ng1i1mndyh9g3q69ba9bkcv38vcb50mm-gzip-1.14.drv",
+      "description": "GNU zip compression program",
+      "install_id": "gzip",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "gzip-1.14",
+      "pname": "gzip",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T04:35:57.641737Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.14",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/i77dhh9r8xm7nxraxaplbswwwkf0r4n2-gzip-1.14-info",
+        "man": "/nix/store/y0s8zqvh6i0bhczzh3w29x1f22f8s2c2-gzip-1.14-man",
+        "out": "/nix/store/ksdh2066yggs7221alr2j1hlpy3b53jq-gzip-1.14"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gzip",
+      "broken": false,
+      "derivation": "/nix/store/qj0am8gin9qzamngcrgshv0iwqwmkffn-gzip-1.14.drv",
+      "description": "GNU zip compression program",
+      "install_id": "gzip",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "gzip-1.14",
+      "pname": "gzip",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:05:36.055555Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.14",
+      "outputs_to_install": [
+        "man",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/pshibvrdnaf88vzd54yynkrlch8mkpyh-gzip-1.14-info",
+        "man": "/nix/store/idgynrxa7lr11nk2jmgjr855hizirz6a-gzip-1.14-man",
+        "out": "/nix/store/m97xrphxwp957cqp9kvv8l22spsivlw9-gzip-1.14"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gzip",
+      "broken": false,
+      "derivation": "/nix/store/28sc1mv06d9c25x1jsnyr4rn0ahk3qg3-gzip-1.14.drv",
+      "description": "GNU zip compression program",
+      "install_id": "gzip",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "gzip-1.14",
+      "pname": "gzip",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:33:59.150848Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.14",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/cwhmn7kcl476by0pbnvjv9bakqvxz31b-gzip-1.14-info",
+        "man": "/nix/store/jfmg7961z1r3kny6ij19vgy8by374d82-gzip-1.14-man",
+        "out": "/nix/store/jdyzs86xl82yy0j0i4b9lcj5zqfa95r2-gzip-1.14"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gzip",
+      "broken": false,
+      "derivation": "/nix/store/a94b4y1lfbnhvb16x73msn3hgh5hyvla-gzip-1.14.drv",
+      "description": "GNU zip compression program",
+      "install_id": "gzip",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "gzip-1.14",
+      "pname": "gzip",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T06:07:10.222696Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.14",
+      "outputs_to_install": [
+        "man",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/yvr2g6kdsllvvrk1jl92g3sg7ijxh70m-gzip-1.14-info",
+        "man": "/nix/store/8ls7hp23hx5j80mihq4q2vdh7rhfa21b-gzip-1.14-man",
+        "out": "/nix/store/84yyzmxs7mb8nhkvcfv9n1l9irpb6mnq-gzip-1.14"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sql-migrate",
+      "broken": false,
+      "derivation": "/nix/store/s24nyk9al4l2hgh98xxk8l5shdhwks3f-sql-migrate-1.8.1.drv",
+      "description": "SQL Schema migration tool for Go. Based on gorp and goose",
+      "install_id": "sql-migrate",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "sql-migrate-1.8.1",
+      "pname": "sql-migrate",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T04:37:45.626358Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.8.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/l6xlcgj4l9b1agaafnqpy6zpdr66c7g1-sql-migrate-1.8.1"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sql-migrate",
+      "broken": false,
+      "derivation": "/nix/store/nhnm57bcw78k7gbx5fxka9xgvkrg9an6-sql-migrate-1.8.1.drv",
+      "description": "SQL Schema migration tool for Go. Based on gorp and goose",
+      "install_id": "sql-migrate",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "sql-migrate-1.8.1",
+      "pname": "sql-migrate",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:07:50.296678Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.8.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/fjw7qdff3adl9s64hc0ajv4pxvld5p8p-sql-migrate-1.8.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sql-migrate",
+      "broken": false,
+      "derivation": "/nix/store/x43s91i6qs4vj1a9gk36gf50v39a458h-sql-migrate-1.8.1.drv",
+      "description": "SQL Schema migration tool for Go. Based on gorp and goose",
+      "install_id": "sql-migrate",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "sql-migrate-1.8.1",
+      "pname": "sql-migrate",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:35:51.423339Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.8.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/xl72756k76hk4f87wl98vadr5dagqn8f-sql-migrate-1.8.1"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sql-migrate",
+      "broken": false,
+      "derivation": "/nix/store/hjxsaz6c5xx75inn9zip8plvyg1mbb5k-sql-migrate-1.8.1.drv",
+      "description": "SQL Schema migration tool for Go. Based on gorp and goose",
+      "install_id": "sql-migrate",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "sql-migrate-1.8.1",
+      "pname": "sql-migrate",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T06:09:29.401611Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.8.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/2ds9crriwhs06946zywajrq58jmyib12-sql-migrate-1.8.1"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sqlc",
+      "broken": false,
+      "derivation": "/nix/store/jgjz2swrjlc0xrmgd47bmdbibq7chg9v-sqlc-1.30.0.drv",
+      "description": "Generate type-safe code from SQL",
+      "install_id": "sqlc",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "sqlc-1.30.0",
+      "pname": "sqlc",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T04:37:45.641200Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.30.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/qgjcidsrjy1mslwxnqhwhs5gy8xm3snp-sqlc-1.30.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sqlc",
+      "broken": false,
+      "derivation": "/nix/store/n74mj130dff3yg9qdph71fasgwv9h5mp-sqlc-1.30.0.drv",
+      "description": "Generate type-safe code from SQL",
+      "install_id": "sqlc",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "sqlc-1.30.0",
+      "pname": "sqlc",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:07:50.316174Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.30.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/7vsd22njzj81y27cqzc3d2sd828xh8xj-sqlc-1.30.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sqlc",
+      "broken": false,
+      "derivation": "/nix/store/rqj1jvgg6z4pyhkip6blh61vqyz3irr5-sqlc-1.30.0.drv",
+      "description": "Generate type-safe code from SQL",
+      "install_id": "sqlc",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "sqlc-1.30.0",
+      "pname": "sqlc",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:35:51.438376Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.30.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/ra8x4wa0qcf07hf8rf2ajic3rw2rqnr1-sqlc-1.30.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sqlc",
+      "broken": false,
+      "derivation": "/nix/store/3bxahba8w5dlilm02chqywxzbc59z1ar-sqlc-1.30.0.drv",
+      "description": "Generate type-safe code from SQL",
+      "install_id": "sqlc",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "sqlc-1.30.0",
+      "pname": "sqlc",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T06:09:29.421361Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.30.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/pq02xbrf1992631zlynbki21amyv5agb-sqlc-1.30.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "templ",
+      "broken": false,
+      "derivation": "/nix/store/c6akpk0fppf2ri95i980szknk3wy8sfx-templ-0.3.977.drv",
+      "description": "Language for writing HTML user interfaces in Go",
+      "install_id": "templ",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "templ-0.3.977",
+      "pname": "templ",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T04:37:47.618661Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.3.977",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/d4rhmvn3zm2x0pbpcnhily3s2qj0nksh-templ-0.3.977"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "templ",
+      "broken": false,
+      "derivation": "/nix/store/ayhpx145pw28c9m0pr65sia5kmv9fkmk-templ-0.3.977.drv",
+      "description": "Language for writing HTML user interfaces in Go",
+      "install_id": "templ",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "templ-0.3.977",
+      "pname": "templ",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:07:53.406619Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.3.977",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/m30r2g8hv19ilkw13qzbj7w8qqjcim2g-templ-0.3.977"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "templ",
+      "broken": false,
+      "derivation": "/nix/store/v8453jkcxc799byvdy5hrrx33fh71v95-templ-0.3.977.drv",
+      "description": "Language for writing HTML user interfaces in Go",
+      "install_id": "templ",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "templ-0.3.977",
+      "pname": "templ",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:35:53.497586Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.3.977",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/nd8y2ikaqrhdfbi4k5422zzr8a15wkmc-templ-0.3.977"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "templ",
+      "broken": false,
+      "derivation": "/nix/store/mjn721iba88cxigrd4fv2jkw3aa93hx1-templ-0.3.977.drv",
+      "description": "Language for writing HTML user interfaces in Go",
+      "install_id": "templ",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "templ-0.3.977",
+      "pname": "templ",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T06:09:32.721100Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.3.977",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/q55lgbn6symx22xnchxmvv5156qfq8ni-templ-0.3.977"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "zstd",
+      "broken": false,
+      "derivation": "/nix/store/92lryc75casjh63s5cbkz50fyha3k4b1-zstd-1.5.7.drv",
+      "description": "Zstandard real-time compression algorithm",
+      "install_id": "zstd",
+      "license": "[ BSD-3-Clause ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "zstd-1.5.7",
+      "pname": "zstd",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T04:38:42.801465Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.5.7",
+      "outputs_to_install": [
+        "bin",
+        "bin",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/k32q306s0zw4gpj6flf7rn5z5gzidsd2-zstd-1.5.7-bin",
+        "dev": "/nix/store/s02a36i388v6m1wsfzb9w0zjxrppkam4-zstd-1.5.7-dev",
+        "man": "/nix/store/0r6dx7pi3v4v90ifdlay8kyk1rziqan5-zstd-1.5.7-man",
+        "out": "/nix/store/jd0zg0sqz8nfqn665lcwnlnh9vijygdw-zstd-1.5.7"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "zstd",
+      "broken": false,
+      "derivation": "/nix/store/x7k5a8npi626jcqy1jrv4b3prgzg0xa4-zstd-1.5.7.drv",
+      "description": "Zstandard real-time compression algorithm",
+      "install_id": "zstd",
+      "license": "[ BSD-3-Clause ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "zstd-1.5.7",
+      "pname": "zstd",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:09:00.542508Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.5.7",
+      "outputs_to_install": [
+        "bin",
+        "bin",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/2hwf2cfc8f8f0jfp1l5s2fbg25kdgqfi-zstd-1.5.7-bin",
+        "dev": "/nix/store/s2wy3dpvj2v44i6dx4y4pq4d7x06pihi-zstd-1.5.7-dev",
+        "man": "/nix/store/c7mxk6ihjgrvd7plwggrgr3m3bcq68zi-zstd-1.5.7-man",
+        "out": "/nix/store/4jnrsvmqinp7wj6h4mivypddg74nrr12-zstd-1.5.7"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "zstd",
+      "broken": false,
+      "derivation": "/nix/store/ywvhdkk5iw6y05ciik0ragmn5zamjfd1-zstd-1.5.7.drv",
+      "description": "Zstandard real-time compression algorithm",
+      "install_id": "zstd",
+      "license": "[ BSD-3-Clause ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "zstd-1.5.7",
+      "pname": "zstd",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T05:36:50.602811Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.5.7",
+      "outputs_to_install": [
+        "bin",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/v9f40nm4qa5qgjz3lki0lgz8i1ljjvmm-zstd-1.5.7-bin",
+        "dev": "/nix/store/2xmg64byvnnh5f8cs79hgw4yxbfmgcrc-zstd-1.5.7-dev",
+        "man": "/nix/store/n4zckbwwgvhr190dpgff2w337wmbr4w5-zstd-1.5.7-man",
+        "out": "/nix/store/n8l4ivrj45dy4jv132b5z67iksf2ln4r-zstd-1.5.7"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "zstd",
+      "broken": false,
+      "derivation": "/nix/store/293kf2jg77kd7g2zwykccz9lhw11z23d-zstd-1.5.7.drv",
+      "description": "Zstandard real-time compression algorithm",
+      "install_id": "zstd",
+      "license": "[ BSD-3-Clause ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "name": "zstd-1.5.7",
+      "pname": "zstd",
+      "rev": "e6eae2ee2110f3d31110d5c222cd395303343b08",
+      "rev_count": 939624,
+      "rev_date": "2026-02-03T10:48:24Z",
+      "scrape_date": "2026-02-04T06:10:43.361907Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.5.7",
+      "outputs_to_install": [
+        "bin",
+        "bin",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/8p25dmhc71km8cnxk7gdfpqbr8aihx0p-zstd-1.5.7-bin",
+        "dev": "/nix/store/jqg7km1ki8in7njqn4q0095p10w8fgm0-zstd-1.5.7-dev",
+        "man": "/nix/store/q8x9sh3hgsll5yd4zvava094gg70r7g6-zstd-1.5.7-man",
+        "out": "/nix/store/hqjka260vqvnl1k73dwqqqhcx0yiy6c0-zstd-1.5.7"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    }
+  ]
+}

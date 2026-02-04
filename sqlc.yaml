@@ -1,0 +1,40 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "queries/"
+    schema: "schema/"
+    gen:
+      go:
+        package: "db"
+        out: "db"
+        sql_package: "pgx/v5"
+        emit_prepared_queries: true
+        overrides:
+          - db_type: "pg_catalog.timestamptz"
+            go_type:
+              import: "time"
+              type: "Time"
+          - db_type: "pg_catalog.timestamptz"
+            go_type:
+              import: "time"
+              type: "Time"
+            nullable: true
+          - db_type: "pg_catalog.varchar"
+            go_type:
+              type: "string"
+            nullable: true
+          - db_type: "pg_catalog.text"
+            go_type:
+              type: "string"
+            nullable: true
+          - db_type: "text"
+            go_type:
+              type: "string"
+            nullable: true
+          - db_type: "pg_catalog.timestamp"
+            go_type:
+              type: "time.Time"
+            nullable: true
+          - db_type: "pg_catalog.timestamp"
+            go_type:
+              type: "time.Time"
