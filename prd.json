@@ -62,7 +62,7 @@
         "Migration applies cleanly via sql-migrate up"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

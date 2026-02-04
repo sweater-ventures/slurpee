@@ -49,3 +49,16 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - Nullable columns simply omit NOT NULL (no special syntax needed for JSONB or INTEGER nullable fields)
   - The subscriptions table links subscribers to subject patterns — this is the many-to-many relationship that will be used for delivery routing
 ---
+
+## 2026-02-04 16:03 MST - US-004
+- Created delivery_attempts table migration: schema/20260204160332-create-delivery-attempts-table.sql
+- Table has 10 columns: id (UUID PK), event_id (UUID FK to events), subscriber_id (UUID FK to subscribers), endpoint_url (text), attempted_at (timestamptz default now), request_headers (jsonb nullable), response_status_code (integer nullable), response_headers (jsonb nullable), response_body (text nullable), status (text not null)
+- Foreign key constraints to both events and subscribers tables (no CASCADE DELETE — delivery history should be preserved)
+- Three indexes: event_id, subscriber_id, status
+- Migration applies cleanly, build passes
+- Files changed: schema/20260204160332-create-delivery-attempts-table.sql
+- **Learnings for future iterations:**
+  - Foreign keys without CASCADE DELETE are the default — simply use REFERENCES table(column) without ON DELETE clause
+  - delivery_attempts does NOT use CASCADE DELETE because delivery history should be preserved even if subscribers are removed (unlike subscriptions which are config data)
+  - Status values will be 'succeeded', 'failed', 'pending' — enforced by application logic, not DB constraint
+---
