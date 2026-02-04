@@ -36,3 +36,16 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - UNIQUE keyword on column definition creates both a unique constraint and implicit unique index (no separate CREATE INDEX needed)
   - Following the same migration pattern as US-001 (IF NOT EXISTS, consistent formatting) works well
 ---
+
+## 2026-02-04 16:01 MST - US-003
+- Created subscriptions table migration: schema/20260204160051-create-subscriptions-table.sql
+- Table has 7 columns: id (UUID PK), subscriber_id (UUID FK to subscribers with CASCADE DELETE), subject_pattern, filter (JSONB nullable), max_retries (integer nullable), created_at (default now), updated_at (default now)
+- Index on subject_pattern for delivery routing lookups
+- Foreign key constraint ensures subscriptions are deleted when parent subscriber is removed
+- Migration applies cleanly, build passes
+- Files changed: schema/20260204160051-create-subscriptions-table.sql
+- **Learnings for future iterations:**
+  - Foreign key with CASCADE DELETE syntax: `REFERENCES table(column) ON DELETE CASCADE` inline with column definition
+  - Nullable columns simply omit NOT NULL (no special syntax needed for JSONB or INTEGER nullable fields)
+  - The subscriptions table links subscribers to subject patterns — this is the many-to-many relationship that will be used for delivery routing
+---
