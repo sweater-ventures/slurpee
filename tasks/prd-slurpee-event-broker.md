@@ -26,7 +26,7 @@ The project scaffolding is complete — config loading, database connection pool
 **Acceptance Criteria:**
 
 - [ ] Migration file in `schema/` creates `events` table
-- [ ] Columns: `id` (UUID v7, primary key), `subject` (text, not null), `timestamp` (timestamptz, not null), `trace_id` (UUID, nullable), `data` (jsonb, not null), `retry_count` (integer, default 0), `delivery_status` (text, default 'pending'), `status_updated_at` (timestamptz)
+- [ ] Columns: `id` (UUID, primary key, no default), `subject` (text, not null), `timestamp` (timestamptz, not null), `trace_id` (UUID, nullable), `data` (jsonb, not null), `retry_count` (integer, default 0), `delivery_status` (text, default 'pending'), `status_updated_at` (timestamptz)
 - [ ] Index on `subject`
 - [ ] Index on `timestamp`
 - [ ] Index on `delivery_status`
@@ -41,7 +41,7 @@ The project scaffolding is complete — config loading, database connection pool
 **Acceptance Criteria:**
 
 - [ ] Migration file in `schema/` creates `subscribers` table
-- [ ] Columns: `id` (UUID, primary key, auto-generated), `name` (text, not null), `endpoint_url` (text, not null, unique), `auth_secret` (text, not null), `max_parallel` (integer, default 1), `created_at` (timestamptz, default now), `updated_at` (timestamptz, default now)
+- [ ] Columns: `id` (UUID, primary key, no default), `name` (text, not null), `endpoint_url` (text, not null, unique), `auth_secret` (text, not null), `max_parallel` (integer, default 1), `created_at` (timestamptz, default now), `updated_at` (timestamptz, default now)
 - [ ] Unique constraint on `endpoint_url`
 - [ ] Migration applies cleanly via `sql-migrate up`
 
@@ -54,7 +54,7 @@ The project scaffolding is complete — config loading, database connection pool
 **Acceptance Criteria:**
 
 - [ ] Migration file in `schema/` creates `subscriptions` table
-- [ ] Columns: `id` (UUID, primary key, auto-generated), `subscriber_id` (UUID, foreign key to subscribers), `subject_pattern` (text, not null), `filter` (jsonb, nullable), `max_retries` (integer, nullable — per-subscription override of global max retries), `created_at` (timestamptz, default now)
+- [ ] Columns: `id` (UUID, primary key, no default), `subscriber_id` (UUID, foreign key to subscribers), `subject_pattern` (text, not null), `filter` (jsonb, nullable), `max_retries` (integer, nullable — per-subscription override of global max retries), `created_at` (timestamptz, default now), `updated_at` (timestamptz, default now)
 - [ ] Foreign key constraint with cascade delete on subscriber removal
 - [ ] Index on `subject_pattern`
 - [ ] Migration applies cleanly via `sql-migrate up`
@@ -68,7 +68,7 @@ The project scaffolding is complete — config loading, database connection pool
 **Acceptance Criteria:**
 
 - [ ] Migration file in `schema/` creates `delivery_attempts` table
-- [ ] Columns: `id` (UUID, primary key, auto-generated), `event_id` (UUID, foreign key to events), `subscriber_id` (UUID, foreign key to subscribers), `endpoint_url` (text, not null), `attempted_at` (timestamptz, not null, default now), `request_headers` (jsonb), `response_status_code` (integer, nullable), `response_headers` (jsonb, nullable), `response_body` (text, nullable), `status` (text, not null — 'succeeded', 'failed', 'pending')
+- [ ] Columns: `id` (UUID, primary key, no default), `event_id` (UUID, foreign key to events), `subscriber_id` (UUID, foreign key to subscribers), `endpoint_url` (text, not null), `attempted_at` (timestamptz, not null, default now), `request_headers` (jsonb), `response_status_code` (integer, nullable), `response_headers` (jsonb, nullable), `response_body` (text, nullable), `status` (text, not null — 'succeeded', 'failed', 'pending')
 - [ ] Foreign key constraints to events and subscribers
 - [ ] Index on `event_id`
 - [ ] Index on `subscriber_id`
@@ -84,7 +84,7 @@ The project scaffolding is complete — config loading, database connection pool
 **Acceptance Criteria:**
 
 - [ ] Migration file in `schema/` creates `log_config` table
-- [ ] Columns: `id` (UUID, primary key, auto-generated), `subject` (text, not null, unique), `log_properties` (text array, not null — list of JSON property paths to log from event data)
+- [ ] Columns: `id` (UUID, primary key, no default), `subject` (text, not null, unique), `log_properties` (text array, not null — list of JSON property paths to log from event data)
 - [ ] Unique constraint on `subject`
 - [ ] Migration applies cleanly via `sql-migrate up`
 
@@ -144,7 +144,7 @@ The project scaffolding is complete — config loading, database connection pool
 
 **Acceptance Criteria:**
 
-- [ ] `POST /api/events` accepts JSON body with fields: `subject` (required), `data` (required, JSON object), `id` (optional UUID v7 — auto-generated if not provided), `timestamp` (optional — auto-assigned to now if not provided), `trace_id` (optional UUID)
+- [ ] `POST /api/events` accepts JSON body with fields: `subject` (required), `data` (required, JSON object), `id` (optional UUID — auto-generated v7 if not provided), `timestamp` (optional — auto-assigned to now if not provided), `trace_id` (optional UUID)
 - [ ] Returns 201 with the created event as JSON (including the assigned `id` and `timestamp`)
 - [ ] Returns 400 with error details if `subject` or `data` is missing
 - [ ] Returns 400 if `data` is not a valid JSON object
@@ -166,6 +166,7 @@ The project scaffolding is complete — config loading, database connection pool
 - [ ] Request must include the global preshared secret in the `X-Slurpee-Admin-Secret` header; returns 401 if missing or incorrect
 - [ ] If a subscriber with the same `endpoint_url` already exists, update its name, auth_secret, max_parallel, and replace its subscriptions (idempotent registration)
 - [ ] If the subscriber is new, create it along with its subscriptions
+- [ ] Update subscription `updated_at` timestamps on changes
 - [ ] Returns 200 with the subscriber and its subscriptions as JSON
 - [ ] Returns 400 with error details for missing required fields
 - [ ] Follows existing API handler pattern
@@ -246,7 +247,7 @@ The project scaffolding is complete — config loading, database connection pool
 **Acceptance Criteria:**
 
 - [ ] View at `/events` renders a table of events showing: subject, event ID (truncated), timestamp, delivery status
-- [ ] Paginated (e.g., 25 per page) with next/previous controls
+- [ ] Paginated (e.g., 50 per page) with next/previous controls
 - [ ] Rows are clickable, linking to the event detail page
 - [ ] Delivery status shown as a colored badge (DaisyUI badge component)
 - [ ] Most recent events shown first
