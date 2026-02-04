@@ -20,7 +20,8 @@ type AppConfig struct {
 	DBSSLMode  string `arg:"--db-ssl-mode,env:DB_SSL_MODE" default:"disable"`
 	DBUsername string `arg:"--db-username,env:DB_USERNAME" default:"slurpee"`
 	DBPassword string `arg:"--db-password,env:DB_PASSWORD" default:"badpassword"`
-	BaseURL    string `arg:"--base-url,env:BASE_URL" default:"http://localhost:8005" help:"Base URL for the application."`
+	BaseURL     string `arg:"--base-url,env:BASE_URL" default:"http://localhost:8005" help:"Base URL for the application."`
+	AdminSecret string `arg:"--admin-secret,env:ADMIN_SECRET" default:"" help:"Pre-shared secret for admin API endpoints (X-Slurpee-Admin-Secret header)."`
 }
 
 func LoadConfig() (*AppConfig, error) {
