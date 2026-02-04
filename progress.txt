@@ -91,3 +91,18 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - `go tool sqlc generate` is the correct invocation (not just `sqlc generate`)
   - Generated files go to db/ directory as configured in sqlc.yaml
 ---
+
+## 2026-02-04 16:28 MST - US-007
+- Created sqlc query file: queries/subscribers.sql with 9 query definitions
+- Subscriber queries: UpsertSubscriber (ON CONFLICT by endpoint_url), GetSubscriberByID, GetSubscriberByEndpointURL, ListSubscribers, DeleteSubscriber
+- Subscription queries: CreateSubscription, ListSubscriptionsForSubscriber, DeleteSubscriptionsForSubscriber, GetSubscriptionsMatchingSubject
+- GetSubscriptionsMatchingSubject uses SQL LIKE with replace() to convert glob patterns (* → %, ? → _) for delivery routing
+- Generated code: db/subscribers.sql.go (240 lines)
+- Files changed: queries/subscribers.sql, db/subscribers.sql.go
+- **Learnings for future iterations:**
+  - PostgreSQL ON CONFLICT DO UPDATE uses EXCLUDED.column_name to reference the values that would have been inserted
+  - The upsert pattern returns the full row via RETURNING * regardless of whether it was an insert or update
+  - For glob/wildcard matching in SQL, use replace() to convert * to % and ? to _ with LIKE operator
+  - Only new files were created — existing db/models.go, db/db.go, db/querier.go, db/events.sql.go were unchanged by sqlc generate
+  - sqlc correctly generates separate .sql.go files per query source file (events.sql.go, subscribers.sql.go)
+---
