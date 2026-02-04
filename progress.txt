@@ -10,6 +10,8 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - sqlc config at sqlc.yaml uses pgx/v5 driver with custom type overrides for timestamptz and nullable text
 - Build with `go build ./...` to verify no compilation errors
 - Makefile `db/models.go` target runs `go tool sqlc generate` when query or schema files change
+- Use `sqlc.arg(name)` for named parameters in sqlc queries to get clean Go struct field names
+- JSONB containment search: `WHERE data @> $1` with `@>` operator
 
 ---
 
@@ -74,4 +76,18 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - The log_config table is the simplest schema table (no foreign keys, no timestamps) since it's pure configuration
   - All five database schema tables (events, subscribers, subscriptions, delivery_attempts, log_config) are now complete
   - Next stories (US-006 through US-009) will create sqlc query files in queries/ directory
+---
+
+## 2026-02-04 16:22 MST - US-006
+- Created sqlc query file: queries/events.sql with 8 query definitions
+- Queries: InsertEvent, GetEventByID, ListEvents (paginated), SearchEventsBySubject, SearchEventsByDateRange, SearchEventsByDeliveryStatus, SearchEventsByDataContent (jsonb @> containment), UpdateEventDeliveryStatus
+- Generated code: db/events.sql.go (307 lines) and db/models.go (59 lines with all 5 table models)
+- Files changed: queries/events.sql, db/events.sql.go, db/models.go
+- **Learnings for future iterations:**
+  - sqlc uses `sqlc.arg(name)` syntax for named parameters — use this to get clean Go struct field names instead of auto-generated ones like `Timestamp_2`
+  - JSONB containment search uses `@>` operator: `WHERE data @> $1` — caller passes a JSON byte slice to match against
+  - sqlc generates a `models.go` file with Go structs for ALL tables in the schema, even those without queries yet
+  - The querier.go interface is currently empty — it will be populated as more query files are added
+  - `go tool sqlc generate` is the correct invocation (not just `sqlc generate`)
+  - Generated files go to db/ directory as configured in sqlc.yaml
 ---
