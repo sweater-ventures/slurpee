@@ -7,7 +7,10 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #229 | 4:32 PM | 🟣 | Created sqlc queries for delivery attempts operations | ~422 |
+| #239 | 4:34 PM | 🟣 | Committed log config queries and generated code for US-009 | ~261 |
+| #238 | " | 🟣 | Implemented sqlc queries for log configuration CRUD operations | ~301 |
+| #233 | 4:32 PM | 🟣 | Committed delivery_attempts sqlc queries and generated code | ~318 |
+| #229 | " | 🟣 | Created sqlc queries for delivery attempts operations | ~422 |
 | #227 | 4:31 PM | 🔵 | Reviewed subscribers.sql query patterns including upsert and exec operations | ~361 |
 | #226 | " | 🔵 | Reviewed existing events.sql query patterns for consistency | ~320 |
 </claude-mem-context>

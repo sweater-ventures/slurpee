@@ -12,6 +12,7 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - Makefile `db/models.go` target runs `go tool sqlc generate` when query or schema files change
 - Use `sqlc.arg(name)` for named parameters in sqlc queries to get clean Go struct field names
 - JSONB containment search: `WHERE data @> $1` with `@>` operator
+- PostgreSQL TEXT[] maps to Go `[]string` in sqlc without needing a custom override
 
 ---
 
@@ -117,4 +118,16 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - The InsertDeliveryAttempt params struct uses pgtype.Timestamptz for attempted_at (via sqlc override) and pgtype.Int4 for nullable response_status_code
   - JSONB columns (request_headers, response_headers) map to []byte in Go — caller is responsible for marshaling/unmarshaling JSON
   - Nullable text column (response_body) maps to string due to sqlc.yaml override for pg_catalog.text nullable
+---
+
+## 2026-02-04 16:34 MST - US-009
+- Created sqlc query file: queries/log_config.sql with 4 query definitions
+- Queries: UpsertLogConfig (ON CONFLICT by subject, updates log_properties), GetLogConfigBySubject, ListLogConfigs (ordered alphabetically by subject), DeleteLogConfigForSubject
+- Generated code: db/log_config.sql.go (78 lines)
+- Files changed: queries/log_config.sql, db/log_config.sql.go
+- **Learnings for future iterations:**
+  - PostgreSQL TEXT[] maps to Go []string in sqlc — no special override needed
+  - The log_config upsert only updates log_properties on conflict (not id) since subject is the unique key used for lookups
+  - All four sqlc query file stories (US-006 through US-009) are now complete, covering events, subscribers/subscriptions, delivery_attempts, and log_config
+  - The sqlc query layer is fully implemented — next stories (US-010+) move to REST API endpoint implementation
 ---

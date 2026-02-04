@@ -128,7 +128,7 @@
         "Generated code appears in db/"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #238 | 4:34 PM | 🟣 | Implemented sqlc queries for log configuration CRUD operations | ~301 |
 | #229 | 4:32 PM | 🟣 | Created sqlc queries for delivery attempts operations | ~422 |
 | #225 | 4:31 PM | 🔵 | Reviewed delivery_attempts table schema for query implementation | ~328 |
 | #144 | 3:49 PM | 🟣 | Implemented events table migration with all required columns and indexes | ~374 |
