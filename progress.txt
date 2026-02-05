@@ -336,3 +336,19 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - filterQueryString helper in .templ file builds URL query strings preserving active filters across pagination
   - DaisyUI select with conditional selected attribute: `selected?={ condition }` in templ syntax
 ---
+
+## 2026-02-05 15:30 MST - US-022
+- Built event detail page at /events/{id} showing full event info and delivery history
+- Templ template in views/event_detail.templ with EventDetail and DeliveryAttemptRow types
+- Event info card displays: ID, subject, timestamp, trace ID, delivery status, retry count, status updated at, and pretty-printed JSON data
+- Delivery attempts section with DaisyUI collapse components — each row shows endpoint URL, timestamp, status badge, and HTTP status code
+- Expandable rows reveal full request/response details (headers and body)
+- Go handler in views/events.go: eventDetailHandler fetches event via GetEventByID and delivery attempts via ListDeliveryAttemptsForEvent
+- Added prettyJSON helper for formatting JSONB columns (request/response headers)
+- Files changed: views/event_detail.templ (new), views/event_detail_templ.go (generated), views/events.go (added handler, imports)
+- **Learnings for future iterations:**
+  - DaisyUI collapse component: use `collapse collapse-arrow bg-base-200` with `<input type="checkbox"/>` for expandable rows
+  - pgtype.Int4 nullable handling: check `.Valid` before formatting `.Int32` as string
+  - prettyJSON helper pattern: unmarshal to interface{} then MarshalIndent for readable display of JSONB columns
+  - The event detail route `GET /events/{id}` coexists with `GET /events` because Go 1.22+ ServeMux uses longest path match
+---
