@@ -295,3 +295,12 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - Prefix matching for active state means /events, /events/123, /events/new all highlight "Events" — this is the expected UX
   - `go tool templ generate -f <file>` generates specific files; `go tool templ generate` with no args generates nothing if files haven't changed since last generate (uses file modification time caching)
 ---
+
+## 2026-02-05 13:45 MST - US-019
+- Updated root redirect from /welcome to /events in views/not_found.go
+- Changed Location header value and updated comment
+- Files changed: views/not_found.go (2 lines changed)
+- **Learnings for future iterations:**
+  - The root redirect lives in views/not_found.go in the notFound handler — it handles both "/" (redirect) and all unmatched paths (404)
+  - Simple one-line change: the redirect path is a string literal in `w.Header().Set("Location", "/events")`
+---
