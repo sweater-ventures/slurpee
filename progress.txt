@@ -246,3 +246,33 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - math.Pow for exponential calculation, cap result with min() against max seconds
   - time.Sleep in a new goroutine allows non-blocking retry scheduling while maintaining WaitGroup tracking
 ---
+
+## 2026-02-05 12:55 MST - US-016
+- Implemented subscription filter evaluation for event delivery in api/delivery.go
+- Added matchesFilter() function that evaluates subscription filter JSON against event data
+- Filter semantics: JSON object with key-value pairs, ALL must match (AND logic) against top-level keys in event data
+- Null/empty filter means "match all events" (no filtering)
+- Non-matching subscriptions are skipped silently — no delivery attempt is recorded
+- Filter check happens in dispatchEvent() when building delivery tasks, before any HTTP calls
+- Uses JSON marshal/unmarshal for type-safe value comparison (handles strings, numbers, booleans, nested objects correctly)
+- Files changed: api/delivery.go (+57 lines)
+- **Learnings for future iterations:**
+  - JSON comparison via marshal-to-string handles type coercion correctly (1 != "1", true != "true")
+  - Filter evaluation happens early in the delivery pipeline to avoid unnecessary HTTP calls and delivery_attempts rows
+  - Subscription.Filter is []byte (JSONB from Postgres), check len(filter) == 0 for null/empty
+  - Using json.Unmarshal to map[string]interface{} works for arbitrary JSON object comparison
+---
+
+## 2026-02-05 13:30 MST - US-017
+- Implemented configurable event data logging in api/events.go createEventHandler
+- After event is persisted, looks up log_config for the event subject via GetLogConfigBySubject
+- If a log_config exists, extracts listed property paths from the already-parsed dataObj (map[string]any) and appends them as structured slog fields
+- Event ID and subject are always logged regardless of log_config
+- If no log_config exists (GetLogConfigBySubject returns error), only event ID and subject are logged
+- Files changed: api/events.go (+11 lines, -1 line)
+- **Learnings for future iterations:**
+  - The dataObj variable from JSON validation (line 61-62) is already available as map[string]any — reuse it for property extraction rather than re-parsing event.Data
+  - Silently ignoring GetLogConfigBySubject errors (including pgx.ErrNoRows) is the correct approach: missing config means "log defaults only"
+  - slog variadic args pattern: build []any slice with key-value pairs and spread with logAttrs...
+  - Property paths are currently top-level keys only; nested path support (e.g., "order.id") would require a recursive lookup helper
+---

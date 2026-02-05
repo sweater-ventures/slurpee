@@ -122,6 +122,16 @@ func dispatchEvent(a *app.Application, event db.Event, getSemaphore func([16]byt
 		}
 
 		for _, sub := range subs {
+			// Check subscription filter against event data
+			if !matchesFilter(sub.Filter, event.Data) {
+				logger.Debug("Subscription filter did not match event data",
+					"subscriber_id", uuidToString(subscriber.ID),
+					"subscription_id", uuidToString(sub.ID),
+					"subject_pattern", sub.SubjectPattern,
+				)
+				continue // Skip this subscription - filter doesn't match
+			}
+
 			// Determine effective max retries: per-subscription override or global default
 			maxRetries := a.Config.MaxRetries
 			if sub.MaxRetries.Valid {
@@ -283,6 +293,53 @@ func processDeliveryTask(
 		// Process the retry
 		processDeliveryTask(ctx, a, nextTask, getSemaphore, globalWg, resultsChan, logger)
 	}()
+}
+
+// matchesFilter evaluates whether an event's data matches a subscription's filter.
+// Filter is a JSON object of key-value pairs; all pairs must match (AND logic) against top-level keys in event data.
+// If filter is nil or empty, returns true (match all).
+func matchesFilter(filter []byte, eventData []byte) bool {
+	// If filter is nil or empty, match all events
+	if len(filter) == 0 {
+		return true
+	}
+
+	// Parse filter JSON
+	var filterObj map[string]interface{}
+	if err := json.Unmarshal(filter, &filterObj); err != nil {
+		// Invalid filter JSON - treat as non-match for safety
+		return false
+	}
+
+	// Empty filter object matches all
+	if len(filterObj) == 0 {
+		return true
+	}
+
+	// Parse event data JSON
+	var dataObj map[string]interface{}
+	if err := json.Unmarshal(eventData, &dataObj); err != nil {
+		// Can't parse event data - no match
+		return false
+	}
+
+	// Check each filter key-value pair (AND logic)
+	for key, filterValue := range filterObj {
+		dataValue, exists := dataObj[key]
+		if !exists {
+			return false
+		}
+
+		// Compare values - use JSON comparison for type-safe equality
+		filterJSON, _ := json.Marshal(filterValue)
+		dataJSON, _ := json.Marshal(dataValue)
+
+		if string(filterJSON) != string(dataJSON) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // calculateBackoff returns the delay duration for exponential backoff.

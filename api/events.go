@@ -111,7 +111,17 @@ func createEventHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	log(r.Context()).Info("Event received", "event_id", uuidToString(event.ID), "subject", event.Subject)
+	// Log event with configured data properties
+	logAttrs := []any{"event_id", uuidToString(event.ID), "subject", event.Subject}
+	logConfig, err := app.DB.GetLogConfigBySubject(r.Context(), req.Subject)
+	if err == nil {
+		for _, prop := range logConfig.LogProperties {
+			if val, ok := dataObj[prop]; ok {
+				logAttrs = append(logAttrs, prop, val)
+			}
+		}
+	}
+	log(r.Context()).Info("Event received", logAttrs...)
 
 	// Send to delivery dispatcher for asynchronous delivery
 	app.DeliveryChan <- event
