@@ -23,6 +23,9 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - Per-subscriber concurrency: buffered channel `make(chan struct{}, maxParallel)` as semaphore pattern
 - SimplePage requires two params: `SimplePage(title, currentPath)` — currentPath enables active sidebar highlighting
 - Templ generate: `go tool templ generate -f <file>` for specific files; `go build ./...` after to verify
+- HTMX partial rendering: extract content into a separate templ component, use hx-target/hx-swap to replace just that section
+- DaisyUI modal: `<dialog class="modal">` with `.showModal()`/`.close()`, `<form method="dialog">` for cancel button
+- Templ `script` keyword for type-safe JS functions callable from `onclick={ funcName(args) }`
 
 ---
 
@@ -370,4 +373,22 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - Server-side form POST handler pattern: ParseForm(), validate, re-render with errors on failure, redirect on success (PRG pattern)
   - HTTP 303 See Other is the correct redirect status for POST-Redirect-GET pattern to ensure browser uses GET for the redirect
   - EventCreateForm uses map[string]string for errors to support per-field error display plus a "general" key for server errors
+---
+
+## 2026-02-05 15:40 MST - US-024
+- Built event delivery replay functionality on the event detail page
+- "Replay All" button re-triggers delivery to all matching subscribers by sending event to DeliveryChan
+- Per-subscriber "Replay" button next to each delivery attempt re-triggers delivery to that single subscriber via exported api.ReplayToSubscriber() function
+- Both replay buttons use DaisyUI modal dialogs for confirmation before executing
+- HTMX integration: POST endpoints return updated delivery section partial (hx-target="#delivery-section", hx-swap="innerHTML") — no full page reload
+- Refactored eventDetailHandler to use shared buildEventDetailView() helper, reducing code duplication between detail view and replay response rendering
+- Added SubscriberID field to DeliveryAttemptRow for per-subscriber replay URL construction
+- Templ `script` declaration used for openReplayModal() to safely pass dynamic event/subscriber IDs to JavaScript
+- Files changed: views/event_detail.templ (updated template with replay UI), views/event_detail_templ.go (generated), views/events.go (added replay handlers, buildEventDetailView helper, route registration), api/delivery.go (added exported ReplayToSubscriber function)
+- **Learnings for future iterations:**
+  - DaisyUI modal pattern: `<dialog id="x" class="modal">` with `.showModal()` and `<form method="dialog">` for close — works with HTMX buttons inside
+  - Templ `script` keyword defines type-safe JS functions that can be called from `onclick={}` with Go string params — preferred over inline JS strings
+  - For HTMX partial updates to work with dynamically-set `hx-post`, call `htmx.process(element)` after setting the attribute via JS
+  - Exporting delivery functions from api package (e.g., ReplayToSubscriber) allows views to trigger delivery without reimplementing HTTP client logic
+  - Route registration order matters: `POST /events/{id}/replay` and `POST /events/{id}/replay/{subscriberId}` must be registered before `GET /events/{id}` to avoid the wildcard catching POST requests (Go 1.22+ method prefix helps but literal paths still need priority)
 ---
