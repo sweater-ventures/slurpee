@@ -15,4 +15,12 @@
 | #229 | " | 🟣 | Created sqlc queries for delivery attempts operations | ~422 |
 | #227 | 4:31 PM | 🔵 | Reviewed subscribers.sql query patterns including upsert and exec operations | ~361 |
 | #226 | " | 🔵 | Reviewed existing events.sql query patterns for consistency | ~320 |
+
+### Feb 5, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #446 | 3:15 PM | 🟣 | Added SearchEventsFiltered query with empty string handling for optional filters | ~361 |
+| #445 | 3:14 PM | ✅ | Removed SearchEventsFiltered query in favor of alternative approach | ~274 |
+| #443 | " | 🟣 | Added unified event search query with optional filter parameters | ~420 |
 </claude-mem-context>

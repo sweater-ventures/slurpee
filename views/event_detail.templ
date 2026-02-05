@@ -1,0 +1,223 @@
+package views
+
+import (
+	"fmt"
+	"github.com/sweater-ventures/slurpee/components"
+)
+
+type EventDetail struct {
+	ID              string
+	Subject         string
+	Timestamp       string
+	TraceID         string
+	DeliveryStatus  string
+	RetryCount      int32
+	StatusUpdatedAt string
+	DataJSON        string
+}
+
+type DeliveryAttemptRow struct {
+	ID                 string
+	SubscriberID       string
+	EndpointURL        string
+	AttemptedAt        string
+	ResponseStatusCode string
+	Status             string
+	RequestHeaders     string
+	ResponseHeaders    string
+	ResponseBody       string
+}
+
+templ EventDetailTemplate(event EventDetail, attempts []DeliveryAttemptRow) {
+	@components.SimplePage("Event Detail", "/events") {
+		<div class="mb-4">
+			<a href="/events" class="btn btn-ghost btn-sm">&larr; Back to Events</a>
+		</div>
+		<div class="card bg-base-200 shadow-md mb-6">
+			<div class="card-body">
+				<div class="flex items-center justify-between mb-4">
+					<h2 class="card-title font-mono text-lg">{ event.Subject }</h2>
+					<span class={ statusBadgeClass(event.DeliveryStatus) }>{ event.DeliveryStatus }</span>
+				</div>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div>
+						<label class="text-sm text-base-content/60">Event ID</label>
+						<p class="font-mono text-sm">{ event.ID }</p>
+					</div>
+					<div>
+						<label class="text-sm text-base-content/60">Timestamp</label>
+						<p>{ event.Timestamp }</p>
+					</div>
+					<div>
+						<label class="text-sm text-base-content/60">Trace ID</label>
+						<p class="font-mono text-sm">
+							if event.TraceID != "" {
+								{ event.TraceID }
+							} else {
+								<span class="text-base-content/40">—</span>
+							}
+						</p>
+					</div>
+					<div>
+						<label class="text-sm text-base-content/60">Retry Count</label>
+						<p>{ fmt.Sprintf("%d", event.RetryCount) }</p>
+					</div>
+					if event.StatusUpdatedAt != "" {
+						<div>
+							<label class="text-sm text-base-content/60">Status Updated At</label>
+							<p>{ event.StatusUpdatedAt }</p>
+						</div>
+					}
+				</div>
+				<div class="mt-4">
+					<label class="text-sm text-base-content/60">Event Data</label>
+					<pre class="bg-base-300 p-4 rounded-lg mt-1 overflow-x-auto text-sm font-mono whitespace-pre-wrap">{ event.DataJSON }</pre>
+				</div>
+			</div>
+		</div>
+		<div id="delivery-section">
+			@deliveryAttemptsSection(event, attempts)
+		</div>
+		<!-- Replay All Confirmation Modal -->
+		<dialog id="replay-all-modal" class="modal">
+			<div class="modal-box">
+				<h3 class="text-lg font-bold">Replay All Deliveries</h3>
+				<p class="py-4">Are you sure you want to replay delivery to all matching subscribers? This will reset the delivery status and create new delivery attempts.</p>
+				<div class="modal-action">
+					<form method="dialog">
+						<button class="btn btn-ghost">Cancel</button>
+					</form>
+					<button
+						class="btn btn-primary"
+						hx-post={ fmt.Sprintf("/events/%s/replay", event.ID) }
+						hx-target="#delivery-section"
+						hx-swap="innerHTML"
+						onclick="document.getElementById('replay-all-modal').close()"
+					>
+						Replay All
+					</button>
+				</div>
+			</div>
+			<form method="dialog" class="modal-backdrop">
+				<button>close</button>
+			</form>
+		</dialog>
+		<!-- Per-Subscriber Replay Confirmation Modal -->
+		<dialog id="replay-subscriber-modal" class="modal">
+			<div class="modal-box">
+				<h3 class="text-lg font-bold">Replay Delivery</h3>
+				<p class="py-4">Are you sure you want to replay delivery to <span id="replay-subscriber-endpoint" class="font-mono font-semibold"></span>?</p>
+				<div class="modal-action">
+					<form method="dialog">
+						<button class="btn btn-ghost">Cancel</button>
+					</form>
+					<button
+						id="replay-subscriber-confirm"
+						class="btn btn-primary"
+						hx-target="#delivery-section"
+						hx-swap="innerHTML"
+						onclick="document.getElementById('replay-subscriber-modal').close()"
+					>
+						Replay
+					</button>
+				</div>
+			</div>
+			<form method="dialog" class="modal-backdrop">
+				<button>close</button>
+			</form>
+		</dialog>
+	}
+}
+
+script openReplayModal(eventId, subscriberId, endpoint string) {
+	document.getElementById('replay-subscriber-endpoint').textContent = endpoint;
+	var btn = document.getElementById('replay-subscriber-confirm');
+	btn.setAttribute('hx-post', '/events/' + eventId + '/replay/' + subscriberId);
+	htmx.process(btn);
+	document.getElementById('replay-subscriber-modal').showModal();
+}
+
+templ deliveryAttemptsSection(event EventDetail, attempts []DeliveryAttemptRow) {
+	<div class="flex items-center justify-between mb-4">
+		<h3 class="text-lg font-semibold">
+			Delivery Attempts
+			<span class="badge badge-ghost ml-2">{ fmt.Sprintf("%d", len(attempts)) }</span>
+		</h3>
+		<button class="btn btn-primary btn-sm" onclick="document.getElementById('replay-all-modal').showModal()">
+			Replay All
+		</button>
+	</div>
+	if len(attempts) == 0 {
+		<div class="text-base-content/60 text-center py-8">No delivery attempts recorded</div>
+	} else {
+		<div class="space-y-2">
+			for _, attempt := range attempts {
+				@deliveryAttemptCard(event, attempt)
+			}
+		</div>
+	}
+}
+
+templ deliveryAttemptCard(event EventDetail, attempt DeliveryAttemptRow) {
+	<div class="collapse collapse-arrow bg-base-200">
+		<input type="checkbox"/>
+		<div class="collapse-title">
+			<div class="flex items-center gap-4 flex-wrap">
+				<span class={ attemptStatusBadgeClass(attempt.Status) }>{ attempt.Status }</span>
+				<span class="font-mono text-sm">{ attempt.EndpointURL }</span>
+				<span class="text-sm text-base-content/60">{ attempt.AttemptedAt }</span>
+				if attempt.ResponseStatusCode != "" {
+					<span class="badge badge-outline badge-sm">{ attempt.ResponseStatusCode }</span>
+				}
+			</div>
+		</div>
+		<div class="collapse-content">
+			<div class="grid grid-cols-1 gap-4 pt-2">
+				if attempt.RequestHeaders != "" && attempt.RequestHeaders != "{}" && attempt.RequestHeaders != "null" {
+					<div>
+						<label class="text-sm text-base-content/60 font-semibold">Request Headers</label>
+						<pre class="bg-base-300 p-3 rounded-lg mt-1 overflow-x-auto text-xs font-mono whitespace-pre-wrap">{ attempt.RequestHeaders }</pre>
+					</div>
+				}
+				if attempt.ResponseHeaders != "" && attempt.ResponseHeaders != "{}" && attempt.ResponseHeaders != "null" {
+					<div>
+						<label class="text-sm text-base-content/60 font-semibold">Response Headers</label>
+						<pre class="bg-base-300 p-3 rounded-lg mt-1 overflow-x-auto text-xs font-mono whitespace-pre-wrap">{ attempt.ResponseHeaders }</pre>
+					</div>
+				}
+				if attempt.ResponseBody != "" {
+					<div>
+						<label class="text-sm text-base-content/60 font-semibold">Response Body</label>
+						<pre class="bg-base-300 p-3 rounded-lg mt-1 overflow-x-auto text-xs font-mono whitespace-pre-wrap">{ attempt.ResponseBody }</pre>
+					</div>
+				}
+				if attempt.RequestHeaders == "" && attempt.ResponseHeaders == "" && attempt.ResponseBody == "" {
+					<p class="text-base-content/40 text-sm">No request/response details available</p>
+				}
+				if attempt.SubscriberID != "" {
+					<div class="flex justify-end pt-2">
+						<button
+							class="btn btn-outline btn-sm"
+							onclick={ openReplayModal(event.ID, attempt.SubscriberID, attempt.EndpointURL) }
+						>
+							Replay
+						</button>
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+func attemptStatusBadgeClass(status string) string {
+	switch status {
+	case "succeeded":
+		return "badge badge-success badge-sm"
+	case "failed":
+		return "badge badge-error badge-sm"
+	case "pending":
+		return "badge badge-warning badge-sm"
+	default:
+		return "badge badge-ghost badge-sm"
+	}
+}

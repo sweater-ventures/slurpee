@@ -34,48 +34,165 @@ func statusBadgeClass(status string) string {
 	}
 }
 
-templ EventsListTemplate(events []EventRow, page int, hasNext bool) {
+func filterQueryString(subject, status, dateFrom, dateTo, content string, page int) string {
+	q := fmt.Sprintf("page=%d", page)
+	if subject != "" {
+		q += "&subject=" + subject
+	}
+	if status != "" {
+		q += "&status=" + status
+	}
+	if dateFrom != "" {
+		q += "&date_from=" + dateFrom
+	}
+	if dateTo != "" {
+		q += "&date_to=" + dateTo
+	}
+	if content != "" {
+		q += "&content=" + content
+	}
+	return q
+}
+
+templ EventsListTemplate(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content string) {
 	@components.SimplePage("Events", "/events") {
 		<div class="flex justify-end items-center mb-6">
 			<a href="/events/new" class="btn btn-primary">New Event</a>
 		</div>
-		<div class="overflow-x-auto">
-			<table class="table table-zebra w-full">
-				<thead>
-					<tr>
-						<th>Subject</th>
-						<th>Event ID</th>
-						<th>Timestamp</th>
-						<th>Status</th>
-					</tr>
-				</thead>
-				<tbody>
-					if len(events) == 0 {
-						<tr>
-							<td colspan="4" class="text-center text-base-content/60 py-8">No events found</td>
-						</tr>
-					}
-					for _, event := range events {
-						<tr class="hover cursor-pointer" onclick={ goToEvent(event.ID) }>
-							<td class="font-mono">{ event.Subject }</td>
-							<td class="font-mono text-sm">{ truncateID(event.ID) }</td>
-							<td>{ event.Timestamp }</td>
-							<td><span class={ statusBadgeClass(event.DeliveryStatus) }>{ event.DeliveryStatus }</span></td>
-						</tr>
-					}
-				</tbody>
-			</table>
-		</div>
-		<div class="flex justify-center gap-2 mt-6">
-			if page > 1 {
-				<a href={ templ.SafeURL(fmt.Sprintf("/events?page=%d", page-1)) } class="btn btn-outline btn-sm">Previous</a>
-			}
-			<span class="btn btn-ghost btn-sm no-animation">{ fmt.Sprintf("Page %d", page) }</span>
-			if hasNext {
-				<a href={ templ.SafeURL(fmt.Sprintf("/events?page=%d", page+1)) } class="btn btn-outline btn-sm">Next</a>
-			}
+		@eventsFilterBar(subject, status, dateFrom, dateTo, content)
+		<div id="events-results">
+			@eventsTableAndPagination(events, page, hasNext, subject, status, dateFrom, dateTo, content)
 		</div>
 	}
+}
+
+templ EventsTablePartial(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content string) {
+	@eventsTableAndPagination(events, page, hasNext, subject, status, dateFrom, dateTo, content)
+}
+
+templ eventsFilterBar(subject, status, dateFrom, dateTo, content string) {
+	<form
+		hx-get="/events"
+		hx-target="#events-results"
+		hx-push-url="true"
+		class="mb-6 p-4 bg-base-200 rounded-lg"
+	>
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+			<div class="form-control">
+				<label class="label">
+					<span class="label-text">Subject</span>
+				</label>
+				<input
+					type="text"
+					name="subject"
+					value={ subject }
+					placeholder="e.g. order.created"
+					class="input input-bordered input-sm w-full"
+				/>
+			</div>
+			<div class="form-control">
+				<label class="label">
+					<span class="label-text">Status</span>
+				</label>
+				<select name="status" class="select select-bordered select-sm w-full">
+					<option value="">All</option>
+					<option value="pending" selected?={ status == "pending" }>Pending</option>
+					<option value="delivered" selected?={ status == "delivered" }>Delivered</option>
+					<option value="failed" selected?={ status == "failed" }>Failed</option>
+					<option value="partial" selected?={ status == "partial" }>Partial</option>
+				</select>
+			</div>
+			<div class="form-control">
+				<label class="label">
+					<span class="label-text">From Date</span>
+				</label>
+				<input
+					type="date"
+					name="date_from"
+					value={ dateFrom }
+					class="input input-bordered input-sm w-full"
+				/>
+			</div>
+			<div class="form-control">
+				<label class="label">
+					<span class="label-text">To Date</span>
+				</label>
+				<input
+					type="date"
+					name="date_to"
+					value={ dateTo }
+					class="input input-bordered input-sm w-full"
+				/>
+			</div>
+			<div class="form-control">
+				<label class="label">
+					<span class="label-text">Content (JSON)</span>
+				</label>
+				<input
+					type="text"
+					name="content"
+					value={ content }
+					placeholder={ `{"key":"value"}` }
+					class="input input-bordered input-sm w-full"
+				/>
+			</div>
+		</div>
+		<div class="flex gap-2 mt-4">
+			<button type="submit" class="btn btn-primary btn-sm">Search</button>
+			<a href="/events" class="btn btn-ghost btn-sm">Clear</a>
+		</div>
+	</form>
+}
+
+templ eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content string) {
+	<div class="overflow-x-auto">
+		<table class="table table-zebra w-full">
+			<thead>
+				<tr>
+					<th>Subject</th>
+					<th>Event ID</th>
+					<th>Timestamp</th>
+					<th>Status</th>
+				</tr>
+			</thead>
+			<tbody>
+				if len(events) == 0 {
+					<tr>
+						<td colspan="4" class="text-center text-base-content/60 py-8">No events found</td>
+					</tr>
+				}
+				for _, event := range events {
+					<tr class="hover cursor-pointer" onclick={ goToEvent(event.ID) }>
+						<td class="font-mono">{ event.Subject }</td>
+						<td class="font-mono text-sm">{ truncateID(event.ID) }</td>
+						<td>{ event.Timestamp }</td>
+						<td><span class={ statusBadgeClass(event.DeliveryStatus) }>{ event.DeliveryStatus }</span></td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+	<div class="flex justify-center gap-2 mt-6">
+		if page > 1 {
+			<a
+				href={ templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page-1)) }
+				hx-get={ "/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page-1) }
+				hx-target="#events-results"
+				hx-push-url="true"
+				class="btn btn-outline btn-sm"
+			>Previous</a>
+		}
+		<span class="btn btn-ghost btn-sm no-animation">{ fmt.Sprintf("Page %d", page) }</span>
+		if hasNext {
+			<a
+				href={ templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page+1)) }
+				hx-get={ "/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page+1) }
+				hx-target="#events-results"
+				hx-push-url="true"
+				class="btn btn-outline btn-sm"
+			>Next</a>
+		}
+	</div>
 }
 
 script goToEvent(id string) {

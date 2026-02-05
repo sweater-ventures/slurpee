@@ -23,6 +23,9 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - Per-subscriber concurrency: buffered channel `make(chan struct{}, maxParallel)` as semaphore pattern
 - SimplePage requires two params: `SimplePage(title, currentPath)` — currentPath enables active sidebar highlighting
 - Templ generate: `go tool templ generate -f <file>` for specific files; `go build ./...` after to verify
+- HTMX partial rendering: extract content into a separate templ component, use hx-target/hx-swap to replace just that section
+- DaisyUI modal: `<dialog class="modal">` with `.showModal()`/`.close()`, `<form method="dialog">` for cancel button
+- Templ `script` keyword for type-safe JS functions callable from `onclick={ funcName(args) }`
 
 ---
 
@@ -318,4 +321,74 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - pgtype.UUID to string: use `uuid.UUID(u.Bytes).String()` from google/uuid (same pattern as api package but in views package as pgtypeUUIDToString)
   - View routes use `"GET /events"` pattern (method prefix) unlike the catch-all `/` route which accepts all methods
   - DaisyUI badge classes: badge-success (green), badge-error (red), badge-warning (yellow), badge-info (blue), badge-ghost (gray)
+---
+
+## 2026-02-05 15:20 MST - US-021
+- Built event search and filtering with a filter bar above the events table
+- Filter bar has inputs for: subject (text, LIKE partial match), delivery status (dropdown), date range (start/end date inputs), content search (JSON containment via @> operator)
+- Added `SearchEventsFiltered` sqlc query combining all optional filters with AND logic using empty-string-means-no-filter for text params and NULL-means-no-filter for timestamptz/jsonb params
+- Filters update the event list via HTMX: form uses hx-get="/events" with hx-target="#events-results" and hx-push-url="true"
+- HTMX partial rendering: handler checks `HX-Request` header and returns just the table+pagination (EventsTablePartial) for HTMX requests, full page for normal requests
+- Pagination links preserve filter params via filterQueryString helper and also use HTMX for seamless navigation
+- Clear button links back to /events (no filters)
+- Files changed: queries/events.sql (added SearchEventsFiltered), db/events.sql.go (generated), views/events.go (refactored with filter parsing), views/events.templ (added filter bar, partial template), views/events_templ.go (generated)
+- **Learnings for future iterations:**
+  - sqlc.narg() with nullable text type override (text -> string) doesn't produce nullable Go types — use empty string convention ("" means no filter) instead of NULL for text params
+  - sqlc.narg() for timestamptz produces pgtype.Timestamptz (despite time.Time override) — zero value pgtype.Timestamptz{} has Valid:false which maps to SQL NULL
+  - HTMX partial rendering pattern: check r.Header.Get("HX-Request") == "true" to serve partial vs full page
+  - filterQueryString helper in .templ file builds URL query strings preserving active filters across pagination
+  - DaisyUI select with conditional selected attribute: `selected?={ condition }` in templ syntax
+---
+
+## 2026-02-05 15:30 MST - US-022
+- Built event detail page at /events/{id} showing full event info and delivery history
+- Templ template in views/event_detail.templ with EventDetail and DeliveryAttemptRow types
+- Event info card displays: ID, subject, timestamp, trace ID, delivery status, retry count, status updated at, and pretty-printed JSON data
+- Delivery attempts section with DaisyUI collapse components — each row shows endpoint URL, timestamp, status badge, and HTTP status code
+- Expandable rows reveal full request/response details (headers and body)
+- Go handler in views/events.go: eventDetailHandler fetches event via GetEventByID and delivery attempts via ListDeliveryAttemptsForEvent
+- Added prettyJSON helper for formatting JSONB columns (request/response headers)
+- Files changed: views/event_detail.templ (new), views/event_detail_templ.go (generated), views/events.go (added handler, imports)
+- **Learnings for future iterations:**
+  - DaisyUI collapse component: use `collapse collapse-arrow bg-base-200` with `<input type="checkbox"/>` for expandable rows
+  - pgtype.Int4 nullable handling: check `.Valid` before formatting `.Int32` as string
+  - prettyJSON helper pattern: unmarshal to interface{} then MarshalIndent for readable display of JSONB columns
+  - The event detail route `GET /events/{id}` coexists with `GET /events` because Go 1.22+ ServeMux uses longest path match
+---
+
+## 2026-02-05 15:35 MST - US-023
+- Built event creation page at /events/new with form for subject, JSON data textarea, and optional trace ID
+- Templ template in views/event_create.templ with EventCreateForm struct (Subject, Data, TraceID, Errors map)
+- Form submits via POST /events/new to server-side handler that validates and persists directly via DB
+- Inline validation errors: required subject, required valid JSON object for data, optional UUID format for trace_id
+- General error alert for server-side failures (DB insert errors)
+- On success, triggers async delivery via DeliveryChan and redirects to /events/{id} with 303 See Other
+- DaisyUI form components: input, textarea, button with error states (input-error, textarea-error)
+- Go handlers: eventCreateFormHandler (GET, renders empty form), eventCreateSubmitHandler (POST, validates + creates)
+- Routes registered before /events/{id} in init() — Go 1.22+ literal paths take priority over wildcards
+- Files changed: views/event_create.templ (new), views/event_create_templ.go (generated), views/events.go (added handlers and routes)
+- **Learnings for future iterations:**
+  - `GET /events/new` must be registered before `GET /events/{id}` — Go 1.22+ ServeMux prioritizes literal path segments over wildcards
+  - templ.KV("class-name", condition) for conditional CSS classes in templ templates (e.g., input-error on validation failure)
+  - Server-side form POST handler pattern: ParseForm(), validate, re-render with errors on failure, redirect on success (PRG pattern)
+  - HTTP 303 See Other is the correct redirect status for POST-Redirect-GET pattern to ensure browser uses GET for the redirect
+  - EventCreateForm uses map[string]string for errors to support per-field error display plus a "general" key for server errors
+---
+
+## 2026-02-05 15:40 MST - US-024
+- Built event delivery replay functionality on the event detail page
+- "Replay All" button re-triggers delivery to all matching subscribers by sending event to DeliveryChan
+- Per-subscriber "Replay" button next to each delivery attempt re-triggers delivery to that single subscriber via exported api.ReplayToSubscriber() function
+- Both replay buttons use DaisyUI modal dialogs for confirmation before executing
+- HTMX integration: POST endpoints return updated delivery section partial (hx-target="#delivery-section", hx-swap="innerHTML") — no full page reload
+- Refactored eventDetailHandler to use shared buildEventDetailView() helper, reducing code duplication between detail view and replay response rendering
+- Added SubscriberID field to DeliveryAttemptRow for per-subscriber replay URL construction
+- Templ `script` declaration used for openReplayModal() to safely pass dynamic event/subscriber IDs to JavaScript
+- Files changed: views/event_detail.templ (updated template with replay UI), views/event_detail_templ.go (generated), views/events.go (added replay handlers, buildEventDetailView helper, route registration), api/delivery.go (added exported ReplayToSubscriber function)
+- **Learnings for future iterations:**
+  - DaisyUI modal pattern: `<dialog id="x" class="modal">` with `.showModal()` and `<form method="dialog">` for close — works with HTMX buttons inside
+  - Templ `script` keyword defines type-safe JS functions that can be called from `onclick={}` with Go string params — preferred over inline JS strings
+  - For HTMX partial updates to work with dynamically-set `hx-post`, call `htmx.process(element)` after setting the attribute via JS
+  - Exporting delivery functions from api package (e.g., ReplayToSubscriber) allows views to trigger delivery without reimplementing HTTP client logic
+  - Route registration order matters: `POST /events/{id}/replay` and `POST /events/{id}/replay/{subscriberId}` must be registered before `GET /events/{id}` to avoid the wildcard catching POST requests (Go 1.22+ method prefix helps but literal paths still need priority)
 ---

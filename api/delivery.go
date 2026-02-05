@@ -466,6 +466,25 @@ func recordFailedAttempt(ctx context.Context, a *app.Application, attemptID pgty
 	}
 }
 
+// ReplayToSubscriber delivers an event to a single subscriber as a replay.
+// It resets the event status to pending, performs a single delivery attempt, and updates the event status.
+func ReplayToSubscriber(a *app.Application, event db.Event, subscriber db.Subscriber) {
+	ctx := context.Background()
+	logger := slog.Default().With("event_id", uuidToString(event.ID), "subject", event.Subject, "replay", true)
+
+	updateEventStatus(ctx, a, event.ID, event.RetryCount, "pending")
+
+	succeeded := deliverToSubscriber(ctx, a, event, subscriber, 0, logger)
+
+	if succeeded {
+		updateEventStatus(ctx, a, event.ID, event.RetryCount, "delivered")
+		logger.Info("Replay delivery succeeded", "subscriber_id", uuidToString(subscriber.ID))
+	} else {
+		updateEventStatus(ctx, a, event.ID, event.RetryCount, "failed")
+		logger.Warn("Replay delivery failed", "subscriber_id", uuidToString(subscriber.ID))
+	}
+}
+
 // updateEventStatus updates the delivery_status, retry_count, and status_updated_at on an event.
 func updateEventStatus(ctx context.Context, a *app.Application, eventID pgtype.UUID, retryCount int32, status string) {
 	_, err := a.DB.UpdateEventDeliveryStatus(ctx, db.UpdateEventDeliveryStatusParams{

@@ -1,0 +1,84 @@
+package views
+
+import "github.com/sweater-ventures/slurpee/components"
+
+type EventCreateForm struct {
+	Subject string
+	Data    string
+	TraceID string
+	Errors  map[string]string
+}
+
+templ EventCreateTemplate(form EventCreateForm) {
+	@components.SimplePage("New Event", "/events") {
+		<div class="mb-4">
+			<a href="/events" class="btn btn-ghost btn-sm">&larr; Back to Events</a>
+		</div>
+		<div class="card bg-base-200 shadow-md max-w-2xl">
+			<div class="card-body">
+				<h2 class="card-title mb-4">Create New Event</h2>
+				<form method="POST" action="/events/new">
+					<div class="form-control mb-4">
+						<label class="label">
+							<span class="label-text">Subject <span class="text-error">*</span></span>
+						</label>
+						<input
+							type="text"
+							name="subject"
+							value={ form.Subject }
+							placeholder="e.g. order.created"
+							class={ "input input-bordered w-full", templ.KV("input-error", form.Errors["subject"] != "") }
+						/>
+						if form.Errors["subject"] != "" {
+							<label class="label">
+								<span class="label-text-alt text-error">{ form.Errors["subject"] }</span>
+							</label>
+						}
+					</div>
+					<div class="form-control mb-4">
+						<label class="label">
+							<span class="label-text">Data (JSON) <span class="text-error">*</span></span>
+						</label>
+						<textarea
+							name="data"
+							rows="10"
+							placeholder={ `{"key": "value"}` }
+							class={ "textarea textarea-bordered w-full font-mono text-sm", templ.KV("textarea-error", form.Errors["data"] != "") }
+						>{ form.Data }</textarea>
+						if form.Errors["data"] != "" {
+							<label class="label">
+								<span class="label-text-alt text-error">{ form.Errors["data"] }</span>
+							</label>
+						}
+					</div>
+					<div class="form-control mb-6">
+						<label class="label">
+							<span class="label-text">Trace ID <span class="text-base-content/40">(optional UUID)</span></span>
+						</label>
+						<input
+							type="text"
+							name="trace_id"
+							value={ form.TraceID }
+							placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
+							class={ "input input-bordered w-full font-mono", templ.KV("input-error", form.Errors["trace_id"] != "") }
+						/>
+						if form.Errors["trace_id"] != "" {
+							<label class="label">
+								<span class="label-text-alt text-error">{ form.Errors["trace_id"] }</span>
+							</label>
+						}
+					</div>
+					if form.Errors["general"] != "" {
+						<div class="alert alert-error mb-4">
+							<span>{ form.Errors["general"] }</span>
+						</div>
+					}
+					<div class="card-actions justify-end">
+						<a href="/events" class="btn btn-ghost">Cancel</a>
+						<button type="submit" class="btn btn-primary">Create Event</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
