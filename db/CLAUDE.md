@@ -22,6 +22,9 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #541 | 4:33 PM | 🟣 | Committed US-026 Subscriber Detail Page Implementation | ~354 |
+| #528 | 4:30 PM | 🔵 | Sqlc-Generated Database Model Structs | ~502 |
+| #527 | " | 🔵 | Sqlc-Generated Subscriber and Subscription Query Functions | ~605 |
 | #511 | 4:27 PM | 🔵 | Generated sqlc model structs for all database tables | ~409 |
 | #510 | " | 🔵 | Generated sqlc code for subscriber and subscription queries | ~486 |
 </claude-mem-context>

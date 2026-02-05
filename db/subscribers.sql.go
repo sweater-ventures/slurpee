@@ -55,6 +55,15 @@ func (q *Queries) DeleteSubscriber(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
+const deleteSubscription = `-- name: DeleteSubscription :exec
+DELETE FROM subscriptions WHERE id = $1
+`
+
+func (q *Queries) DeleteSubscription(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSubscription, id)
+	return err
+}
+
 const deleteSubscriptionsForSubscriber = `-- name: DeleteSubscriptionsForSubscriber :exec
 DELETE FROM subscriptions WHERE subscriber_id = $1
 `
@@ -196,6 +205,43 @@ func (q *Queries) ListSubscriptionsForSubscriber(ctx context.Context, subscriber
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateSubscriber = `-- name: UpdateSubscriber :one
+UPDATE subscribers SET
+    name = $1,
+    auth_secret = $2,
+    max_parallel = $3,
+    updated_at = now()
+WHERE id = $4
+RETURNING id, name, endpoint_url, auth_secret, max_parallel, created_at, updated_at
+`
+
+type UpdateSubscriberParams struct {
+	Name        string
+	AuthSecret  string
+	MaxParallel int32
+	ID          pgtype.UUID
+}
+
+func (q *Queries) UpdateSubscriber(ctx context.Context, arg UpdateSubscriberParams) (Subscriber, error) {
+	row := q.db.QueryRow(ctx, updateSubscriber,
+		arg.Name,
+		arg.AuthSecret,
+		arg.MaxParallel,
+		arg.ID,
+	)
+	var i Subscriber
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.EndpointUrl,
+		&i.AuthSecret,
+		&i.MaxParallel,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const upsertSubscriber = `-- name: UpsertSubscriber :one

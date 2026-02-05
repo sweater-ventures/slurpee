@@ -33,3 +33,15 @@ DELETE FROM subscriptions WHERE subscriber_id = $1;
 
 -- name: GetSubscriptionsMatchingSubject :many
 SELECT * FROM subscriptions WHERE $1 LIKE replace(replace(subject_pattern, '*', '%'), '?', '_');
+
+-- name: UpdateSubscriber :one
+UPDATE subscribers SET
+    name = sqlc.arg(name),
+    auth_secret = sqlc.arg(auth_secret),
+    max_parallel = sqlc.arg(max_parallel),
+    updated_at = now()
+WHERE id = sqlc.arg(id)
+RETURNING *;
+
+-- name: DeleteSubscription :exec
+DELETE FROM subscriptions WHERE id = $1;
