@@ -37,5 +37,6 @@ func connectToDB(config *config.AppConfig) (*pgxpool.Pool, error) {
 }
 
 func (a *Application) Close() {
+	a.stopDelivery()
 	a.dbconn.Close()
 }

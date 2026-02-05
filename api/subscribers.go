@@ -90,7 +90,7 @@ func createSubscriberHandler(app *app.Application, w http.ResponseWriter, r *htt
 		}
 	}
 
-	maxParallel := int32(1)
+	maxParallel := int32(app.Config.MaxParallel)
 	if req.MaxParallel != nil {
 		maxParallel = *req.MaxParallel
 	}

@@ -9,10 +9,11 @@ import (
 )
 
 type Application struct {
-	Config config.AppConfig
-	// Database access, caching, etc. would go here
-	DB     *db.Queries
-	dbconn *pgxpool.Pool
+	Config       config.AppConfig
+	DB           *db.Queries
+	DeliveryChan chan db.Event
+	dbconn       *pgxpool.Pool
+	stopDelivery func()
 }
 
 func NewApp(config *config.AppConfig) (*Application, error) {
@@ -24,8 +25,14 @@ func NewApp(config *config.AppConfig) (*Application, error) {
 	}
 
 	return &Application{
-		Config: *config,
-		DB:     queries,
-		dbconn: conn,
+		Config:       *config,
+		DB:           queries,
+		DeliveryChan: make(chan db.Event, 1000),
+		dbconn:       conn,
+		stopDelivery: func() {},
 	}, nil
+}
+
+func (a *Application) SetStopDelivery(fn func()) {
+	a.stopDelivery = fn
 }

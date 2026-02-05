@@ -7,6 +7,10 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #303 | 5:04 PM | 🔵 | Database models reviewed | ~382 |
+| #302 | 5:03 PM | 🔵 | Event queries reviewed | ~444 |
+| #301 | " | 🔵 | Delivery attempts queries reviewed | ~406 |
+| #300 | " | 🔵 | Subscriber and subscription queries reviewed | ~439 |
 | #275 | 4:54 PM | 🔵 | Generated sqlc Event Queries with Type-Safe Database Access | ~401 |
 | #257 | 4:49 PM | 🔵 | Database Model Structures | ~474 |
 | #256 | 4:48 PM | 🔵 | Subscriber and Subscription Database Query Layer | ~482 |

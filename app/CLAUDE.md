@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #304 | 5:04 PM | 🔵 | Application structure reviewed | ~338 |
 | #261 | 4:50 PM | 🔵 | Configuration Access Pattern Investigation | ~485 |
 | #259 | 4:49 PM | 🔵 | Application Context Structure | ~425 |
 | #50 | 2:32 PM | 🔵 | Application Structure and Database Initialization | ~345 |

@@ -1,11 +1,16 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/vearutop/statigz"
 	"github.com/vearutop/statigz/zstd"
@@ -31,11 +36,11 @@ func main() {
 		log.Fatal("Nil AppConfig, WTF")
 	}
 
-	app, err := app.NewApp(appConfig)
+	slurpee, err := app.NewApp(appConfig)
 	if err != nil {
-		log.Fatal("Unable to initialize application", err)
+		log.Fatal("Unable to initialize slurpee", err)
 	}
-	defer app.Close()
+	defer slurpee.Close()
 
 	slog.Debug("Configuration",
 		"DevMode", appConfig.DevMode,
@@ -48,12 +53,41 @@ func main() {
 	} else {
 		router.Handle("/static/", statigz.FileServer(static, zstd.AddEncoding))
 	}
-	views.AddViews(app, router)
-	api.AddApis(app, router)
+	views.AddViews(slurpee, router)
+	api.AddApis(slurpee, router)
 
-	slog.Info("Starting Slurpee", "port", appConfig.Port)
-	err = http.ListenAndServe(fmt.Sprintf(":%d", appConfig.Port), middleware.AllStandardMiddleware(router))
-	if err != nil {
-		log.Fatal(err)
+	// Start the centralized delivery dispatcher
+	api.StartDispatcher(slurpee)
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", appConfig.Port),
+		Handler: middleware.AllStandardMiddleware(router),
 	}
+
+	// Listen for shutdown signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		slog.Info("Starting Slurpee", "port", appConfig.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	<-sigChan
+	slog.Info("Shutdown signal received")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("HTTP server shutdown error", "error", err)
+	}
+
+	// slurpee.Close() runs via defer:
+	// 1. Closes DeliveryChan (dispatcher stops accepting)
+	// 2. Dispatcher drains buffered events and waits for all workers
+	// 3. DB pool closes
+	slog.Info("Shutdown complete")
 }

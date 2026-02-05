@@ -113,6 +113,9 @@ func createEventHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 
 	log(r.Context()).Info("Event received", "event_id", uuidToString(event.ID), "subject", event.Subject)
 
+	// Send to delivery dispatcher for asynchronous delivery
+	app.DeliveryChan <- event
+
 	writeJsonResponse(w, http.StatusCreated, eventToResponse(event))
 }
 
