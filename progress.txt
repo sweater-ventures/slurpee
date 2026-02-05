@@ -406,3 +406,20 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - The pgtypeUUIDToString helper from events.go is accessible across the views package since all files share the same package
   - goToSubscriber script in .templ file mirrors the goToEvent pattern for clickable table rows
 ---
+
+## 2026-02-05 16:40 MST - US-026
+- Built subscriber detail page at /subscribers/{id} showing full subscriber configuration and subscriptions table
+- Templ template in views/subscriber_detail.templ with SubscriberDetail and SubscriptionRow structs
+- Subscriber info card displays: ID, name, endpoint URL, auth secret (masked with reveal toggle), max parallel, created/updated timestamps
+- Auth secret uses show/hide toggle via toggleSecret() templ script function with DOM manipulation
+- Subscriptions table shows: subject pattern, filter (pretty-printed JSON if present), max retries (with "global default" fallback text)
+- Go handler in views/subscribers.go: subscriberDetailHandler fetches subscriber via GetSubscriberByID and subscriptions via ListSubscriptionsForSubscriber
+- Uses prettyJSON helper from events.go for formatting subscription filter JSONB
+- Files changed: views/subscriber_detail.templ (new), views/subscriber_detail_templ.go (generated), views/subscribers.go (added handler, imports, route)
+- **Learnings for future iterations:**
+  - Subscriber detail follows same pattern as event detail page: back button, card with grid layout, related items table below
+  - Auth secret masking uses paired elements with hidden class toggling — simpler than input type switching
+  - Subscription Filter is []byte from JSONB; check `len(filter) > 0 && string(filter) != "null"` to distinguish real filters from null/empty
+  - pgtype.Int4.Valid check needed for nullable max_retries before formatting as string
+  - prettyJSON helper from events.go is available across views package — no need to duplicate
+---
