@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"sync"
 	"time"
@@ -16,6 +17,22 @@ import (
 	"github.com/sweater-ventures/slurpee/app"
 	"github.com/sweater-ventures/slurpee/db"
 )
+
+// deliveryTask represents a pending delivery with retry state.
+type deliveryTask struct {
+	event        db.Event
+	subscription db.Subscription
+	subscriber   db.Subscriber
+	attemptNum   int // 0-indexed attempt number (0 = first attempt)
+	maxRetries   int // effective max retries for this subscription
+}
+
+// deliveryResult represents the final outcome of a delivery to a subscription.
+type deliveryResult struct {
+	subscriptionID pgtype.UUID
+	succeeded      bool
+	exhausted      bool // true if max retries exhausted without success
+}
 
 // StartDispatcher launches the centralized event delivery dispatcher.
 // It reads events from app.DeliveryChan and delivers them to matching subscribers,
@@ -69,13 +86,13 @@ func dispatchEvent(a *app.Application, event db.Event, getSemaphore func([16]byt
 	subscriptions, err := a.DB.GetSubscriptionsMatchingSubject(ctx, event.Subject)
 	if err != nil {
 		logger.Error("Failed to find matching subscriptions", "error", err)
-		updateEventStatus(ctx, a, event, "failed")
+		updateEventStatus(ctx, a, event.ID, event.RetryCount, "failed")
 		return
 	}
 
 	if len(subscriptions) == 0 {
 		logger.Info("No matching subscriptions for event")
-		updateEventStatus(ctx, a, event, "delivered")
+		updateEventStatus(ctx, a, event.ID, event.RetryCount, "delivered")
 		return
 	}
 
@@ -96,69 +113,191 @@ func dispatchEvent(a *app.Application, event db.Event, getSemaphore func([16]byt
 		subscribers[subID] = subscriber
 	}
 
-	// Track results across all deliveries for this event
-	var mu sync.Mutex
-	allSucceeded := true
-	anyAttempted := false
-
-	var eventWg sync.WaitGroup
-
+	// Build initial delivery tasks
+	var tasks []deliveryTask
 	for subID, subs := range subscriberSubs {
 		subscriber, ok := subscribers[subID]
 		if !ok {
-			mu.Lock()
-			allSucceeded = false
-			mu.Unlock()
 			continue
 		}
 
-		sem := getSemaphore(subscriber.ID.Bytes, subscriber.MaxParallel)
+		for _, sub := range subs {
+			// Determine effective max retries: per-subscription override or global default
+			maxRetries := a.Config.MaxRetries
+			if sub.MaxRetries.Valid {
+				maxRetries = int(sub.MaxRetries.Int32)
+			}
 
-		for range subs {
-			eventWg.Add(1)
-			globalWg.Add(1)
-			anyAttempted = true
-
-			go func(sub db.Subscriber, sem chan struct{}) {
-				defer eventWg.Done()
-				defer globalWg.Done()
-
-				sem <- struct{}{}
-				defer func() { <-sem }()
-
-				succeeded := deliverToSubscriber(ctx, a, event, sub, logger)
-
-				mu.Lock()
-				if !succeeded {
-					allSucceeded = false
-				}
-				mu.Unlock()
-			}(subscriber, sem)
+			tasks = append(tasks, deliveryTask{
+				event:        event,
+				subscription: sub,
+				subscriber:   subscriber,
+				attemptNum:   0,
+				maxRetries:   maxRetries,
+			})
 		}
 	}
 
-	// Wait for all deliveries for this event in a separate goroutine so dispatcher can continue
+	if len(tasks) == 0 {
+		logger.Warn("No valid subscribers found for matching subscriptions")
+		updateEventStatus(ctx, a, event.ID, event.RetryCount, "failed")
+		return
+	}
+
+	resultsChan := make(chan deliveryResult, len(tasks))
+
+	// Track all in-flight tasks for this event
+	var eventWg sync.WaitGroup
+
+	// Process initial deliveries
+	for _, task := range tasks {
+		eventWg.Add(1)
+		globalWg.Add(1)
+
+		go func(t deliveryTask) {
+			defer eventWg.Done()
+			defer globalWg.Done()
+
+			processDeliveryTask(ctx, a, t, getSemaphore, globalWg, resultsChan, logger)
+		}(task)
+	}
+
+	// Wait for all deliveries and determine final status
 	globalWg.Add(1)
 	go func() {
 		defer globalWg.Done()
 		eventWg.Wait()
+		close(resultsChan)
+
+		// Collect results
+		results := make(map[[16]byte]deliveryResult)
+		for r := range resultsChan {
+			// Only keep the final result for each subscription
+			results[r.subscriptionID.Bytes] = r
+		}
+
+		// Determine final status
+		allSucceeded := true
+		anyFailed := false
+		for _, r := range results {
+			if !r.succeeded {
+				allSucceeded = false
+				if r.exhausted {
+					anyFailed = true
+				}
+			}
+		}
 
 		var finalStatus string
-		if !anyAttempted {
-			finalStatus = "failed"
-		} else if allSucceeded {
+		if allSucceeded {
 			finalStatus = "delivered"
+		} else if anyFailed {
+			finalStatus = "failed"
 		} else {
+			// This shouldn't happen in normal flow but handle it
 			finalStatus = "failed"
 		}
 
-		updateEventStatus(ctx, a, event, finalStatus)
+		updateEventStatus(ctx, a, event.ID, event.RetryCount, finalStatus)
 		logger.Info("Event delivery complete", "status", finalStatus)
 	}()
 }
 
+// processDeliveryTask handles a single delivery attempt with retry logic.
+func processDeliveryTask(
+	ctx context.Context,
+	a *app.Application,
+	task deliveryTask,
+	getSemaphore func([16]byte, int32) chan struct{},
+	globalWg *sync.WaitGroup,
+	resultsChan chan<- deliveryResult,
+	logger *slog.Logger,
+) {
+	sem := getSemaphore(task.subscriber.ID.Bytes, task.subscriber.MaxParallel)
+
+	// Acquire semaphore
+	sem <- struct{}{}
+	defer func() { <-sem }()
+
+	succeeded := deliverToSubscriber(ctx, a, task.event, task.subscriber, task.attemptNum, logger)
+
+	if succeeded {
+		resultsChan <- deliveryResult{
+			subscriptionID: task.subscription.ID,
+			succeeded:      true,
+			exhausted:      false,
+		}
+		return
+	}
+
+	// Delivery failed - check if we should retry
+	if task.attemptNum >= task.maxRetries {
+		// Max retries exhausted
+		logger.Warn("Max retries exhausted",
+			"subscriber_id", uuidToString(task.subscriber.ID),
+			"endpoint_url", task.subscriber.EndpointUrl,
+			"attempt", task.attemptNum+1,
+			"max_retries", task.maxRetries,
+		)
+		resultsChan <- deliveryResult{
+			subscriptionID: task.subscription.ID,
+			succeeded:      false,
+			exhausted:      true,
+		}
+		return
+	}
+
+	// Schedule retry with exponential backoff
+	delay := calculateBackoff(task.attemptNum, a.Config.MaxBackoffSeconds)
+	logger.Info("Scheduling retry",
+		"subscriber_id", uuidToString(task.subscriber.ID),
+		"endpoint_url", task.subscriber.EndpointUrl,
+		"attempt", task.attemptNum+1,
+		"next_attempt", task.attemptNum+2,
+		"delay_seconds", delay.Seconds(),
+	)
+
+	// Update event status to partial while retrying
+	updateEventStatus(ctx, a, task.event.ID, task.event.RetryCount+1, "partial")
+
+	// Increment retry count on the event
+	task.event.RetryCount++
+
+	// Schedule the retry in a new goroutine
+	globalWg.Add(1)
+	go func() {
+		defer globalWg.Done()
+
+		// Wait for backoff delay
+		time.Sleep(delay)
+
+		// Create next attempt task
+		nextTask := deliveryTask{
+			event:        task.event,
+			subscription: task.subscription,
+			subscriber:   task.subscriber,
+			attemptNum:   task.attemptNum + 1,
+			maxRetries:   task.maxRetries,
+		}
+
+		// Process the retry
+		processDeliveryTask(ctx, a, nextTask, getSemaphore, globalWg, resultsChan, logger)
+	}()
+}
+
+// calculateBackoff returns the delay duration for exponential backoff.
+// Base delay is 1 second, doubling each attempt, capped at maxBackoffSeconds.
+func calculateBackoff(attemptNum int, maxBackoffSeconds int) time.Duration {
+	// Exponential backoff: 1s, 2s, 4s, 8s, 16s, ...
+	delaySeconds := math.Pow(2, float64(attemptNum))
+	if delaySeconds > float64(maxBackoffSeconds) {
+		delaySeconds = float64(maxBackoffSeconds)
+	}
+	return time.Duration(delaySeconds) * time.Second
+}
+
 // deliverToSubscriber sends the event to a single subscriber endpoint and records the delivery attempt.
-func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event, subscriber db.Subscriber, logger *slog.Logger) bool {
+func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event, subscriber db.Subscriber, attemptNum int, logger *slog.Logger) bool {
 	attemptID := pgtype.UUID{Bytes: uuid.Must(uuid.NewV7()), Valid: true}
 	now := time.Now().UTC()
 
@@ -167,10 +306,10 @@ func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event
 
 	// Build request headers
 	reqHeaders := map[string]string{
-		"Content-Type":      "application/json",
-		"X-Slurpee-Secret":  subscriber.AuthSecret,
-		"X-Event-ID":        uuidToString(event.ID),
-		"X-Event-Subject":   event.Subject,
+		"Content-Type":     "application/json",
+		"X-Slurpee-Secret": subscriber.AuthSecret,
+		"X-Event-ID":       uuidToString(event.ID),
+		"X-Event-Subject":  event.Subject,
 	}
 	reqHeadersJSON, _ := json.Marshal(reqHeaders)
 
@@ -181,6 +320,7 @@ func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event
 			"error", err,
 			"subscriber_id", uuidToString(subscriber.ID),
 			"endpoint_url", subscriber.EndpointUrl,
+			"attempt", attemptNum+1,
 		)
 		recordFailedAttempt(ctx, a, attemptID, event, subscriber, reqHeadersJSON, now, fmt.Sprintf("request creation failed: %v", err))
 		return false
@@ -199,6 +339,7 @@ func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event
 			"error", err,
 			"subscriber_id", uuidToString(subscriber.ID),
 			"endpoint_url", subscriber.EndpointUrl,
+			"attempt", attemptNum+1,
 		)
 		recordFailedAttempt(ctx, a, attemptID, event, subscriber, reqHeadersJSON, now, fmt.Sprintf("request failed: %v", err))
 		return false
@@ -237,12 +378,14 @@ func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event
 			"subscriber_id", uuidToString(subscriber.ID),
 			"endpoint_url", subscriber.EndpointUrl,
 			"status_code", resp.StatusCode,
+			"attempt", attemptNum+1,
 		)
 	} else {
 		logger.Warn("Delivery failed",
 			"subscriber_id", uuidToString(subscriber.ID),
 			"endpoint_url", subscriber.EndpointUrl,
 			"status_code", resp.StatusCode,
+			"attempt", attemptNum+1,
 		)
 	}
 
@@ -266,15 +409,15 @@ func recordFailedAttempt(ctx context.Context, a *app.Application, attemptID pgty
 	}
 }
 
-// updateEventStatus updates the delivery_status and status_updated_at on an event.
-func updateEventStatus(ctx context.Context, a *app.Application, event db.Event, status string) {
+// updateEventStatus updates the delivery_status, retry_count, and status_updated_at on an event.
+func updateEventStatus(ctx context.Context, a *app.Application, eventID pgtype.UUID, retryCount int32, status string) {
 	_, err := a.DB.UpdateEventDeliveryStatus(ctx, db.UpdateEventDeliveryStatusParams{
 		DeliveryStatus:  status,
-		RetryCount:      event.RetryCount,
+		RetryCount:      retryCount,
 		StatusUpdatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		ID:              event.ID,
+		ID:              eventID,
 	})
 	if err != nil {
-		slog.Error("Failed to update event delivery status", "error", err, "event_id", uuidToString(event.ID))
+		slog.Error("Failed to update event delivery status", "error", err, "event_id", uuidToString(eventID))
 	}
 }
