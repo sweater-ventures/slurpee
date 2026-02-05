@@ -7,6 +7,9 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #275 | 4:54 PM | 🔵 | Generated sqlc Event Queries with Type-Safe Database Access | ~401 |
+| #257 | 4:49 PM | 🔵 | Database Model Structures | ~474 |
+| #256 | 4:48 PM | 🔵 | Subscriber and Subscription Database Query Layer | ~482 |
 | #239 | 4:34 PM | 🟣 | Committed log config queries and generated code for US-009 | ~261 |
 | #233 | 4:32 PM | 🟣 | Committed delivery_attempts sqlc queries and generated code | ~318 |
 | #232 | " | 🔵 | Verified generated delivery_attempts Go code structure and type mappings | ~415 |

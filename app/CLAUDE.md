@@ -7,6 +7,8 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #261 | 4:50 PM | 🔵 | Configuration Access Pattern Investigation | ~485 |
+| #259 | 4:49 PM | 🔵 | Application Context Structure | ~425 |
 | #50 | 2:32 PM | 🔵 | Application Structure and Database Initialization | ~345 |
 | #48 | " | 🔵 | Database Connection Pool Configuration | ~282 |
 </claude-mem-context>

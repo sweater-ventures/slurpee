@@ -7,6 +7,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #258 | 4:49 PM | 🔵 | Subscriber SQL Query Definitions | ~492 |
 | #239 | 4:34 PM | 🟣 | Committed log config queries and generated code for US-009 | ~261 |
 | #238 | " | 🟣 | Implemented sqlc queries for log configuration CRUD operations | ~301 |
 | #233 | 4:32 PM | 🟣 | Committed delivery_attempts sqlc queries and generated code | ~318 |

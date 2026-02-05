@@ -13,6 +13,12 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - Use `sqlc.arg(name)` for named parameters in sqlc queries to get clean Go struct field names
 - JSONB containment search: `WHERE data @> $1` with `@>` operator
 - PostgreSQL TEXT[] maps to Go `[]string` in sqlc without needing a custom override
+- Go 1.22+ method routing: use `"POST /events"` pattern in ServeMux for method-restricted routes
+- API routes register under `/events` (not `/api/events`) — the `/api` prefix is stripped by AddApis()
+- Use `pgtype.UUID{Valid: false}` for nullable UUID columns (SQL NULL); `json.RawMessage` for JSONB round-tripping
+- Admin-protected endpoints validate `X-Slurpee-Admin-Secret` header against `app.Config.AdminSecret`
+- Idempotent subscriber registration: upsert by endpoint_url, then delete + recreate subscriptions
+- Path parameters: `"GET /events/{id}"` route pattern + `r.PathValue("id")` to extract; use `pgx.ErrNoRows` with `errors.Is()` for 404
 
 ---
 
@@ -130,4 +136,70 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - The log_config upsert only updates log_properties on conflict (not id) since subject is the unique key used for lookups
   - All four sqlc query file stories (US-006 through US-009) are now complete, covering events, subscribers/subscriptions, delivery_attempts, and log_config
   - The sqlc query layer is fully implemented — next stories (US-010+) move to REST API endpoint implementation
+---
+
+## 2026-02-04 16:40 MST - US-010
+- Implemented POST /api/events endpoint in api/events.go
+- Accepts JSON body with subject (required), data (required JSON object), id (optional UUID v7), timestamp (optional, defaults to now), trace_id (optional UUID)
+- Returns 201 with created event including assigned id and timestamp
+- Returns 400 with error details for missing/invalid fields (subject, data, id, trace_id)
+- Validates data is a JSON object (not array, string, etc.)
+- Uses uuid.NewV7() from google/uuid for auto-generated event IDs
+- Persists to database via app.DB.InsertEvent before responding
+- Logs event subject and ID on receipt using slog via context logger
+- Follows existing routeHandler/writeJsonResponse/init() pattern
+- Helper functions: eventToResponse() converts db.Event to API response, uuidToString() converts pgtype.UUID to string
+- Files changed: api/events.go (new)
+- **Learnings for future iterations:**
+  - Go 1.22+ method-based routing: `"POST /events"` pattern restricts to POST only without manual method checking
+  - pgtype.UUID with Valid:false represents SQL NULL — use this for optional UUID fields like trace_id
+  - json.RawMessage preserves raw JSON for request parsing and response serialization (no double-encoding)
+  - The api/ package routes are stripped of `/api` prefix by AddApis(), so register as `/events` not `/api/events`
+  - uuid.Must(uuid.NewV7()) generates time-ordered UUIDs for natural chronological ordering
+---
+
+## 2026-02-04 16:48 MST - US-011
+- Implemented POST /api/subscribers endpoint in api/subscribers.go
+- Added ADMIN_SECRET field to AppConfig in config/configuration.go (env var ADMIN_SECRET)
+- Accepts JSON body with name (required), endpoint_url (required), auth_secret (required), max_parallel (optional, default 1), subscriptions (required array with subject_pattern + optional filter/max_retries)
+- Validates X-Slurpee-Admin-Secret header against app.Config.AdminSecret; returns 401 if invalid
+- Upserts subscriber by endpoint_url (creates new or updates existing with same endpoint)
+- On upsert, deletes existing subscriptions and recreates them (idempotent replace)
+- Returns 200 with full subscriber and subscriptions as JSON
+- Returns 400 for missing required fields
+- Files changed: api/subscribers.go (new), config/configuration.go (added AdminSecret field)
+- **Learnings for future iterations:**
+  - Admin-protected endpoints check X-Slurpee-Admin-Secret header against app.Config.AdminSecret
+  - The upsert + delete-and-recreate pattern for subscriptions ensures idempotent replacement: subscriber is upserted by endpoint_url, then all subscriptions are deleted and recreated fresh
+  - pgtype.Int4{Int32: value, Valid: true} for nullable integer columns, pgtype.Int4{} (zero value) for NULL
+  - json.RawMessage works for optional JSONB filter fields — check for nil/null before passing to DB as []byte
+  - AppConfig uses go-arg library with struct tags for env var binding: `arg:"--flag,env:ENV_VAR" default:"value"`
+---
+
+## 2026-02-04 16:55 MST - US-012
+- Implemented GET /api/events/{id} endpoint in api/events.go (added to existing file)
+- Parses {id} path parameter using r.PathValue("id") (Go 1.22+ ServeMux feature)
+- Validates UUID format, returns 400 if invalid
+- Calls app.DB.GetEventByID, returns 404 if not found (checks errors.Is(err, pgx.ErrNoRows))
+- Returns 200 with full event JSON using existing eventToResponse() helper
+- Registered via init() alongside existing POST /events route
+- Files changed: api/events.go (added getEventHandler, new imports for errors and pgx)
+- **Learnings for future iterations:**
+  - Go 1.22+ path parameters: use `{name}` in route pattern and `r.PathValue("name")` to extract — no external router needed
+  - pgx.ErrNoRows sentinel error with errors.Is() for detecting "not found" from :one queries
+  - Multiple routes can be registered in the same init() block by calling router.Handle multiple times
+---
+
+## 2026-02-04 16:57 MST - US-013
+- Implemented GET /api/subscribers endpoint in api/subscribers.go (added to existing file)
+- Lists all subscribers with their subscriptions as a JSON array
+- Validates X-Slurpee-Admin-Secret header (401 if missing/incorrect)
+- Returns empty array [] if no subscribers registered
+- For each subscriber, fetches subscriptions via ListSubscriptionsForSubscriber and converts using existing helper functions
+- Registered via init() alongside existing POST /subscribers route
+- Files changed: api/subscribers.go (added listSubscribersHandler, +40 lines)
+- **Learnings for future iterations:**
+  - Reuse existing response type structs and converter functions (subscriberToResponse, subscriptionToResponse) — no new types needed for GET list endpoints
+  - Admin auth pattern is duplicated per handler — a middleware would reduce duplication if more admin endpoints are added
+  - Initialize nil slices to empty (`[]Type{}`) before JSON serialization to return `[]` instead of `null`
 ---
