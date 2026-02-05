@@ -352,3 +352,22 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - prettyJSON helper pattern: unmarshal to interface{} then MarshalIndent for readable display of JSONB columns
   - The event detail route `GET /events/{id}` coexists with `GET /events` because Go 1.22+ ServeMux uses longest path match
 ---
+
+## 2026-02-05 15:35 MST - US-023
+- Built event creation page at /events/new with form for subject, JSON data textarea, and optional trace ID
+- Templ template in views/event_create.templ with EventCreateForm struct (Subject, Data, TraceID, Errors map)
+- Form submits via POST /events/new to server-side handler that validates and persists directly via DB
+- Inline validation errors: required subject, required valid JSON object for data, optional UUID format for trace_id
+- General error alert for server-side failures (DB insert errors)
+- On success, triggers async delivery via DeliveryChan and redirects to /events/{id} with 303 See Other
+- DaisyUI form components: input, textarea, button with error states (input-error, textarea-error)
+- Go handlers: eventCreateFormHandler (GET, renders empty form), eventCreateSubmitHandler (POST, validates + creates)
+- Routes registered before /events/{id} in init() — Go 1.22+ literal paths take priority over wildcards
+- Files changed: views/event_create.templ (new), views/event_create_templ.go (generated), views/events.go (added handlers and routes)
+- **Learnings for future iterations:**
+  - `GET /events/new` must be registered before `GET /events/{id}` — Go 1.22+ ServeMux prioritizes literal path segments over wildcards
+  - templ.KV("class-name", condition) for conditional CSS classes in templ templates (e.g., input-error on validation failure)
+  - Server-side form POST handler pattern: ParseForm(), validate, re-render with errors on failure, redirect on success (PRG pattern)
+  - HTTP 303 See Other is the correct redirect status for POST-Redirect-GET pattern to ensure browser uses GET for the redirect
+  - EventCreateForm uses map[string]string for errors to support per-field error display plus a "general" key for server errors
+---
