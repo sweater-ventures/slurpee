@@ -1,0 +1,84 @@
+package views
+
+import (
+	"fmt"
+	"github.com/sweater-ventures/slurpee/components"
+)
+
+type EventRow struct {
+	ID             string
+	Subject        string
+	Timestamp      string
+	DeliveryStatus string
+}
+
+func truncateID(id string) string {
+	if len(id) > 8 {
+		return id[:8] + "..."
+	}
+	return id
+}
+
+func statusBadgeClass(status string) string {
+	switch status {
+	case "delivered":
+		return "badge badge-success"
+	case "failed":
+		return "badge badge-error"
+	case "pending":
+		return "badge badge-warning"
+	case "partial":
+		return "badge badge-info"
+	default:
+		return "badge badge-ghost"
+	}
+}
+
+templ EventsListTemplate(events []EventRow, page int, hasNext bool) {
+	@components.SimplePage("Events", "/events") {
+		<div class="flex justify-between items-center mb-6">
+			<h1 class="text-3xl font-bold">Events</h1>
+			<a href="/events/new" class="btn btn-primary">New Event</a>
+		</div>
+		<div class="overflow-x-auto">
+			<table class="table table-zebra w-full">
+				<thead>
+					<tr>
+						<th>Subject</th>
+						<th>Event ID</th>
+						<th>Timestamp</th>
+						<th>Status</th>
+					</tr>
+				</thead>
+				<tbody>
+					if len(events) == 0 {
+						<tr>
+							<td colspan="4" class="text-center text-base-content/60 py-8">No events found</td>
+						</tr>
+					}
+					for _, event := range events {
+						<tr class="hover cursor-pointer" onclick={ goToEvent(event.ID) }>
+							<td class="font-mono">{ event.Subject }</td>
+							<td class="font-mono text-sm">{ truncateID(event.ID) }</td>
+							<td>{ event.Timestamp }</td>
+							<td><span class={ statusBadgeClass(event.DeliveryStatus) }>{ event.DeliveryStatus }</span></td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		<div class="flex justify-center gap-2 mt-6">
+			if page > 1 {
+				<a href={ templ.SafeURL(fmt.Sprintf("/events?page=%d", page-1)) } class="btn btn-outline btn-sm">Previous</a>
+			}
+			<span class="btn btn-ghost btn-sm no-animation">{ fmt.Sprintf("Page %d", page) }</span>
+			if hasNext {
+				<a href={ templ.SafeURL(fmt.Sprintf("/events?page=%d", page+1)) } class="btn btn-outline btn-sm">Next</a>
+			}
+		</div>
+	}
+}
+
+script goToEvent(id string) {
+	window.location.href = "/events/" + id;
+}
