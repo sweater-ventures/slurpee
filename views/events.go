@@ -17,6 +17,8 @@ import (
 
 func init() {
 	registerRoute(func(slurpee *app.Application, router *http.ServeMux) {
+		router.Handle("GET /events/new", routeHandler(slurpee, eventCreateFormHandler))
+		router.Handle("POST /events/new", routeHandler(slurpee, eventCreateSubmitHandler))
 		router.Handle("GET /events", routeHandler(slurpee, eventsListHandler))
 		router.Handle("GET /events/{id}", routeHandler(slurpee, eventDetailHandler))
 	})
@@ -222,6 +224,98 @@ func eventDetailHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 		log(r.Context()).Error("Error rendering event detail view", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
+}
+
+func eventCreateFormHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+	form := EventCreateForm{Errors: map[string]string{}}
+	if err := EventCreateTemplate(form).Render(r.Context(), w); err != nil {
+		log(r.Context()).Error("Error rendering event create view", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func eventCreateSubmitHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	subject := r.FormValue("subject")
+	data := r.FormValue("data")
+	traceID := r.FormValue("trace_id")
+
+	form := EventCreateForm{
+		Subject: subject,
+		Data:    data,
+		TraceID: traceID,
+		Errors:  map[string]string{},
+	}
+
+	// Validate required fields
+	if subject == "" {
+		form.Errors["subject"] = "Subject is required"
+	}
+	if data == "" {
+		form.Errors["data"] = "Data is required"
+	} else if !json.Valid([]byte(data)) {
+		form.Errors["data"] = "Data must be valid JSON"
+	} else {
+		// Validate it's a JSON object
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(data), &obj); err != nil {
+			form.Errors["data"] = "Data must be a JSON object (not array or primitive)"
+		}
+	}
+
+	// Validate optional trace_id
+	var traceUUID pgtype.UUID
+	if traceID != "" {
+		parsed, err := uuid.Parse(traceID)
+		if err != nil {
+			form.Errors["trace_id"] = "Trace ID must be a valid UUID"
+		} else {
+			traceUUID = pgtype.UUID{Bytes: parsed, Valid: true}
+		}
+	}
+
+	// If there are validation errors, re-render the form
+	if len(form.Errors) > 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		if err := EventCreateTemplate(form).Render(r.Context(), w); err != nil {
+			log(r.Context()).Error("Error rendering event create view", "err", err)
+		}
+		return
+	}
+
+	// Create the event
+	now := time.Now().UTC()
+	eventID := pgtype.UUID{Bytes: uuid.Must(uuid.NewV7()), Valid: true}
+
+	event, err := app.DB.InsertEvent(r.Context(), db.InsertEventParams{
+		ID:              eventID,
+		Subject:         subject,
+		Timestamp:       pgtype.Timestamptz{Time: now, Valid: true},
+		TraceID:         traceUUID,
+		Data:            json.RawMessage(data),
+		RetryCount:      0,
+		DeliveryStatus:  "pending",
+		StatusUpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+	})
+	if err != nil {
+		log(r.Context()).Error("Error creating event", "err", err)
+		form.Errors["general"] = "Failed to create event. Please try again."
+		w.WriteHeader(http.StatusInternalServerError)
+		if renderErr := EventCreateTemplate(form).Render(r.Context(), w); renderErr != nil {
+			log(r.Context()).Error("Error rendering event create view", "err", renderErr)
+		}
+		return
+	}
+
+	// Trigger async delivery
+	app.DeliveryChan <- event
+
+	// Redirect to the newly created event detail page
+	http.Redirect(w, r, "/events/"+pgtypeUUIDToString(event.ID), http.StatusSeeOther)
 }
 
 func prettyJSON(data []byte) string {
