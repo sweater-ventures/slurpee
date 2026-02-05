@@ -392,3 +392,17 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - Exporting delivery functions from api package (e.g., ReplayToSubscriber) allows views to trigger delivery without reimplementing HTTP client logic
   - Route registration order matters: `POST /events/{id}/replay` and `POST /events/{id}/replay/{subscriberId}` must be registered before `GET /events/{id}` to avoid the wildcard catching POST requests (Go 1.22+ method prefix helps but literal paths still need priority)
 ---
+
+## 2026-02-05 16:30 MST - US-025
+- Built subscribers list page at /subscribers with table showing name, endpoint URL, max parallel, subscription count, and created at timestamp
+- Templ template in views/subscribers.templ with SubscriberRow struct and goToSubscriber script for clickable rows
+- Go handler in views/subscribers.go using init() route registration and routeHandler wrapper pattern
+- For each subscriber, fetches subscription count via ListSubscriptionsForSubscriber query
+- Empty state shows "No subscribers registered" message
+- Files changed: views/subscribers.templ (new), views/subscribers_templ.go (generated), views/subscribers.go (new)
+- **Learnings for future iterations:**
+  - Subscriber list page follows exact same pattern as events list page but simpler (no pagination/filtering needed since subscribers are typically few)
+  - Subscription count requires a per-subscriber query (ListSubscriptionsForSubscriber) — for large subscriber counts a dedicated COUNT query would be more efficient
+  - The pgtypeUUIDToString helper from events.go is accessible across the views package since all files share the same package
+  - goToSubscriber script in .templ file mirrors the goToEvent pattern for clickable table rows
+---
