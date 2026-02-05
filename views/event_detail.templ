@@ -18,6 +18,7 @@ type EventDetail struct {
 
 type DeliveryAttemptRow struct {
 	ID                 string
+	SubscriberID       string
 	EndpointURL        string
 	AttemptedAt        string
 	ResponseStatusCode string
@@ -74,23 +75,90 @@ templ EventDetailTemplate(event EventDetail, attempts []DeliveryAttemptRow) {
 				</div>
 			</div>
 		</div>
-		<h3 class="text-lg font-semibold mb-4">
-			Delivery Attempts
-			<span class="badge badge-ghost ml-2">{ fmt.Sprintf("%d", len(attempts)) }</span>
-		</h3>
-		if len(attempts) == 0 {
-			<div class="text-base-content/60 text-center py-8">No delivery attempts recorded</div>
-		} else {
-			<div class="space-y-2">
-				for _, attempt := range attempts {
-					@deliveryAttemptCard(attempt)
-				}
+		<div id="delivery-section">
+			@deliveryAttemptsSection(event, attempts)
+		</div>
+		<!-- Replay All Confirmation Modal -->
+		<dialog id="replay-all-modal" class="modal">
+			<div class="modal-box">
+				<h3 class="text-lg font-bold">Replay All Deliveries</h3>
+				<p class="py-4">Are you sure you want to replay delivery to all matching subscribers? This will reset the delivery status and create new delivery attempts.</p>
+				<div class="modal-action">
+					<form method="dialog">
+						<button class="btn btn-ghost">Cancel</button>
+					</form>
+					<button
+						class="btn btn-primary"
+						hx-post={ fmt.Sprintf("/events/%s/replay", event.ID) }
+						hx-target="#delivery-section"
+						hx-swap="innerHTML"
+						onclick="document.getElementById('replay-all-modal').close()"
+					>
+						Replay All
+					</button>
+				</div>
 			</div>
-		}
+			<form method="dialog" class="modal-backdrop">
+				<button>close</button>
+			</form>
+		</dialog>
+		<!-- Per-Subscriber Replay Confirmation Modal -->
+		<dialog id="replay-subscriber-modal" class="modal">
+			<div class="modal-box">
+				<h3 class="text-lg font-bold">Replay Delivery</h3>
+				<p class="py-4">Are you sure you want to replay delivery to <span id="replay-subscriber-endpoint" class="font-mono font-semibold"></span>?</p>
+				<div class="modal-action">
+					<form method="dialog">
+						<button class="btn btn-ghost">Cancel</button>
+					</form>
+					<button
+						id="replay-subscriber-confirm"
+						class="btn btn-primary"
+						hx-target="#delivery-section"
+						hx-swap="innerHTML"
+						onclick="document.getElementById('replay-subscriber-modal').close()"
+					>
+						Replay
+					</button>
+				</div>
+			</div>
+			<form method="dialog" class="modal-backdrop">
+				<button>close</button>
+			</form>
+		</dialog>
 	}
 }
 
-templ deliveryAttemptCard(attempt DeliveryAttemptRow) {
+script openReplayModal(eventId, subscriberId, endpoint string) {
+	document.getElementById('replay-subscriber-endpoint').textContent = endpoint;
+	var btn = document.getElementById('replay-subscriber-confirm');
+	btn.setAttribute('hx-post', '/events/' + eventId + '/replay/' + subscriberId);
+	htmx.process(btn);
+	document.getElementById('replay-subscriber-modal').showModal();
+}
+
+templ deliveryAttemptsSection(event EventDetail, attempts []DeliveryAttemptRow) {
+	<div class="flex items-center justify-between mb-4">
+		<h3 class="text-lg font-semibold">
+			Delivery Attempts
+			<span class="badge badge-ghost ml-2">{ fmt.Sprintf("%d", len(attempts)) }</span>
+		</h3>
+		<button class="btn btn-primary btn-sm" onclick="document.getElementById('replay-all-modal').showModal()">
+			Replay All
+		</button>
+	</div>
+	if len(attempts) == 0 {
+		<div class="text-base-content/60 text-center py-8">No delivery attempts recorded</div>
+	} else {
+		<div class="space-y-2">
+			for _, attempt := range attempts {
+				@deliveryAttemptCard(event, attempt)
+			}
+		</div>
+	}
+}
+
+templ deliveryAttemptCard(event EventDetail, attempt DeliveryAttemptRow) {
 	<div class="collapse collapse-arrow bg-base-200">
 		<input type="checkbox"/>
 		<div class="collapse-title">
@@ -125,6 +193,16 @@ templ deliveryAttemptCard(attempt DeliveryAttemptRow) {
 				}
 				if attempt.RequestHeaders == "" && attempt.ResponseHeaders == "" && attempt.ResponseBody == "" {
 					<p class="text-base-content/40 text-sm">No request/response details available</p>
+				}
+				if attempt.SubscriberID != "" {
+					<div class="flex justify-end pt-2">
+						<button
+							class="btn btn-outline btn-sm"
+							onclick={ openReplayModal(event.ID, attempt.SubscriberID, attempt.EndpointURL) }
+						>
+							Replay
+						</button>
+					</div>
 				}
 			</div>
 		</div>

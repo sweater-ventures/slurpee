@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/sweater-ventures/slurpee/api"
 	"github.com/sweater-ventures/slurpee/app"
 	"github.com/sweater-ventures/slurpee/db"
 )
@@ -19,6 +20,8 @@ func init() {
 	registerRoute(func(slurpee *app.Application, router *http.ServeMux) {
 		router.Handle("GET /events/new", routeHandler(slurpee, eventCreateFormHandler))
 		router.Handle("POST /events/new", routeHandler(slurpee, eventCreateSubmitHandler))
+		router.Handle("POST /events/{id}/replay", routeHandler(slurpee, eventReplayAllHandler))
+		router.Handle("POST /events/{id}/replay/{subscriberId}", routeHandler(slurpee, eventReplaySubscriberHandler))
 		router.Handle("GET /events", routeHandler(slurpee, eventsListHandler))
 		router.Handle("GET /events/{id}", routeHandler(slurpee, eventDetailHandler))
 	})
@@ -170,7 +173,102 @@ func eventDetailHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Format event data as pretty JSON
+	detail, attemptRows := buildEventDetailView(event, attempts)
+
+	if err := EventDetailTemplate(detail, attemptRows).Render(r.Context(), w); err != nil {
+		log(r.Context()).Error("Error rendering event detail view", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func eventReplayAllHandler(a *app.Application, w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	parsed, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid event ID", http.StatusBadRequest)
+		return
+	}
+	pgID := pgtype.UUID{Bytes: parsed, Valid: true}
+
+	event, err := a.DB.GetEventByID(r.Context(), pgID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "Event not found", http.StatusNotFound)
+			return
+		}
+		log(r.Context()).Error("Error fetching event for replay", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Reset event status to pending and send to delivery channel
+	a.DeliveryChan <- event
+
+	// Re-fetch the event and delivery attempts for the updated view
+	event, _ = a.DB.GetEventByID(r.Context(), pgID)
+	attempts, _ := a.DB.ListDeliveryAttemptsForEvent(r.Context(), pgID)
+
+	detail, attemptRows := buildEventDetailView(event, attempts)
+	if err := deliveryAttemptsSection(detail, attemptRows).Render(r.Context(), w); err != nil {
+		log(r.Context()).Error("Error rendering delivery section", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func eventReplaySubscriberHandler(a *app.Application, w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	parsed, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid event ID", http.StatusBadRequest)
+		return
+	}
+	pgID := pgtype.UUID{Bytes: parsed, Valid: true}
+
+	subscriberIDStr := r.PathValue("subscriberId")
+	subscriberParsed, err := uuid.Parse(subscriberIDStr)
+	if err != nil {
+		http.Error(w, "Invalid subscriber ID", http.StatusBadRequest)
+		return
+	}
+	subscriberPgID := pgtype.UUID{Bytes: subscriberParsed, Valid: true}
+
+	event, err := a.DB.GetEventByID(r.Context(), pgID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "Event not found", http.StatusNotFound)
+			return
+		}
+		log(r.Context()).Error("Error fetching event for replay", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	subscriber, err := a.DB.GetSubscriberByID(r.Context(), subscriberPgID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "Subscriber not found", http.StatusNotFound)
+			return
+		}
+		log(r.Context()).Error("Error fetching subscriber for replay", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Replay delivery to the single subscriber in a background goroutine
+	go api.ReplayToSubscriber(a, event, subscriber)
+
+	// Re-fetch the event and delivery attempts for the updated view
+	event, _ = a.DB.GetEventByID(r.Context(), pgID)
+	attempts, _ := a.DB.ListDeliveryAttemptsForEvent(r.Context(), pgID)
+
+	detail, attemptRows := buildEventDetailView(event, attempts)
+	if err := deliveryAttemptsSection(detail, attemptRows).Render(r.Context(), w); err != nil {
+		log(r.Context()).Error("Error rendering delivery section", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func buildEventDetailView(event db.Event, attempts []db.DeliveryAttempt) (EventDetail, []DeliveryAttemptRow) {
 	var prettyData string
 	var rawData interface{}
 	if err := json.Unmarshal(event.Data, &rawData); err == nil {
@@ -200,10 +298,11 @@ func eventDetailHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 	attemptRows := make([]DeliveryAttemptRow, len(attempts))
 	for i, a := range attempts {
 		row := DeliveryAttemptRow{
-			ID:          pgtypeUUIDToString(a.ID),
-			EndpointURL: a.EndpointUrl,
-			AttemptedAt: a.AttemptedAt.Time.Format("2006-01-02 15:04:05 MST"),
-			Status:      a.Status,
+			ID:           pgtypeUUIDToString(a.ID),
+			SubscriberID: pgtypeUUIDToString(a.SubscriberID),
+			EndpointURL:  a.EndpointUrl,
+			AttemptedAt:  a.AttemptedAt.Time.Format("2006-01-02 15:04:05 MST"),
+			Status:       a.Status,
 		}
 		if a.ResponseStatusCode.Valid {
 			row.ResponseStatusCode = fmt.Sprintf("%d", a.ResponseStatusCode.Int32)
@@ -220,10 +319,7 @@ func eventDetailHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 		attemptRows[i] = row
 	}
 
-	if err := EventDetailTemplate(detail, attemptRows).Render(r.Context(), w); err != nil {
-		log(r.Context()).Error("Error rendering event detail view", "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
-	}
+	return detail, attemptRows
 }
 
 func eventCreateFormHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
