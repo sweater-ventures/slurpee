@@ -1,0 +1,125 @@
+package views
+
+import (
+	"fmt"
+	"github.com/sweater-ventures/slurpee/components"
+)
+
+type SubscriberDetail struct {
+	ID          string
+	Name        string
+	EndpointURL string
+	AuthSecret  string
+	MaxParallel int32
+	CreatedAt   string
+	UpdatedAt   string
+}
+
+type SubscriptionRow struct {
+	ID             string
+	SubjectPattern string
+	Filter         string
+	MaxRetries     string
+}
+
+templ SubscriberDetailTemplate(subscriber SubscriberDetail, subscriptions []SubscriptionRow) {
+	@components.SimplePage("Subscriber Detail", "/subscribers") {
+		<div class="mb-4">
+			<a href="/subscribers" class="btn btn-ghost btn-sm">&larr; Back to Subscribers</a>
+		</div>
+		<div class="card bg-base-200 shadow-md mb-6">
+			<div class="card-body">
+				<h2 class="card-title text-lg">{ subscriber.Name }</h2>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+					<div>
+						<label class="text-sm text-base-content/60">Subscriber ID</label>
+						<p class="font-mono text-sm">{ subscriber.ID }</p>
+					</div>
+					<div>
+						<label class="text-sm text-base-content/60">Endpoint URL</label>
+						<p class="font-mono text-sm">{ subscriber.EndpointURL }</p>
+					</div>
+					<div>
+						<label class="text-sm text-base-content/60">Auth Secret</label>
+						<div class="flex items-center gap-2">
+							<p class="font-mono text-sm" id="auth-secret-masked">••••••••</p>
+							<p class="font-mono text-sm hidden" id="auth-secret-revealed">{ subscriber.AuthSecret }</p>
+							<button class="btn btn-ghost btn-xs" onclick={ toggleSecret() }>
+								<span id="toggle-text">Show</span>
+							</button>
+						</div>
+					</div>
+					<div>
+						<label class="text-sm text-base-content/60">Max Parallel</label>
+						<p>{ fmt.Sprintf("%d", subscriber.MaxParallel) }</p>
+					</div>
+					<div>
+						<label class="text-sm text-base-content/60">Created At</label>
+						<p>{ subscriber.CreatedAt }</p>
+					</div>
+					<div>
+						<label class="text-sm text-base-content/60">Updated At</label>
+						<p>{ subscriber.UpdatedAt }</p>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div>
+			<h3 class="text-lg font-semibold mb-4">
+				Subscriptions
+				<span class="badge badge-ghost ml-2">{ fmt.Sprintf("%d", len(subscriptions)) }</span>
+			</h3>
+			if len(subscriptions) == 0 {
+				<div class="text-base-content/60 text-center py-8">No subscriptions configured</div>
+			} else {
+				<div class="overflow-x-auto">
+					<table class="table table-zebra w-full">
+						<thead>
+							<tr>
+								<th>Subject Pattern</th>
+								<th>Filter</th>
+								<th>Max Retries</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, sub := range subscriptions {
+								<tr>
+									<td class="font-mono text-sm">{ sub.SubjectPattern }</td>
+									<td class="font-mono text-sm">
+										if sub.Filter != "" {
+											<pre class="bg-base-300 p-2 rounded text-xs whitespace-pre-wrap">{ sub.Filter }</pre>
+										} else {
+											<span class="text-base-content/40">—</span>
+										}
+									</td>
+									<td>
+										if sub.MaxRetries != "" {
+											{ sub.MaxRetries }
+										} else {
+											<span class="text-base-content/40">global default</span>
+										}
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+		</div>
+	}
+}
+
+script toggleSecret() {
+	var masked = document.getElementById('auth-secret-masked');
+	var revealed = document.getElementById('auth-secret-revealed');
+	var toggleText = document.getElementById('toggle-text');
+	if (masked.classList.contains('hidden')) {
+		masked.classList.remove('hidden');
+		revealed.classList.add('hidden');
+		toggleText.textContent = 'Show';
+	} else {
+		masked.classList.add('hidden');
+		revealed.classList.remove('hidden');
+		toggleText.textContent = 'Hide';
+	}
+}

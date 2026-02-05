@@ -17,4 +17,11 @@
 | #239 | 4:34 PM | 🟣 | Committed log config queries and generated code for US-009 | ~261 |
 | #233 | 4:32 PM | 🟣 | Committed delivery_attempts sqlc queries and generated code | ~318 |
 | #232 | " | 🔵 | Verified generated delivery_attempts Go code structure and type mappings | ~415 |
+
+### Feb 5, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #511 | 4:27 PM | 🔵 | Generated sqlc model structs for all database tables | ~409 |
+| #510 | " | 🔵 | Generated sqlc code for subscriber and subscription queries | ~486 |
 </claude-mem-context>
