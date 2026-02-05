@@ -227,3 +227,22 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - HTTP client should have a timeout (30s) to prevent hanging on unresponsive subscriber endpoints
   - Response body reading should be limited (1MB) to prevent memory issues from large responses
 ---
+
+## 2026-02-05 11:50 MST - US-015
+- Implemented delivery retry with exponential backoff in api/delivery.go
+- Added MAX_RETRIES (default 5) and MAX_BACKOFF_SECONDS (default 300) config fields to AppConfig
+- Refactored delivery engine to track per-subscription retry state using deliveryTask struct
+- deliveryResult struct tracks final outcome per subscription (succeeded or exhausted)
+- Exponential backoff: 1s, 2s, 4s, 8s, 16s... capped at MaxBackoffSeconds
+- Per-subscription max_retries override takes precedence over global default
+- New "partial" delivery status used while some subscriptions succeeded and others are still retrying
+- Each retry attempt recorded as new row in delivery_attempts table
+- retry_count on event incremented for each retry cycle
+- status_updated_at updated on each status change
+- Files changed: api/delivery.go (major refactor, +150 lines), config/configuration.go (added 2 config fields)
+- **Learnings for future iterations:**
+  - Package-level type definitions needed when types are used across multiple functions (deliveryResult couldn't be local to dispatchEvent and used in processDeliveryTask)
+  - Recursive goroutine pattern works for retry scheduling: processDeliveryTask spawns itself after delay
+  - math.Pow for exponential calculation, cap result with min() against max seconds
+  - time.Sleep in a new goroutine allows non-blocking retry scheduling while maintaining WaitGroup tracking
+---
