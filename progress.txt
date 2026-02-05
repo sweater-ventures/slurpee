@@ -19,6 +19,8 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - Admin-protected endpoints validate `X-Slurpee-Admin-Secret` header against `app.Config.AdminSecret`
 - Idempotent subscriber registration: upsert by endpoint_url, then delete + recreate subscriptions
 - Path parameters: `"GET /events/{id}"` route pattern + `r.PathValue("id")` to extract; use `pgx.ErrNoRows` with `errors.Is()` for 404
+- Async delivery: `deliverEvent(app, event)` in api/delivery.go triggers background goroutine after event persistence; uses `context.Background()` not request context
+- Per-subscriber concurrency: buffered channel `make(chan struct{}, maxParallel)` as semaphore pattern
 
 ---
 
@@ -202,4 +204,26 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - Reuse existing response type structs and converter functions (subscriberToResponse, subscriptionToResponse) — no new types needed for GET list endpoints
   - Admin auth pattern is duplicated per handler — a middleware would reduce duplication if more admin endpoints are added
   - Initialize nil slices to empty (`[]Type{}`) before JSON serialization to return `[]` instead of `null`
+---
+
+## 2026-02-04 17:05 MST - US-014
+- Implemented event delivery engine in api/delivery.go
+- After POST /api/events stores the event, deliverEvent() is called to trigger async delivery in a background goroutine
+- Uses GetSubscriptionsMatchingSubject (SQL LIKE with glob-to-SQL conversion) to find matching subscriptions
+- Groups subscriptions by subscriber, loads subscriber details, then delivers in parallel
+- Per-subscriber concurrency limited by max_parallel using buffered channel as semaphore
+- Each delivery sends HTTP POST to subscriber endpoint_url with event data as JSON body
+- X-Slurpee-Secret header set to subscriber's auth_secret for authentication
+- Delivery attempts recorded in delivery_attempts table with request headers, response status/headers/body, and status
+- 2xx responses marked as "succeeded", all others as "failed"
+- Event delivery_status updated after all attempts complete: "delivered" (all succeeded), "failed" (any failed)
+- Events with no matching subscriptions marked as "delivered"
+- Files changed: api/delivery.go (new, ~236 lines), api/events.go (added deliverEvent call after event persistence)
+- **Learnings for future iterations:**
+  - pgtype.UUID is comparable and works as a Go map key (struct with [16]byte array + bool)
+  - Buffered channels (`make(chan struct{}, n)`) work as simple semaphores for per-subscriber concurrency control
+  - Background goroutines need context.Background() not the request context, since the HTTP request context is cancelled after response is sent
+  - The delivery engine is intentionally decoupled from subscription filters (US-016) and retry logic (US-015) to keep stories focused
+  - HTTP client should have a timeout (30s) to prevent hanging on unresponsive subscriber endpoints
+  - Response body reading should be limited (1MB) to prevent memory issues from large responses
 ---
