@@ -21,8 +21,10 @@ type AppConfig struct {
 	DBUsername string `arg:"--db-username,env:DB_USERNAME" default:"slurpee"`
 	DBPassword string `arg:"--db-password,env:DB_PASSWORD" default:"badpassword"`
 	BaseURL     string `arg:"--base-url,env:BASE_URL" default:"http://localhost:8005" help:"Base URL for the application."`
-	AdminSecret string `arg:"--admin-secret,env:ADMIN_SECRET" default:"" help:"Pre-shared secret for admin API endpoints (X-Slurpee-Admin-Secret header)."`
-	MaxParallel int    `arg:"--max-parallel,env:MAX_PARALLEL" default:"1" help:"Default max parallel deliveries per subscriber."`
+	AdminSecret       string `arg:"--admin-secret,env:ADMIN_SECRET" default:"" help:"Pre-shared secret for admin API endpoints (X-Slurpee-Admin-Secret header)."`
+	MaxParallel       int    `arg:"--max-parallel,env:MAX_PARALLEL" default:"1" help:"Default max parallel deliveries per subscriber."`
+	MaxRetries        int    `arg:"--max-retries,env:MAX_RETRIES" default:"5" help:"Maximum number of delivery retry attempts per subscription."`
+	MaxBackoffSeconds int    `arg:"--max-backoff-seconds,env:MAX_BACKOFF_SECONDS" default:"300" help:"Maximum backoff delay in seconds between retries (cap for exponential backoff)."`
 }
 
 func LoadConfig() (*AppConfig, error) {
