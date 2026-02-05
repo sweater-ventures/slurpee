@@ -319,3 +319,20 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - View routes use `"GET /events"` pattern (method prefix) unlike the catch-all `/` route which accepts all methods
   - DaisyUI badge classes: badge-success (green), badge-error (red), badge-warning (yellow), badge-info (blue), badge-ghost (gray)
 ---
+
+## 2026-02-05 15:20 MST - US-021
+- Built event search and filtering with a filter bar above the events table
+- Filter bar has inputs for: subject (text, LIKE partial match), delivery status (dropdown), date range (start/end date inputs), content search (JSON containment via @> operator)
+- Added `SearchEventsFiltered` sqlc query combining all optional filters with AND logic using empty-string-means-no-filter for text params and NULL-means-no-filter for timestamptz/jsonb params
+- Filters update the event list via HTMX: form uses hx-get="/events" with hx-target="#events-results" and hx-push-url="true"
+- HTMX partial rendering: handler checks `HX-Request` header and returns just the table+pagination (EventsTablePartial) for HTMX requests, full page for normal requests
+- Pagination links preserve filter params via filterQueryString helper and also use HTMX for seamless navigation
+- Clear button links back to /events (no filters)
+- Files changed: queries/events.sql (added SearchEventsFiltered), db/events.sql.go (generated), views/events.go (refactored with filter parsing), views/events.templ (added filter bar, partial template), views/events_templ.go (generated)
+- **Learnings for future iterations:**
+  - sqlc.narg() with nullable text type override (text -> string) doesn't produce nullable Go types — use empty string convention ("" means no filter) instead of NULL for text params
+  - sqlc.narg() for timestamptz produces pgtype.Timestamptz (despite time.Time override) — zero value pgtype.Timestamptz{} has Valid:false which maps to SQL NULL
+  - HTMX partial rendering pattern: check r.Header.Get("HX-Request") == "true" to serve partial vs full page
+  - filterQueryString helper in .templ file builds URL query strings preserving active filters across pagination
+  - DaisyUI select with conditional selected attribute: `selected?={ condition }` in templ syntax
+---
