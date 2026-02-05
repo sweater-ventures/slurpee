@@ -8,7 +8,7 @@ package components
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func SimplePage(title string) templ.Component {
+func SimplePage(title string, currentPath string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -42,7 +42,15 @@ func SimplePage(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, ": Slurpee</title><!-- ========== CSS DEPENDENCIES  ========== --><!-- DaisyUI + Tailwind CSS --><link href=\"/static/daisyui.css\" rel=\"stylesheet\" type=\"text/css\"><script src=\"/static/tailwind.js\"></script><!-- Our Customer Theme --><script src=\"/static/htmx-2.0.8.min.js\"></script><!-- ======================================================== --></head><body class=\"bg-base-200\"><div class=\"flex h-screen overflow-hidden\"><!-- ========== MAIN CONTENT AREA  ========== --><div class=\"flex-1 flex flex-col overflow-hidden\"><!-- ========== TOP HEADER BAR  ========== -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, ": Slurpee</title><!-- ========== CSS DEPENDENCIES  ========== --><!-- DaisyUI + Tailwind CSS --><link href=\"/static/daisyui.css\" rel=\"stylesheet\" type=\"text/css\"><script src=\"/static/tailwind.js\"></script><link href=\"/static/theme.css\" rel=\"stylesheet\" type=\"text/css\"><!-- Our Customer Theme --><script src=\"/static/htmx-2.0.8.min.js\"></script><!-- ======================================================== --></head><body class=\"bg-base-100\"><div class=\"flex h-screen overflow-hidden\"><!-- ========== SIDEBAR NAVIGATION ========== -->")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = Sidebar(currentPath).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<!-- ========== MAIN CONTENT AREA  ========== --><div class=\"flex-1 flex flex-col overflow-hidden\"><!-- ========== TOP HEADER BAR  ========== -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -50,11 +58,15 @@ func SimplePage(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<main class=\"flex-1 overflow-auto p-8\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		templ_7745c5c3_Err = templ_7745c5c3_Var1.Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<!-- ======================================================= --><!-- ========== MAIN DASHBOARD CONTENT  ========== --><!-- ============================================================== --></div><!-- ============================================================== --></div><!-- ============================================== --></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</main><!-- ============================================================== --></div><!-- ============================================================== --></div><!-- ============================================== --></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

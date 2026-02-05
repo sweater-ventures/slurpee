@@ -1,6 +1,6 @@
 package components
 
-templ SimplePage(title string) {
+templ SimplePage(title string, currentPath string) {
 	<!DOCTYPE html>
 	<html lang="en" data-theme="dark">
 		<head>
@@ -15,19 +15,26 @@ templ SimplePage(title string) {
 				type="text/css"
 			/>
 			<script src="/static/tailwind.js"></script>
+			<link
+				href="/static/theme.css"
+				rel="stylesheet"
+				type="text/css"
+			/>
 			<!-- Our Customer Theme -->
 			<script src="/static/htmx-2.0.8.min.js"></script>
 			<!-- ======================================================== -->
 		</head>
-		<body class="bg-base-200">
+		<body class="bg-base-100">
 			<div class="flex h-screen overflow-hidden">
+				<!-- ========== SIDEBAR NAVIGATION ========== -->
+				@Sidebar(currentPath)
 				<!-- ========== MAIN CONTENT AREA  ========== -->
 				<div class="flex-1 flex flex-col overflow-hidden">
 					<!-- ========== TOP HEADER BAR  ========== -->
 					@HeaderBar(title)
-					{ children... }
-					<!-- ======================================================= -->
-					<!-- ========== MAIN DASHBOARD CONTENT  ========== -->
+					<main class="flex-1 overflow-auto p-8">
+						{ children... }
+					</main>
 					<!-- ============================================================== -->
 				</div>
 				<!-- ============================================================== -->
