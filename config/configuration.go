@@ -22,6 +22,7 @@ type AppConfig struct {
 	DBPassword string `arg:"--db-password,env:DB_PASSWORD" default:"badpassword"`
 	BaseURL     string `arg:"--base-url,env:BASE_URL" default:"http://localhost:8005" help:"Base URL for the application."`
 	AdminSecret string `arg:"--admin-secret,env:ADMIN_SECRET" default:"" help:"Pre-shared secret for admin API endpoints (X-Slurpee-Admin-Secret header)."`
+	MaxParallel int    `arg:"--max-parallel,env:MAX_PARALLEL" default:"1" help:"Default max parallel deliveries per subscriber."`
 }
 
 func LoadConfig() (*AppConfig, error) {
