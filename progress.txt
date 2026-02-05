@@ -26,6 +26,9 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - HTMX partial rendering: extract content into a separate templ component, use hx-target/hx-swap to replace just that section
 - DaisyUI modal: `<dialog class="modal">` with `.showModal()`/`.close()`, `<form method="dialog">` for cancel button
 - Templ `script` keyword for type-safe JS functions callable from `onclick={ funcName(args) }`
+- HTMX edit pattern: use `hx-put` for updates, `hx-delete` for deletes, `hx-post` for creates; all target a shared content div
+- `hx-confirm` attribute provides simple browser-native confirmation dialogs — simpler than DaisyUI modals for destructive actions
+- Shared `buildXxxDetailView()` helper pattern: extract DB fetch + transform logic to reduce duplication across detail/update/create/delete handlers
 
 ---
 
@@ -422,4 +425,24 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - Subscription Filter is []byte from JSONB; check `len(filter) > 0 && string(filter) != "null"` to distinguish real filters from null/empty
   - pgtype.Int4.Valid check needed for nullable max_retries before formatting as string
   - prettyJSON helper from events.go is available across views package — no need to duplicate
+---
+
+## 2026-02-05 16:50 MST - US-027
+- Built subscriber edit functionality on the subscriber detail page (/subscribers/{id})
+- Editable fields: name, auth secret, max parallel via DaisyUI form inputs with save button
+- Endpoint URL and subscriber ID displayed as read-only (not editable)
+- Add new subscriptions via DaisyUI modal dialog with subject pattern, optional filter JSON, and optional max_retries
+- Delete existing subscriptions with per-row delete button using hx-confirm for confirmation
+- All changes persist via HTMX (PUT for subscriber update, POST for add subscription, DELETE for remove subscription) — no full page reload
+- Success/error messages displayed via alert banners after each operation
+- Added new sqlc queries: UpdateSubscriber (update by ID), DeleteSubscription (delete single subscription by ID)
+- Refactored subscriberDetailHandler to use shared buildSubscriberDetailView() helper, reducing code duplication across 4 handlers
+- Files changed: queries/subscribers.sql (added 2 queries), db/subscribers.sql.go (generated), views/subscriber_detail.templ (rewritten with edit forms), views/subscriber_detail_templ.go (generated), views/subscribers.go (added 3 handlers + 2 helpers)
+- **Learnings for future iterations:**
+  - HTMX partial rendering for edit operations: use `subscriberDetailContent` (inner content) for HTMX responses and `SubscriberDetailTemplate` (full page) for initial GET — same pattern as events list with EventsTablePartial
+  - hx-confirm attribute provides simple browser-native confirmation dialogs without needing DaisyUI modals — simpler for delete operations
+  - PUT method for updates: `hx-put` in form tag triggers PUT request; route registered as `"PUT /subscribers/{id}"` in Go 1.22+ ServeMux
+  - For edit forms, display read-only fields (ID, endpoint URL, timestamps) as plain text outside the form, editable fields as form inputs inside
+  - `buildSubscriberDetailView()` helper pattern avoids repeating subscriber + subscriptions fetch + transform logic across detail, update, create-subscription, and delete-subscription handlers
+  - sqlc `UpdateSubscriber` query uses `sqlc.arg(name)` for clean Go struct field names in the generated UpdateSubscriberParams
 ---

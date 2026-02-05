@@ -424,7 +424,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 27,
-      "passes": false,
+      "passes": true,
       "notes": "Adds edit forms and save logic to the detail page built in US-026."
     },
     {
