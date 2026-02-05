@@ -14,8 +14,8 @@ func init() {
 
 func notFound(app *app.Application, w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
-		// forward to overview page
-		w.Header().Set("Location", "/welcome")
+		// forward to events page
+		w.Header().Set("Location", "/events")
 		w.WriteHeader(http.StatusFound)
 		return
 	}
