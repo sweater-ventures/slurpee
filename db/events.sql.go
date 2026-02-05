@@ -273,6 +273,64 @@ func (q *Queries) SearchEventsBySubject(ctx context.Context, arg SearchEventsByS
 	return items, nil
 }
 
+const searchEventsFiltered = `-- name: SearchEventsFiltered :many
+SELECT id, subject, timestamp, trace_id, data, retry_count, delivery_status, status_updated_at FROM events
+WHERE
+  ($3::text = '' OR subject LIKE $3)
+  AND ($4::text = '' OR delivery_status = $4)
+  AND ($5::timestamptz IS NULL OR timestamp >= $5)
+  AND ($6::timestamptz IS NULL OR timestamp <= $6)
+  AND ($7::jsonb IS NULL OR data @> $7)
+ORDER BY timestamp DESC LIMIT $1 OFFSET $2
+`
+
+type SearchEventsFilteredParams struct {
+	Limit           int32
+	Offset          int32
+	SubjectFilter   string
+	StatusFilter    string
+	StartTimeFilter pgtype.Timestamptz
+	EndTimeFilter   pgtype.Timestamptz
+	DataFilter      []byte
+}
+
+func (q *Queries) SearchEventsFiltered(ctx context.Context, arg SearchEventsFilteredParams) ([]Event, error) {
+	rows, err := q.db.Query(ctx, searchEventsFiltered,
+		arg.Limit,
+		arg.Offset,
+		arg.SubjectFilter,
+		arg.StatusFilter,
+		arg.StartTimeFilter,
+		arg.EndTimeFilter,
+		arg.DataFilter,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Event
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.ID,
+			&i.Subject,
+			&i.Timestamp,
+			&i.TraceID,
+			&i.Data,
+			&i.RetryCount,
+			&i.DeliveryStatus,
+			&i.StatusUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateEventDeliveryStatus = `-- name: UpdateEventDeliveryStatus :one
 UPDATE events SET delivery_status = $1, retry_count = $2, status_updated_at = $3 WHERE id = $4 RETURNING id, subject, timestamp, trace_id, data, retry_count, delivery_status, status_updated_at
 `
