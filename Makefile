@@ -2,15 +2,19 @@
 
 %.css.gz: %.css
 	gzip -k -9 -f $<
+	touch $<.gz
 
 %.js.gz: %.js
 	gzip -k -9 -f $<
+	touch $<.gz
 
 %.css.zst: %.css
 	zstd -q -19 -k -f $<
+	touch $<.zst
 
 %.js.zst: %.js
 	zstd -q -19 -k -f $<
+	touch $<.zst
 
 SQL_FILES = $(wildcard queries/*.sql)
 SCHEMA_FILES = $(wildcard schema/*.sql)
@@ -27,7 +31,7 @@ all: slurpee
 db/models.go: $(SQL_FILES) $(SCHEMA_FILES)
 	go tool sqlc generate
 
-slurpee: $(COMP_STATIC_JS) $(COMP_STATIC_JS) $(GO_FILES) $(TEMPL_FILES) db/models.go
+slurpee: $(COMP_STATIC_JS) $(COMP_STATIC_CSS) $(GO_FILES) $(TEMPL_FILES) db/models.go
 	go build
 
 slurpee-dev: slurpee
