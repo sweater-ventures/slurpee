@@ -21,6 +21,8 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - Path parameters: `"GET /events/{id}"` route pattern + `r.PathValue("id")` to extract; use `pgx.ErrNoRows` with `errors.Is()` for 404
 - Async delivery: `deliverEvent(app, event)` in api/delivery.go triggers background goroutine after event persistence; uses `context.Background()` not request context
 - Per-subscriber concurrency: buffered channel `make(chan struct{}, maxParallel)` as semaphore pattern
+- SimplePage requires two params: `SimplePage(title, currentPath)` — currentPath enables active sidebar highlighting
+- Templ generate: `go tool templ generate -f <file>` for specific files; `go build ./...` after to verify
 
 ---
 
@@ -275,4 +277,21 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - Silently ignoring GetLogConfigBySubject errors (including pgx.ErrNoRows) is the correct approach: missing config means "log defaults only"
   - slog variadic args pattern: build []any slice with key-value pairs and spread with logAttrs...
   - Property paths are currently top-level keys only; nested path support (e.g., "order.id") would require a recursive lookup helper
+---
+
+## 2026-02-05 13:40 MST - US-018
+- Built sidebar navigation component in components/sidebar.templ with links to Events (/events), Subscribers (/subscribers), and Logging Config (/logging)
+- Updated SimplePage to accept currentPath parameter for active state highlighting
+- Integrated sidebar into SimplePage layout — appears on all pages as a 256px wide panel on the left
+- Uses DaisyUI `menu` component with `active` class for current page highlighting
+- `isActive()` helper uses prefix matching so /events/123 still highlights the Events link
+- SVG icons inline for each nav item (lightning bolt for Events, people for Subscribers, gear for Logging)
+- Updated welcome.templ to pass currentPath="/welcome" to SimplePage
+- Files changed: components/sidebar.templ (new), components/simple-page.templ (updated), views/welcome.templ (updated), plus generated _templ.go files
+- **Learnings for future iterations:**
+  - SimplePage now requires two params: `title` and `currentPath` — all future views must pass both
+  - DaisyUI `menu` component with `active` class provides sidebar navigation styling out of the box with dark theme
+  - Templ conditional attributes: use `if condition { class="active" }` inside an element to conditionally add attributes
+  - Prefix matching for active state means /events, /events/123, /events/new all highlight "Events" — this is the expected UX
+  - `go tool templ generate -f <file>` generates specific files; `go tool templ generate` with no args generates nothing if files haven't changed since last generate (uses file modification time caching)
 ---
