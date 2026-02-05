@@ -304,3 +304,18 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - The root redirect lives in views/not_found.go in the notFound handler — it handles both "/" (redirect) and all unmatched paths (404)
   - Simple one-line change: the redirect path is a string literal in `w.Header().Set("Location", "/events")`
 ---
+
+## 2026-02-05 13:50 MST - US-020
+- Built events list page at /events with paginated table showing subject, truncated event ID, timestamp, and delivery status
+- Templ template in views/events.templ with EventRow struct, truncateID helper, and statusBadgeClass for colored DaisyUI badges
+- Go handler in views/events.go with pagination (50 per page, fetch N+1 to detect next page)
+- Rows clickable via onclick + JS navigation to /events/{id}
+- Previous/Next pagination controls with page number display
+- Files changed: views/events.go (new), views/events.templ (new), views/events_templ.go (generated)
+- **Learnings for future iterations:**
+  - Templ types (structs, helper functions) defined in .templ files are accessible from .go files in the same package — EventRow defined in events.templ is used in events.go
+  - For pagination, fetch Limit+1 rows and check len > Limit to determine hasNext without a separate COUNT query
+  - pgtype.UUID to string: use `uuid.UUID(u.Bytes).String()` from google/uuid (same pattern as api package but in views package as pgtypeUUIDToString)
+  - View routes use `"GET /events"` pattern (method prefix) unlike the catch-all `/` route which accepts all methods
+  - DaisyUI badge classes: badge-success (green), badge-error (red), badge-warning (yellow), badge-info (blue), badge-ghost (gray)
+---
