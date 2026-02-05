@@ -246,3 +246,19 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - math.Pow for exponential calculation, cap result with min() against max seconds
   - time.Sleep in a new goroutine allows non-blocking retry scheduling while maintaining WaitGroup tracking
 ---
+
+## 2026-02-05 12:55 MST - US-016
+- Implemented subscription filter evaluation for event delivery in api/delivery.go
+- Added matchesFilter() function that evaluates subscription filter JSON against event data
+- Filter semantics: JSON object with key-value pairs, ALL must match (AND logic) against top-level keys in event data
+- Null/empty filter means "match all events" (no filtering)
+- Non-matching subscriptions are skipped silently — no delivery attempt is recorded
+- Filter check happens in dispatchEvent() when building delivery tasks, before any HTTP calls
+- Uses JSON marshal/unmarshal for type-safe value comparison (handles strings, numbers, booleans, nested objects correctly)
+- Files changed: api/delivery.go (+57 lines)
+- **Learnings for future iterations:**
+  - JSON comparison via marshal-to-string handles type coercion correctly (1 != "1", true != "true")
+  - Filter evaluation happens early in the delivery pipeline to avoid unnecessary HTTP calls and delivery_attempts rows
+  - Subscription.Filter is []byte (JSONB from Postgres), check len(filter) == 0 for null/empty
+  - Using json.Unmarshal to map[string]interface{} works for arbitrary JSON object comparison
+---
