@@ -42,7 +42,7 @@ func SimplePage(title string, currentPath string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, ": Slurpee</title><!-- ========== CSS DEPENDENCIES  ========== --><!-- DaisyUI + Tailwind CSS --><link href=\"/static/daisyui.css\" rel=\"stylesheet\" type=\"text/css\"><script src=\"/static/tailwind.js\"></script><!-- Our Customer Theme --><script src=\"/static/htmx-2.0.8.min.js\"></script><!-- ======================================================== --></head><body class=\"bg-base-200\"><div class=\"flex h-screen overflow-hidden\"><!-- ========== SIDEBAR NAVIGATION ========== -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, ": Slurpee</title><!-- ========== CSS DEPENDENCIES  ========== --><!-- DaisyUI + Tailwind CSS --><link href=\"/static/daisyui.css\" rel=\"stylesheet\" type=\"text/css\"><script src=\"/static/tailwind.js\"></script><link href=\"/static/theme.css\" rel=\"stylesheet\" type=\"text/css\"><!-- Our Customer Theme --><script src=\"/static/htmx-2.0.8.min.js\"></script><!-- ======================================================== --></head><body class=\"bg-base-100\"><div class=\"flex h-screen overflow-hidden\"><!-- ========== SIDEBAR NAVIGATION ========== -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

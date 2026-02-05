@@ -29,7 +29,7 @@ func Sidebar(currentPath string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<aside class=\"w-64 bg-base-100 border-r border-base-300 flex flex-col\"><div class=\"p-4 border-b border-base-300\"><h1 class=\"text-xl font-bold text-primary\">Slurpee</h1><p class=\"text-xs text-base-content/60\">Event Broker</p></div><ul class=\"menu p-4 gap-1\"><li><a href=\"/events\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<aside class=\"w-64 bg-base-300 border-r border-base-300 flex flex-col\"><div class=\"px-8 py-4 border-b border-base-300\"><img src=\"/static/slurpee-logo.png\" alt=\"Slurpee Event Broker\" class=\"h-10\"></div><ul class=\"menu p-4 gap-1\"><li><a href=\"/events\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
