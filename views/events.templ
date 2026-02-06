@@ -56,13 +56,17 @@ func filterQueryString(subject, status, dateFrom, dateTo, content string, page i
 
 templ EventsListTemplate(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content string) {
 	@components.SimplePage("Events", "/events") {
-		<div class="flex justify-end items-center mb-6">
+		<div class="flex justify-end items-center gap-2 mb-6">
+			<button id="live-toggle-btn" class="btn btn-outline btn-success btn-sm" onclick="toggleLiveMode()">
+				Go Live
+			</button>
 			<a href="/events/new" class="btn btn-primary">New Event</a>
 		</div>
 		@eventsFilterBar(subject, status, dateFrom, dateTo, content)
 		<div id="events-results">
 			@eventsTableAndPagination(events, page, hasNext, subject, status, dateFrom, dateTo, content)
 		</div>
+		@liveStreamScript()
 	}
 }
 
@@ -193,6 +197,157 @@ templ eventsTableAndPagination(events []EventRow, page int, hasNext bool, subjec
 			>Next</a>
 		}
 	</div>
+}
+
+templ liveStreamScript() {
+	<script>
+		(function() {
+			var evtSource = null;
+			var isLive = false;
+			var MAX_ROWS = 100;
+
+			function getFilterParams() {
+				var form = document.querySelector('form[hx-get="/events"]');
+				if (!form) return '';
+				var params = new URLSearchParams(new FormData(form));
+				// Remove empty values
+				var clean = new URLSearchParams();
+				params.forEach(function(v, k) {
+					if (v) clean.append(k, v);
+				});
+				return clean.toString();
+			}
+
+			function statusBadgeClass(status) {
+				switch (status) {
+					case 'delivered': return 'badge badge-success';
+					case 'failed': return 'badge badge-error';
+					case 'pending': return 'badge badge-warning';
+					case 'partial': return 'badge badge-info';
+					default: return 'badge badge-ghost';
+				}
+			}
+
+			function truncateID(id) {
+				if (id && id.length > 8) return id.substring(0, 8) + '...';
+				return id || '';
+			}
+
+			function formatTimestamp(ts) {
+				var d = new Date(ts);
+				if (isNaN(d.getTime())) return ts;
+				var pad = function(n) { return n < 10 ? '0' + n : n; };
+				return d.getUTCFullYear() + '-' + pad(d.getUTCMonth()+1) + '-' + pad(d.getUTCDate()) +
+					' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds()) + ' UTC';
+			}
+
+			function createEventRow(data) {
+				var tr = document.createElement('tr');
+				tr.className = 'hover cursor-pointer';
+				tr.onclick = function() { window.location.href = '/events/' + data.event_id; };
+
+				var tdSubject = document.createElement('td');
+				tdSubject.className = 'font-mono';
+				tdSubject.textContent = data.subject || '';
+
+				var tdID = document.createElement('td');
+				tdID.className = 'font-mono text-sm';
+				tdID.textContent = truncateID(data.event_id);
+
+				var tdTimestamp = document.createElement('td');
+				tdTimestamp.textContent = formatTimestamp(data.timestamp);
+
+				var tdStatus = document.createElement('td');
+				var badge = document.createElement('span');
+				badge.className = statusBadgeClass(data.delivery_status);
+				badge.textContent = data.delivery_status || '';
+				tdStatus.appendChild(badge);
+
+				tr.appendChild(tdSubject);
+				tr.appendChild(tdID);
+				tr.appendChild(tdTimestamp);
+				tr.appendChild(tdStatus);
+				return tr;
+			}
+
+			function startLive() {
+				var url = '/events/stream';
+				var params = getFilterParams();
+				if (params) url += '?' + params;
+
+				evtSource = new EventSource(url);
+				isLive = true;
+
+				// Update button
+				var btn = document.getElementById('live-toggle-btn');
+				btn.className = 'btn btn-error btn-sm';
+				btn.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-success animate-pulse mr-2"></span>Stop';
+
+				// Clear table body and set up for live mode
+				var tbody = document.querySelector('#events-results tbody');
+				if (tbody) {
+					tbody.innerHTML = '<tr><td colspan="4" class="text-center text-base-content/60 py-8">Waiting for events...</td></tr>';
+				}
+
+				// Hide pagination
+				var pagination = document.querySelector('#events-results .flex.justify-center');
+				if (pagination) pagination.style.display = 'none';
+
+				var receivedFirst = false;
+
+				evtSource.onmessage = function(e) {
+					var data;
+					try { data = JSON.parse(e.data); } catch (_) { return; }
+
+					// Only add rows for 'created' events (new events)
+					if (data.type !== 'created') return;
+
+					if (!receivedFirst) {
+						receivedFirst = true;
+						// Clear the "Waiting for events" message
+						if (tbody) tbody.innerHTML = '';
+					}
+
+					var row = createEventRow(data);
+					if (tbody) {
+						tbody.insertBefore(row, tbody.firstChild);
+						// Cap at MAX_ROWS
+						while (tbody.children.length > MAX_ROWS) {
+							tbody.removeChild(tbody.lastChild);
+						}
+					}
+				};
+
+				evtSource.onerror = function() {
+					// EventSource auto-reconnects; no action needed
+				};
+			}
+
+			function stopLive() {
+				if (evtSource) {
+					evtSource.close();
+					evtSource = null;
+				}
+				isLive = false;
+
+				// Restore button
+				var btn = document.getElementById('live-toggle-btn');
+				btn.className = 'btn btn-outline btn-success btn-sm';
+				btn.innerHTML = 'Go Live';
+
+				// Reload the normal paginated view
+				htmx.ajax('GET', '/events', {target: '#events-results', swap: 'innerHTML'});
+			}
+
+			window.toggleLiveMode = function() {
+				if (isLive) {
+					stopLive();
+				} else {
+					startLive();
+				}
+			};
+		})();
+	</script>
 }
 
 script goToEvent(id string) {
