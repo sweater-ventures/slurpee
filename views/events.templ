@@ -56,13 +56,18 @@ func filterQueryString(subject, status, dateFrom, dateTo, content string, page i
 
 templ EventsListTemplate(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content string) {
 	@components.SimplePage("Events", "/events") {
-		<div class="flex justify-end items-center mb-6">
+		<div class="flex justify-end items-center gap-2 mb-6">
+			<button id="live-toggle-btn" class="btn btn-outline btn-success btn-sm" onclick="toggleLiveMode()">
+				Go Live
+			</button>
 			<a href="/events/new" class="btn btn-primary">New Event</a>
 		</div>
 		@eventsFilterBar(subject, status, dateFrom, dateTo, content)
 		<div id="events-results">
 			@eventsTableAndPagination(events, page, hasNext, subject, status, dateFrom, dateTo, content)
 		</div>
+		<div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+		@liveStreamScript()
 	}
 }
 
@@ -193,6 +198,424 @@ templ eventsTableAndPagination(events []EventRow, page int, hasNext bool, subjec
 			>Next</a>
 		}
 	</div>
+}
+
+templ MissedEventsRows(events []EventRow) {
+	for _, event := range events {
+		<tr class="hover cursor-pointer bg-info/10" data-event-id={ event.ID } onclick={ goToEvent(event.ID) }>
+			<td class="font-mono">{ event.Subject }</td>
+			<td class="font-mono text-sm">{ truncateID(event.ID) }</td>
+			<td>{ event.Timestamp }</td>
+			<td><span class={ statusBadgeClass(event.DeliveryStatus) }>{ event.DeliveryStatus }</span></td>
+		</tr>
+	}
+}
+
+templ liveStreamScript() {
+	<script>
+		(function () {
+			var evtSource = null;
+			var isLive = false;
+			var MAX_ROWS = 100;
+			var lastReconnectNanos = null;
+
+			function getFilterForm() {
+				return document.querySelector('form[hx-get="/events"]');
+			}
+
+			function getFilterParams() {
+				var form = getFilterForm();
+				if (!form) return "";
+				var params = new URLSearchParams(new FormData(form));
+				// Remove empty values
+				var clean = new URLSearchParams();
+				params.forEach(function (v, k) {
+					if (v) clean.append(k, v);
+				});
+				return clean.toString();
+			}
+
+			function statusBadgeClass(status) {
+				switch (status) {
+					case "delivered":
+						return "badge badge-success";
+					case "failed":
+						return "badge badge-error";
+					case "pending":
+						return "badge badge-warning";
+					case "partial":
+						return "badge badge-info";
+					default:
+						return "badge badge-ghost";
+				}
+			}
+
+			function truncateID(id) {
+				if (id && id.length > 8) return id.substring(0, 8) + "...";
+				return id || "";
+			}
+
+			function formatTimestamp(ts) {
+				var d = new Date(ts);
+				if (isNaN(d.getTime())) return ts;
+				var pad = function (n) {
+					return n < 10 ? "0" + n : n;
+				};
+				return (
+					d.getUTCFullYear() +
+					"-" +
+					pad(d.getUTCMonth() + 1) +
+					"-" +
+					pad(d.getUTCDate()) +
+					" " +
+					pad(d.getUTCHours()) +
+					":" +
+					pad(d.getUTCMinutes()) +
+					":" +
+					pad(d.getUTCSeconds()) +
+					" UTC"
+				);
+			}
+
+			function createEventRow(data) {
+				var tr = document.createElement("tr");
+				tr.className = "hover cursor-pointer";
+				tr.setAttribute("data-event-id", data.event_id);
+				tr.onclick = function () {
+					window.location.href = "/events/" + data.event_id;
+				};
+
+				var tdSubject = document.createElement("td");
+				tdSubject.className = "font-mono";
+				tdSubject.textContent = data.subject || "";
+
+				var tdID = document.createElement("td");
+				tdID.className = "font-mono text-sm";
+				tdID.textContent = truncateID(data.event_id);
+
+				var tdTimestamp = document.createElement("td");
+				tdTimestamp.textContent = formatTimestamp(data.timestamp);
+
+				var tdStatus = document.createElement("td");
+				var badge = document.createElement("span");
+				badge.className = statusBadgeClass(data.delivery_status);
+				badge.textContent = data.delivery_status || "";
+				tdStatus.appendChild(badge);
+
+				tr.appendChild(tdSubject);
+				tr.appendChild(tdID);
+				tr.appendChild(tdTimestamp);
+				tr.appendChild(tdStatus);
+				return tr;
+			}
+
+			function updateStatusBadge(data) {
+				var row = document.querySelector(
+					'#events-results tr[data-event-id="' + data.event_id + '"]',
+				);
+				if (!row) return;
+				var badge = row.querySelector("td:last-child span");
+				if (badge) {
+					badge.className = statusBadgeClass(data.delivery_status);
+					badge.textContent = data.delivery_status || "";
+				}
+			}
+
+			function showDeliveryToast(data) {
+				var container = document.getElementById("toast-container");
+				if (!container) return;
+
+				var toast = document.createElement("div");
+				toast.className = "alert alert-sm shadow-lg max-w-sm animate-fade-in";
+
+				console.log("Delivery attempt status:", data.attempt_status);
+				var isSuccess = data.attempt_status === "succeeded";
+				if (isSuccess) {
+					toast.classList.add("alert-success");
+					toast.textContent = "Delivered to " + data.subscriber_endpoint;
+				} else {
+					toast.classList.add("alert-error");
+					var msg = "Failed delivery to " + data.subscriber_endpoint;
+					if (data.response_status_code) {
+						msg += " - " + data.response_status_code;
+					}
+					toast.textContent = msg;
+				}
+
+				container.appendChild(toast);
+
+				setTimeout(function () {
+					toast.style.opacity = "0";
+					toast.style.transition = "opacity 0.3s";
+					setTimeout(function () {
+						if (toast.parentNode) toast.parentNode.removeChild(toast);
+					}, 300);
+				}, 3000);
+			}
+
+			function showMissedBanner(count, afterNanos) {
+				removeMissedBanner();
+				var tbody = document.querySelector("#events-results tbody");
+				if (!tbody) return;
+				var tr = document.createElement("tr");
+				tr.id = "missed-banner";
+				var td = document.createElement("td");
+				td.setAttribute("colspan", "4");
+				td.className = "py-3 px-4 bg-warning/20 text-warning-content";
+				td.innerHTML =
+					'<div class="flex items-center justify-between">' +
+					"<span>You missed <strong>" +
+					count +
+					"</strong> event" +
+					(count !== 1 ? "s" : "") +
+					" while away</span>" +
+					'<div class="flex gap-2">' +
+					'<button class="btn btn-warning btn-xs" id="load-missed-btn">Load</button>' +
+					'<button class="btn btn-ghost btn-xs" id="dismiss-missed-btn">\u2715</button>' +
+					"</div></div>";
+				tbody.insertBefore(tr, tbody.firstChild);
+
+				document
+					.getElementById("load-missed-btn")
+					.addEventListener("click", function () {
+						loadMissedEvents(afterNanos);
+					});
+				document
+					.getElementById("dismiss-missed-btn")
+					.addEventListener("click", function () {
+						removeMissedBanner();
+					});
+			}
+
+			function removeMissedBanner() {
+				var banner = document.getElementById("missed-banner");
+				if (banner) banner.parentNode.removeChild(banner);
+			}
+
+			function loadMissedEvents(afterNanos) {
+				removeMissedBanner();
+				var url = "/events/stream/missed?after=" + afterNanos;
+				var params = getFilterParams();
+				if (params) url += "&" + params;
+
+				fetch(url)
+					.then(function (resp) {
+						return resp.text();
+					})
+					.then(function (html) {
+						if (!html.trim()) return;
+						var tbody = document.querySelector("#events-results tbody");
+						if (!tbody) return;
+						// Remove "Waiting for events..." placeholder if present
+						var placeholder = tbody.querySelector('td[colspan="4"]');
+						if (placeholder) {
+							placeholder.closest("tr").remove();
+						}
+						// Insert missed rows at the top of the table
+						var temp = document.createElement("tbody");
+						temp.innerHTML = html;
+						var rows = Array.prototype.slice.call(temp.children);
+						for (var i = rows.length - 1; i >= 0; i--) {
+							tbody.insertBefore(rows[i], tbody.firstChild);
+						}
+						// Enforce max rows
+						while (tbody.children.length > MAX_ROWS) {
+							tbody.removeChild(tbody.lastChild);
+						}
+					});
+			}
+
+			function reconnectWithFilters() {
+				// Close existing connection
+				if (evtSource) {
+					evtSource.close();
+					evtSource = null;
+				}
+
+				// Reset reconnection state
+				lastReconnectNanos = null;
+				removeMissedBanner();
+
+				// Clear table for fresh stream
+				var tbody = document.querySelector("#events-results tbody");
+				if (tbody) {
+					tbody.innerHTML =
+						'<tr><td colspan="4" class="text-center text-base-content/60 py-8">Waiting for events...</td></tr>';
+				}
+
+				// Open new connection with current filter params
+				var url = "/events/stream";
+				var params = getFilterParams();
+				if (params) url += "?" + params;
+
+				evtSource = new EventSource(url);
+				attachEventSourceHandlers(evtSource);
+			}
+
+			function attachEventSourceHandlers(source) {
+				var receivedFirst = false;
+
+				source.onmessage = function (e) {
+					var data;
+					try {
+						data = JSON.parse(e.data);
+					} catch (_) {
+						return;
+					}
+
+					// Track last event ID for reconnection
+					if (e.lastEventId) {
+						var parts = e.lastEventId.split(":");
+						if (parts.length === 2) {
+							lastReconnectNanos = parts[1];
+						}
+					}
+
+					if (data.type === "created") {
+						var tbody = document.querySelector("#events-results tbody");
+						if (!receivedFirst) {
+							receivedFirst = true;
+							if (tbody) tbody.innerHTML = "";
+						}
+
+						var row = createEventRow(data);
+						if (tbody) {
+							// Insert after the missed banner if present
+							var banner = document.getElementById("missed-banner");
+							if (banner && banner.nextSibling) {
+								tbody.insertBefore(row, banner.nextSibling);
+							} else {
+								tbody.insertBefore(row, tbody.firstChild);
+							}
+							while (tbody.children.length > MAX_ROWS) {
+								tbody.removeChild(tbody.lastChild);
+							}
+						}
+					} else if (data.type === "status_changed") {
+						updateStatusBadge(data);
+					} else if (data.type === "delivery_attempt") {
+						showDeliveryToast(data);
+					}
+				};
+
+				// Listen for named 'missed' events (reconnection indicator)
+				source.addEventListener("missed", function (e) {
+					var data;
+					try {
+						data = JSON.parse(e.data);
+					} catch (_) {
+						return;
+					}
+					if (data.count && data.count > 0 && lastReconnectNanos) {
+						showMissedBanner(data.count, lastReconnectNanos);
+					}
+				});
+
+				source.onerror = function () {
+					// EventSource auto-reconnects; no action needed
+				};
+			}
+
+			function startLive() {
+				isLive = true;
+
+				// Update button
+				var btn = document.getElementById("live-toggle-btn");
+				btn.className = "btn btn-error btn-sm";
+				btn.innerHTML =
+					'<span class="inline-block w-2 h-2 rounded-full bg-success animate-pulse mr-2"></span>Stop';
+
+				// Clear table body and set up for live mode
+				var tbody = document.querySelector("#events-results tbody");
+				if (tbody) {
+					tbody.innerHTML =
+						'<tr><td colspan="4" class="text-center text-base-content/60 py-8">Waiting for events...</td></tr>';
+				}
+
+				// Hide pagination
+				var pagination = document.querySelector(
+					"#events-results .flex.justify-center",
+				);
+				if (pagination) pagination.style.display = "none";
+
+				// Open EventSource with current filter params
+				var url = "/events/stream";
+				var params = getFilterParams();
+				if (params) url += "?" + params;
+
+				evtSource = new EventSource(url);
+				attachEventSourceHandlers(evtSource);
+
+				// Intercept filter form submit during live mode
+				var form = getFilterForm();
+				if (form) {
+					form.addEventListener("submit", liveSearchHandler);
+				}
+
+				// Intercept Clear link during live mode
+				var clearLink = document.querySelector(
+					'form[hx-get="/events"] a[href="/events"]',
+				);
+				if (clearLink) {
+					clearLink.addEventListener("click", liveClearHandler);
+				}
+			}
+
+			function stopLive() {
+				if (evtSource) {
+					evtSource.close();
+					evtSource = null;
+				}
+				isLive = false;
+
+				// Remove live mode event listeners
+				var form = getFilterForm();
+				if (form) {
+					form.removeEventListener("submit", liveSearchHandler);
+				}
+				var clearLink = document.querySelector(
+					'form[hx-get="/events"] a[href="/events"]',
+				);
+				if (clearLink) {
+					clearLink.removeEventListener("click", liveClearHandler);
+				}
+
+				// Restore button
+				var btn = document.getElementById("live-toggle-btn");
+				btn.className = "btn btn-outline btn-success btn-sm";
+				btn.innerHTML = "Go Live";
+
+				// Reload the normal paginated view
+				htmx.ajax("GET", "/events", {
+					target: "#events-results",
+					swap: "innerHTML",
+				});
+			}
+
+			function liveSearchHandler(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				reconnectWithFilters();
+			}
+
+			function liveClearHandler(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				// Reset form fields
+				var form = getFilterForm();
+				if (form) form.reset();
+				reconnectWithFilters();
+			}
+
+			window.toggleLiveMode = function () {
+				if (isLive) {
+					stopLive();
+				} else {
+					startLive();
+				}
+			};
+		})();
+	</script>
 }
 
 script goToEvent(id string) {
