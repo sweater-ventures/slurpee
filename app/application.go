@@ -13,6 +13,7 @@ type Application struct {
 	DB           *db.Queries
 	DeliveryChan chan db.Event
 	EventBus     *EventBus
+	Sessions     *SessionStore
 	dbconn       *pgxpool.Pool
 	stopDelivery func()
 }
@@ -30,6 +31,7 @@ func NewApp(config *config.AppConfig) (*Application, error) {
 		DB:           queries,
 		DeliveryChan: make(chan db.Event, 1000),
 		EventBus:     NewEventBus(),
+		Sessions:     NewSessionStore(),
 		dbconn:       conn,
 		stopDelivery: func() {},
 	}, nil
