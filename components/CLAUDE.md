@@ -14,6 +14,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #627 | 7:21 PM | 🔵 | SimplePage Layout Template with DaisyUI and HTMX | ~466 |
 | #541 | 4:33 PM | 🟣 | Committed US-026 Subscriber Detail Page Implementation | ~354 |
 | #486 | 3:33 PM | 🔵 | SimplePage Layout Component Structure | ~462 |
 </claude-mem-context>
