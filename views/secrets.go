@@ -16,6 +16,8 @@ func init() {
 		router.Handle("GET /secrets", routeHandler(slurpee, secretsListHandler))
 		router.Handle("POST /secrets", routeHandler(slurpee, secretCreateHandler))
 		router.Handle("POST /secrets/{id}/delete", routeHandler(slurpee, secretDeleteHandler))
+		router.Handle("GET /secrets/{id}/edit", routeHandler(slurpee, secretEditHandler))
+		router.Handle("POST /secrets/{id}/edit", routeHandler(slurpee, secretUpdateHandler))
 	})
 }
 
@@ -194,6 +196,161 @@ func secretDeleteHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 	}
 
 	http.Redirect(w, r, "/secrets", http.StatusSeeOther)
+}
+
+func secretEditHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(w, r) {
+		return
+	}
+
+	idStr := r.PathValue("id")
+	parsed, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid secret ID", http.StatusBadRequest)
+		return
+	}
+	pgID := pgtype.UUID{Bytes: parsed, Valid: true}
+
+	secret, err := slurpee.DB.GetApiSecretByID(r.Context(), pgID)
+	if err != nil {
+		log(r.Context()).Error("Error fetching API secret", "err", err)
+		http.Error(w, "Secret not found", http.StatusNotFound)
+		return
+	}
+
+	renderSecretEditPage(slurpee, w, r, secret, "", "")
+}
+
+func secretUpdateHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
+	if !requireAdmin(w, r) {
+		return
+	}
+
+	idStr := r.PathValue("id")
+	parsed, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid secret ID", http.StatusBadRequest)
+		return
+	}
+	pgID := pgtype.UUID{Bytes: parsed, Valid: true}
+
+	if err := r.ParseForm(); err != nil {
+		secret, _ := slurpee.DB.GetApiSecretByID(r.Context(), pgID)
+		renderSecretEditPage(slurpee, w, r, secret, "", "Invalid form data")
+		return
+	}
+
+	name := r.FormValue("name")
+	subjectPattern := r.FormValue("subject_pattern")
+	subscriberIDs := r.Form["subscriber_ids"]
+
+	if name == "" || subjectPattern == "" {
+		secret, _ := slurpee.DB.GetApiSecretByID(r.Context(), pgID)
+		renderSecretEditPage(slurpee, w, r, secret, "", "Name and subject pattern are required")
+		return
+	}
+
+	// Validate host:port constraint
+	if len(subscriberIDs) > 1 {
+		subscribers, err := slurpee.DB.ListSubscribers(r.Context())
+		if err != nil {
+			log(r.Context()).Error("Error listing subscribers for validation", "err", err)
+			secret, _ := slurpee.DB.GetApiSecretByID(r.Context(), pgID)
+			renderSecretEditPage(slurpee, w, r, secret, "", "Internal error")
+			return
+		}
+		subMap := make(map[string]string)
+		for _, s := range subscribers {
+			subMap[pgtypeUUIDToString(s.ID)] = s.EndpointUrl
+		}
+		var hostPort string
+		for _, sid := range subscriberIDs {
+			endpointURL, ok := subMap[sid]
+			if !ok {
+				continue
+			}
+			hp := extractHostPort(endpointURL)
+			if hostPort == "" {
+				hostPort = hp
+			} else if hp != hostPort {
+				secret, _ := slurpee.DB.GetApiSecretByID(r.Context(), pgID)
+				renderSecretEditPage(slurpee, w, r, secret, "", "All selected subscribers must share the same host:port")
+				return
+			}
+		}
+	}
+
+	// Update name and subject_pattern
+	_, err = slurpee.DB.UpdateApiSecret(r.Context(), db.UpdateApiSecretParams{
+		ID:             pgID,
+		Name:           name,
+		SubjectPattern: subjectPattern,
+	})
+	if err != nil {
+		log(r.Context()).Error("Error updating API secret", "err", err)
+		secret, _ := slurpee.DB.GetApiSecretByID(r.Context(), pgID)
+		renderSecretEditPage(slurpee, w, r, secret, "", "Failed to update secret")
+		return
+	}
+
+	// Replace subscriber associations: delete all, re-add selected
+	slurpee.DB.RemoveAllApiSecretSubscribers(r.Context(), pgID)
+	for _, sid := range subscriberIDs {
+		subParsed, err := uuid.Parse(sid)
+		if err != nil {
+			continue
+		}
+		slurpee.DB.AddApiSecretSubscriber(r.Context(), db.AddApiSecretSubscriberParams{
+			ApiSecretID:  pgID,
+			SubscriberID: pgtype.UUID{Bytes: subParsed, Valid: true},
+		})
+	}
+
+	http.Redirect(w, r, "/secrets", http.StatusSeeOther)
+}
+
+func renderSecretEditPage(slurpee *app.Application, w http.ResponseWriter, r *http.Request, secret db.ApiSecret, successMsg, errorMsg string) {
+	editData := SecretEditData{
+		ID:             pgtypeUUIDToString(secret.ID),
+		Name:           secret.Name,
+		SubjectPattern: secret.SubjectPattern,
+	}
+
+	// Load all subscribers and mark which ones are associated
+	allSubs, err := slurpee.DB.ListSubscribers(r.Context())
+	if err != nil {
+		log(r.Context()).Error("Error listing subscribers", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	associatedSubs, err := slurpee.DB.ListSubscribersForApiSecret(r.Context(), secret.ID)
+	if err != nil {
+		log(r.Context()).Error("Error listing associated subscribers", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	associatedSet := make(map[string]bool)
+	for _, s := range associatedSubs {
+		associatedSet[pgtypeUUIDToString(s.ID)] = true
+	}
+
+	checkboxes := make([]SubscriberCheckbox, len(allSubs))
+	for i, s := range allSubs {
+		sid := pgtypeUUIDToString(s.ID)
+		checkboxes[i] = SubscriberCheckbox{
+			ID:          sid,
+			Name:        s.Name,
+			EndpointURL: s.EndpointUrl,
+			Checked:     associatedSet[sid],
+		}
+	}
+
+	if err := SecretEditTemplate(editData, checkboxes, successMsg, errorMsg).Render(r.Context(), w); err != nil {
+		log(r.Context()).Error("Error rendering secret edit view", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 func extractHostPort(endpointURL string) string {
