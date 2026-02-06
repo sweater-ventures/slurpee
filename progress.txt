@@ -21,6 +21,8 @@ Started: Thu Feb  5 19:29:35 MST 2026
 - Templ `script` keyword for type-safe JS functions callable from `onclick={ funcName(args) }`
 - HTMX edit pattern: use `hx-put` for updates, `hx-delete` for deletes, `hx-post` for creates; all target a shared content div
 - EventBus: in-memory pub/sub in app/eventbus.go; Subscribe() returns (<-chan BusMessage, unsubscribe func); Publish() does non-blocking fan-out with monotonic IDs
+- EventBus publishing: all event creation paths publish BusMessageCreated; updateEventStatus publishes BusMessageStatusChanged; deliverToSubscriber/recordFailedAttempt publish BusMessageDeliveryAttempt
+- Package shadowing workaround: when `app` parameter shadows `app` package, use package-level helpers with `a` parameter name
 ---
 
 ## 2026-02-05 19:30 MST - US-001
@@ -33,4 +35,20 @@ Started: Thu Feb  5 19:29:35 MST 2026
   - EventBus uses sync.RWMutex: RLock for Publish (concurrent reads), full Lock for Subscribe/Unsubscribe
   - atomic.Uint64 for thread-safe monotonic ID generation without locking
   - Non-blocking send pattern: `select { case ch <- msg: default: }` drops for slow consumers
+  - When function parameter name shadows a package import (e.g. `func handler(app *app.Application)`), create a package-level helper function to access the package types
+---
+
+## 2026-02-05 19:37 MST - US-002
+- Published EventBus messages from all event creation and delivery pipeline code paths
+- `eventCreateSubmitHandler` in views/events.go: publishes 'created' message via helper `publishCreatedEvent`
+- `createEventHandler` in api/events.go: publishes 'created' message via helper `publishCreatedEvent`
+- `updateEventStatus` in api/delivery.go: publishes 'status_changed' message after updating DB
+- `deliverToSubscriber` in api/delivery.go: publishes 'delivery_attempt' message after recording attempt (includes endpoint, status, response code)
+- `recordFailedAttempt` in api/delivery.go: publishes 'delivery_attempt' message for pre-response failures
+- Files changed: views/events.go, api/events.go, api/delivery.go
+- **Learnings for future iterations:**
+  - Parameter name `app` shadows the `app` package import in handler functions — use a package-level helper function to construct types from the shadowed package
+  - Helper pattern: `publishCreatedEvent(a *app.Application, event db.Event)` can be called from shadowed scope since it uses `a` not `app` as parameter name
+  - All bus publish calls should happen after the DB operation succeeds (not before) to ensure consistency
+  - `recordFailedAttempt` also needs a bus publish for delivery_attempt — don't forget error path publishing
 ---
