@@ -57,7 +57,7 @@ func main() {
 	api.AddApis(slurpee, router)
 
 	// Start the centralized delivery dispatcher
-	api.StartDispatcher(slurpee)
+	app.StartDispatcher(slurpee)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", appConfig.Port),

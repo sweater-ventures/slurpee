@@ -1,4 +1,4 @@
-package api
+package app
 
 import (
 	"bytes"
@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/sweater-ventures/slurpee/app"
 	"github.com/sweater-ventures/slurpee/db"
 )
 
@@ -37,7 +36,7 @@ type deliveryResult struct {
 // StartDispatcher launches the centralized event delivery dispatcher.
 // It reads events from app.DeliveryChan and delivers them to matching subscribers,
 // enforcing per-subscriber concurrency limits via persistent semaphores.
-func StartDispatcher(a *app.Application) {
+func StartDispatcher(slurpee *Application) {
 	var globalWg sync.WaitGroup
 
 	// Persistent per-subscriber semaphores keyed by UUID bytes
@@ -61,8 +60,8 @@ func StartDispatcher(a *app.Application) {
 	go func() {
 		defer close(done)
 
-		for event := range a.DeliveryChan {
-			dispatchEvent(a, event, getSemaphore, &globalWg)
+		for event := range slurpee.DeliveryChan {
+			dispatchEvent(slurpee, event, getSemaphore, &globalWg)
 		}
 
 		// Channel closed — wait for all in-flight deliveries
@@ -71,28 +70,28 @@ func StartDispatcher(a *app.Application) {
 		slog.Info("All deliveries complete")
 	}()
 
-	a.SetStopDelivery(func() {
-		close(a.DeliveryChan)
+	slurpee.SetStopDelivery(func() {
+		close(slurpee.DeliveryChan)
 		<-done
 	})
 }
 
 // dispatchEvent finds matching subscriptions for an event and spawns delivery workers.
-func dispatchEvent(a *app.Application, event db.Event, getSemaphore func([16]byte, int32) chan struct{}, globalWg *sync.WaitGroup) {
+func dispatchEvent(slurpee *Application, event db.Event, getSemaphore func([16]byte, int32) chan struct{}, globalWg *sync.WaitGroup) {
 	ctx := context.Background()
-	logger := slog.Default().With("event_id", uuidToString(event.ID), "subject", event.Subject)
+	logger := slog.Default().With("event_id", UuidToString(event.ID), "subject", event.Subject)
 
 	// Find all subscriptions whose subject_pattern matches the event subject
-	subscriptions, err := a.DB.GetSubscriptionsMatchingSubject(ctx, event.Subject)
+	subscriptions, err := slurpee.DB.GetSubscriptionsMatchingSubject(ctx, event.Subject)
 	if err != nil {
 		logger.Error("Failed to find matching subscriptions", "error", err)
-		updateEventStatus(ctx, a, event.ID, event.RetryCount, "failed")
+		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "failed")
 		return
 	}
 
 	if len(subscriptions) == 0 {
 		logger.Info("No matching subscriptions for event")
-		updateEventStatus(ctx, a, event.ID, event.RetryCount, "delivered")
+		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "delivered")
 		return
 	}
 
@@ -105,9 +104,9 @@ func dispatchEvent(a *app.Application, event db.Event, getSemaphore func([16]byt
 	// Load subscriber details for each unique subscriber
 	subscribers := make(map[pgtype.UUID]db.Subscriber)
 	for subID := range subscriberSubs {
-		subscriber, err := a.DB.GetSubscriberByID(ctx, subID)
+		subscriber, err := slurpee.DB.GetSubscriberByID(ctx, subID)
 		if err != nil {
-			logger.Error("Failed to get subscriber", "error", err, "subscriber_id", uuidToString(subID))
+			logger.Error("Failed to get subscriber", "error", err, "subscriber_id", UuidToString(subID))
 			continue
 		}
 		subscribers[subID] = subscriber
@@ -125,15 +124,15 @@ func dispatchEvent(a *app.Application, event db.Event, getSemaphore func([16]byt
 			// Check subscription filter against event data
 			if !matchesFilter(sub.Filter, event.Data) {
 				logger.Debug("Subscription filter did not match event data",
-					"subscriber_id", uuidToString(subscriber.ID),
-					"subscription_id", uuidToString(sub.ID),
+					"subscriber_id", UuidToString(subscriber.ID),
+					"subscription_id", UuidToString(sub.ID),
 					"subject_pattern", sub.SubjectPattern,
 				)
 				continue // Skip this subscription - filter doesn't match
 			}
 
 			// Determine effective max retries: per-subscription override or global default
-			maxRetries := a.Config.MaxRetries
+			maxRetries := slurpee.Config.MaxRetries
 			if sub.MaxRetries.Valid {
 				maxRetries = int(sub.MaxRetries.Int32)
 			}
@@ -150,7 +149,7 @@ func dispatchEvent(a *app.Application, event db.Event, getSemaphore func([16]byt
 
 	if len(tasks) == 0 {
 		logger.Warn("No valid subscribers found for matching subscriptions")
-		updateEventStatus(ctx, a, event.ID, event.RetryCount, "failed")
+		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "failed")
 		return
 	}
 
@@ -168,7 +167,7 @@ func dispatchEvent(a *app.Application, event db.Event, getSemaphore func([16]byt
 			defer eventWg.Done()
 			defer globalWg.Done()
 
-			processDeliveryTask(ctx, a, t, getSemaphore, globalWg, resultsChan, logger)
+			processDeliveryTask(ctx, slurpee, t, getSemaphore, globalWg, resultsChan, logger)
 		}(task)
 	}
 
@@ -208,7 +207,7 @@ func dispatchEvent(a *app.Application, event db.Event, getSemaphore func([16]byt
 			finalStatus = "failed"
 		}
 
-		updateEventStatus(ctx, a, event.ID, event.RetryCount, finalStatus)
+		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, finalStatus)
 		logger.Info("Event delivery complete", "status", finalStatus)
 	}()
 }
@@ -216,7 +215,7 @@ func dispatchEvent(a *app.Application, event db.Event, getSemaphore func([16]byt
 // processDeliveryTask handles a single delivery attempt with retry logic.
 func processDeliveryTask(
 	ctx context.Context,
-	a *app.Application,
+	slurpee *Application,
 	task deliveryTask,
 	getSemaphore func([16]byte, int32) chan struct{},
 	globalWg *sync.WaitGroup,
@@ -229,7 +228,7 @@ func processDeliveryTask(
 	sem <- struct{}{}
 	defer func() { <-sem }()
 
-	succeeded := deliverToSubscriber(ctx, a, task.event, task.subscriber, task.attemptNum, logger)
+	succeeded := deliverToSubscriber(ctx, slurpee, task.event, task.subscriber, task.attemptNum, logger)
 
 	if succeeded {
 		resultsChan <- deliveryResult{
@@ -244,7 +243,7 @@ func processDeliveryTask(
 	if task.attemptNum >= task.maxRetries {
 		// Max retries exhausted
 		logger.Warn("Max retries exhausted",
-			"subscriber_id", uuidToString(task.subscriber.ID),
+			"subscriber_id", UuidToString(task.subscriber.ID),
 			"endpoint_url", task.subscriber.EndpointUrl,
 			"attempt", task.attemptNum+1,
 			"max_retries", task.maxRetries,
@@ -258,9 +257,9 @@ func processDeliveryTask(
 	}
 
 	// Schedule retry with exponential backoff
-	delay := calculateBackoff(task.attemptNum, a.Config.MaxBackoffSeconds)
+	delay := calculateBackoff(task.attemptNum, slurpee.Config.MaxBackoffSeconds)
 	logger.Info("Scheduling retry",
-		"subscriber_id", uuidToString(task.subscriber.ID),
+		"subscriber_id", UuidToString(task.subscriber.ID),
 		"endpoint_url", task.subscriber.EndpointUrl,
 		"attempt", task.attemptNum+1,
 		"next_attempt", task.attemptNum+2,
@@ -268,7 +267,7 @@ func processDeliveryTask(
 	)
 
 	// Update event status to partial while retrying
-	updateEventStatus(ctx, a, task.event.ID, task.event.RetryCount+1, "partial")
+	updateEventStatus(ctx, slurpee, task.event.ID, task.event.RetryCount+1, "partial")
 
 	// Increment retry count on the event
 	task.event.RetryCount++
@@ -291,7 +290,7 @@ func processDeliveryTask(
 		}
 
 		// Process the retry
-		processDeliveryTask(ctx, a, nextTask, getSemaphore, globalWg, resultsChan, logger)
+		processDeliveryTask(ctx, slurpee, nextTask, getSemaphore, globalWg, resultsChan, logger)
 	}()
 }
 
@@ -354,7 +353,7 @@ func calculateBackoff(attemptNum int, maxBackoffSeconds int) time.Duration {
 }
 
 // deliverToSubscriber sends the event to a single subscriber endpoint and records the delivery attempt.
-func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event, subscriber db.Subscriber, attemptNum int, logger *slog.Logger) bool {
+func deliverToSubscriber(ctx context.Context, slurpee *Application, event db.Event, subscriber db.Subscriber, attemptNum int, logger *slog.Logger) bool {
 	attemptID := pgtype.UUID{Bytes: uuid.Must(uuid.NewV7()), Valid: true}
 	now := time.Now().UTC()
 
@@ -365,7 +364,7 @@ func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event
 	reqHeaders := map[string]string{
 		"Content-Type":     "application/json",
 		"X-Slurpee-Secret": subscriber.AuthSecret,
-		"X-Event-ID":       uuidToString(event.ID),
+		"X-Event-ID":       UuidToString(event.ID),
 		"X-Event-Subject":  event.Subject,
 	}
 	reqHeadersJSON, _ := json.Marshal(reqHeaders)
@@ -375,17 +374,17 @@ func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event
 	if err != nil {
 		logger.Error("Failed to create delivery request",
 			"error", err,
-			"subscriber_id", uuidToString(subscriber.ID),
+			"subscriber_id", UuidToString(subscriber.ID),
 			"endpoint_url", subscriber.EndpointUrl,
 			"attempt", attemptNum+1,
 		)
-		recordFailedAttempt(ctx, a, attemptID, event, subscriber, reqHeadersJSON, now, fmt.Sprintf("request creation failed: %v", err))
+		recordFailedAttempt(ctx, slurpee, attemptID, event, subscriber, reqHeadersJSON, now, fmt.Sprintf("request creation failed: %v", err))
 		return false
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Slurpee-Secret", subscriber.AuthSecret)
-	req.Header.Set("X-Event-ID", uuidToString(event.ID))
+	req.Header.Set("X-Event-ID", UuidToString(event.ID))
 	req.Header.Set("X-Event-Subject", event.Subject)
 
 	// Send the request
@@ -394,11 +393,11 @@ func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event
 	if err != nil {
 		logger.Error("Delivery request failed",
 			"error", err,
-			"subscriber_id", uuidToString(subscriber.ID),
+			"subscriber_id", UuidToString(subscriber.ID),
 			"endpoint_url", subscriber.EndpointUrl,
 			"attempt", attemptNum+1,
 		)
-		recordFailedAttempt(ctx, a, attemptID, event, subscriber, reqHeadersJSON, now, fmt.Sprintf("request failed: %v", err))
+		recordFailedAttempt(ctx, slurpee, attemptID, event, subscriber, reqHeadersJSON, now, fmt.Sprintf("request failed: %v", err))
 		return false
 	}
 	defer resp.Body.Close()
@@ -414,7 +413,7 @@ func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event
 	}
 
 	// Record the delivery attempt
-	_, err = a.DB.InsertDeliveryAttempt(ctx, db.InsertDeliveryAttemptParams{
+	_, err = slurpee.DB.InsertDeliveryAttempt(ctx, db.InsertDeliveryAttemptParams{
 		ID:                 attemptID,
 		EventID:            event.ID,
 		SubscriberID:       subscriber.ID,
@@ -427,19 +426,31 @@ func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event
 		Status:             status,
 	})
 	if err != nil {
-		logger.Error("Failed to record delivery attempt", "error", err, "subscriber_id", uuidToString(subscriber.ID))
+		logger.Error("Failed to record delivery attempt", "error", err, "subscriber_id", UuidToString(subscriber.ID))
 	}
+
+	// Publish 'delivery_attempt' message to the event bus for SSE clients
+	slurpee.EventBus.Publish(BusMessage{
+		Type:               BusMessageDeliveryAttempt,
+		EventID:            UuidToString(event.ID),
+		Subject:            event.Subject,
+		DeliveryStatus:     event.DeliveryStatus,
+		Timestamp:          now,
+		SubscriberEndpoint: subscriber.EndpointUrl,
+		AttemptStatus:      status,
+		ResponseStatusCode: resp.StatusCode,
+	})
 
 	if status == "succeeded" {
 		logger.Info("Delivery succeeded",
-			"subscriber_id", uuidToString(subscriber.ID),
+			"subscriber_id", UuidToString(subscriber.ID),
 			"endpoint_url", subscriber.EndpointUrl,
 			"status_code", resp.StatusCode,
 			"attempt", attemptNum+1,
 		)
 	} else {
 		logger.Warn("Delivery failed",
-			"subscriber_id", uuidToString(subscriber.ID),
+			"subscriber_id", UuidToString(subscriber.ID),
 			"endpoint_url", subscriber.EndpointUrl,
 			"status_code", resp.StatusCode,
 			"attempt", attemptNum+1,
@@ -450,8 +461,8 @@ func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event
 }
 
 // recordFailedAttempt records a delivery attempt that failed before getting a response.
-func recordFailedAttempt(ctx context.Context, a *app.Application, attemptID pgtype.UUID, event db.Event, subscriber db.Subscriber, reqHeadersJSON []byte, attemptedAt time.Time, errMsg string) {
-	_, err := a.DB.InsertDeliveryAttempt(ctx, db.InsertDeliveryAttemptParams{
+func recordFailedAttempt(ctx context.Context, slurpee *Application, attemptID pgtype.UUID, event db.Event, subscriber db.Subscriber, reqHeadersJSON []byte, attemptedAt time.Time, errMsg string) {
+	_, err := slurpee.DB.InsertDeliveryAttempt(ctx, db.InsertDeliveryAttemptParams{
 		ID:             attemptID,
 		EventID:        event.ID,
 		SubscriberID:   subscriber.ID,
@@ -462,38 +473,68 @@ func recordFailedAttempt(ctx context.Context, a *app.Application, attemptID pgty
 		Status:         "failed",
 	})
 	if err != nil {
-		slog.Error("Failed to record failed delivery attempt", "error", err, "subscriber_id", uuidToString(subscriber.ID))
+		slog.Error("Failed to record failed delivery attempt", "error", err, "subscriber_id", UuidToString(subscriber.ID))
 	}
+	// Publish 'delivery_attempt' message to the event bus for SSE clients
+	slurpee.EventBus.Publish(BusMessage{
+		Type:               BusMessageDeliveryAttempt,
+		EventID:            UuidToString(event.ID),
+		Subject:            event.Subject,
+		DeliveryStatus:     event.DeliveryStatus,
+		Timestamp:          attemptedAt,
+		SubscriberEndpoint: subscriber.EndpointUrl,
+		AttemptStatus:      "failed",
+		ResponseStatusCode: 0,
+	})
+}
+
+// PublishCreatedEvent publishes a 'created' bus message for SSE clients.
+func PublishCreatedEvent(slurpee *Application, event db.Event) {
+	slurpee.EventBus.Publish(BusMessage{
+		Type:           BusMessageCreated,
+		EventID:        UuidToString(event.ID),
+		Subject:        event.Subject,
+		DeliveryStatus: event.DeliveryStatus,
+		Timestamp:      event.Timestamp.Time,
+	})
 }
 
 // ReplayToSubscriber delivers an event to a single subscriber as a replay.
 // It resets the event status to pending, performs a single delivery attempt, and updates the event status.
-func ReplayToSubscriber(a *app.Application, event db.Event, subscriber db.Subscriber) {
+func ReplayToSubscriber(slurpee *Application, event db.Event, subscriber db.Subscriber) {
 	ctx := context.Background()
-	logger := slog.Default().With("event_id", uuidToString(event.ID), "subject", event.Subject, "replay", true)
+	logger := slog.Default().With("event_id", UuidToString(event.ID), "subject", event.Subject, "replay", true)
 
-	updateEventStatus(ctx, a, event.ID, event.RetryCount, "pending")
+	updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "pending")
 
-	succeeded := deliverToSubscriber(ctx, a, event, subscriber, 0, logger)
+	succeeded := deliverToSubscriber(ctx, slurpee, event, subscriber, 0, logger)
 
 	if succeeded {
-		updateEventStatus(ctx, a, event.ID, event.RetryCount, "delivered")
-		logger.Info("Replay delivery succeeded", "subscriber_id", uuidToString(subscriber.ID))
+		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "delivered")
+		logger.Info("Replay delivery succeeded", "subscriber_id", UuidToString(subscriber.ID))
 	} else {
-		updateEventStatus(ctx, a, event.ID, event.RetryCount, "failed")
-		logger.Warn("Replay delivery failed", "subscriber_id", uuidToString(subscriber.ID))
+		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "failed")
+		logger.Warn("Replay delivery failed", "subscriber_id", UuidToString(subscriber.ID))
 	}
 }
 
 // updateEventStatus updates the delivery_status, retry_count, and status_updated_at on an event.
-func updateEventStatus(ctx context.Context, a *app.Application, eventID pgtype.UUID, retryCount int32, status string) {
-	_, err := a.DB.UpdateEventDeliveryStatus(ctx, db.UpdateEventDeliveryStatusParams{
+func updateEventStatus(ctx context.Context, slurpee *Application, eventID pgtype.UUID, retryCount int32, status string) {
+	_, err := slurpee.DB.UpdateEventDeliveryStatus(ctx, db.UpdateEventDeliveryStatusParams{
 		DeliveryStatus:  status,
 		RetryCount:      retryCount,
 		StatusUpdatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		ID:              eventID,
 	})
 	if err != nil {
-		slog.Error("Failed to update event delivery status", "error", err, "event_id", uuidToString(eventID))
+		slog.Error("Failed to update event delivery status", "error", err, "event_id", UuidToString(eventID))
+		return
 	}
+	// Publish 'status_changed' message to the event bus for SSE clients
+	slurpee.EventBus.Publish(BusMessage{
+		Type:           BusMessageStatusChanged,
+		EventID:        UuidToString(eventID),
+		DeliveryStatus: status,
+		Timestamp:      time.Now().UTC(),
+	})
 }

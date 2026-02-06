@@ -15,9 +15,9 @@ import (
 )
 
 func init() {
-	registerRoute(func(app *app.Application, router *http.ServeMux) {
-		router.Handle("POST /events", routeHandler(app, createEventHandler))
-		router.Handle("GET /events/{id}", routeHandler(app, getEventHandler))
+	registerRoute(func(slurpee *app.Application, router *http.ServeMux) {
+		router.Handle("POST /events", routeHandler(slurpee, createEventHandler))
+		router.Handle("GET /events/{id}", routeHandler(slurpee, getEventHandler))
 	})
 }
 
@@ -48,7 +48,7 @@ func LogEvent(ctx context.Context, slurpee *app.Application, event db.Event) {
 		log(ctx).Error("Failed to unmarshal event data for logging", "error", err)
 		return
 	}
-	logAttrs := []any{"event_id", uuidToString(event.ID), "subject", event.Subject}
+	logAttrs := []any{"event_id", app.UuidToString(event.ID), "subject", event.Subject}
 	logConfig, err := slurpee.DB.GetLogConfigBySubject(ctx, event.Subject)
 	if err == nil {
 		for _, prop := range logConfig.LogProperties {
@@ -60,7 +60,7 @@ func LogEvent(ctx context.Context, slurpee *app.Application, event db.Event) {
 	log(ctx).Info("Event received", logAttrs...)
 }
 
-func createEventHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func createEventHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	var req CreateEventRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJsonResponse(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
@@ -115,7 +115,7 @@ func createEventHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 		traceID = pgtype.UUID{Bytes: parsed, Valid: true}
 	}
 
-	event, err := app.DB.InsertEvent(r.Context(), db.InsertEventParams{
+	event, err := slurpee.DB.InsertEvent(r.Context(), db.InsertEventParams{
 		ID:              eventID,
 		Subject:         req.Subject,
 		Timestamp:       pgtype.Timestamptz{Time: ts, Valid: true},
@@ -131,14 +131,16 @@ func createEventHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	LogEvent(r.Context(), app, event)
+	LogEvent(r.Context(), slurpee, event)
+	// Publish 'created' message to the event bus for SSE clients
+	app.PublishCreatedEvent(slurpee, event)
 	// Send to delivery dispatcher for asynchronous delivery
-	app.DeliveryChan <- event
+	slurpee.DeliveryChan <- event
 
 	writeJsonResponse(w, http.StatusCreated, eventToResponse(event))
 }
 
-func getEventHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func getEventHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {
@@ -146,7 +148,7 @@ func getEventHandler(app *app.Application, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	event, err := app.DB.GetEventByID(r.Context(), pgtype.UUID{Bytes: parsed, Valid: true})
+	event, err := slurpee.DB.GetEventByID(r.Context(), pgtype.UUID{Bytes: parsed, Valid: true})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeJsonResponse(w, http.StatusNotFound, map[string]string{"error": "event not found"})
@@ -162,7 +164,7 @@ func getEventHandler(app *app.Application, w http.ResponseWriter, r *http.Reques
 
 func eventToResponse(e db.Event) EventResponse {
 	resp := EventResponse{
-		ID:             uuidToString(e.ID),
+		ID:             app.UuidToString(e.ID),
 		Subject:        e.Subject,
 		Timestamp:      e.Timestamp.Time,
 		Data:           e.Data,
@@ -170,7 +172,7 @@ func eventToResponse(e db.Event) EventResponse {
 		DeliveryStatus: e.DeliveryStatus,
 	}
 	if e.TraceID.Valid {
-		s := uuidToString(e.TraceID)
+		s := app.UuidToString(e.TraceID)
 		resp.TraceID = &s
 	}
 	if e.StatusUpdatedAt.Valid {
@@ -178,8 +180,4 @@ func eventToResponse(e db.Event) EventResponse {
 		resp.StatusUpdatedAt = &t
 	}
 	return resp
-}
-
-func uuidToString(u pgtype.UUID) string {
-	return uuid.UUID(u.Bytes).String()
 }

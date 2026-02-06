@@ -12,9 +12,9 @@ import (
 )
 
 func init() {
-	registerRoute(func(app *app.Application, router *http.ServeMux) {
-		router.Handle("POST /subscribers", routeHandler(app, createSubscriberHandler))
-		router.Handle("GET /subscribers", routeHandler(app, listSubscribersHandler))
+	registerRoute(func(slurpee *app.Application, router *http.ServeMux) {
+		router.Handle("POST /subscribers", routeHandler(slurpee, createSubscriberHandler))
+		router.Handle("GET /subscribers", routeHandler(slurpee, listSubscribersHandler))
 	})
 }
 
@@ -51,10 +51,10 @@ type SubscriberResponse struct {
 	Subscriptions []SubscriptionResponse `json:"subscriptions"`
 }
 
-func createSubscriberHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func createSubscriberHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	// Verify admin secret
 	adminSecret := r.Header.Get("X-Slurpee-Admin-Secret")
-	if app.Config.AdminSecret == "" || adminSecret != app.Config.AdminSecret {
+	if slurpee.Config.AdminSecret == "" || adminSecret != slurpee.Config.AdminSecret {
 		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Invalid or missing admin secret"})
 		return
 	}
@@ -90,14 +90,14 @@ func createSubscriberHandler(app *app.Application, w http.ResponseWriter, r *htt
 		}
 	}
 
-	maxParallel := int32(app.Config.MaxParallel)
+	maxParallel := int32(slurpee.Config.MaxParallel)
 	if req.MaxParallel != nil {
 		maxParallel = *req.MaxParallel
 	}
 
 	// Upsert subscriber
 	subscriberID := pgtype.UUID{Bytes: uuid.Must(uuid.NewV7()), Valid: true}
-	subscriber, err := app.DB.UpsertSubscriber(r.Context(), db.UpsertSubscriberParams{
+	subscriber, err := slurpee.DB.UpsertSubscriber(r.Context(), db.UpsertSubscriberParams{
 		ID:          subscriberID,
 		Name:        req.Name,
 		EndpointUrl: req.EndpointURL,
@@ -111,7 +111,7 @@ func createSubscriberHandler(app *app.Application, w http.ResponseWriter, r *htt
 	}
 
 	// Delete existing subscriptions and recreate (idempotent replace)
-	if err := app.DB.DeleteSubscriptionsForSubscriber(r.Context(), subscriber.ID); err != nil {
+	if err := slurpee.DB.DeleteSubscriptionsForSubscriber(r.Context(), subscriber.ID); err != nil {
 		log(r.Context()).Error("Failed to delete existing subscriptions", "error", err)
 		writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update subscriptions"})
 		return
@@ -131,7 +131,7 @@ func createSubscriberHandler(app *app.Application, w http.ResponseWriter, r *htt
 			maxRetries = pgtype.Int4{Int32: *sub.MaxRetries, Valid: true}
 		}
 
-		created, err := app.DB.CreateSubscription(r.Context(), db.CreateSubscriptionParams{
+		created, err := slurpee.DB.CreateSubscription(r.Context(), db.CreateSubscriptionParams{
 			ID:             subID,
 			SubscriberID:   subscriber.ID,
 			SubjectPattern: sub.SubjectPattern,
@@ -148,7 +148,7 @@ func createSubscriberHandler(app *app.Application, w http.ResponseWriter, r *htt
 	}
 
 	log(r.Context()).Info("Subscriber registered",
-		"subscriber_id", uuidToString(subscriber.ID),
+		"subscriber_id", app.UuidToString(subscriber.ID),
 		"name", subscriber.Name,
 		"endpoint_url", subscriber.EndpointUrl,
 		"subscription_count", len(subscriptions),
@@ -163,7 +163,7 @@ func subscriberToResponse(s db.Subscriber, subs []SubscriptionResponse) Subscrib
 		subs = []SubscriptionResponse{}
 	}
 	return SubscriberResponse{
-		ID:            uuidToString(s.ID),
+		ID:            app.UuidToString(s.ID),
 		Name:          s.Name,
 		EndpointURL:   s.EndpointUrl,
 		MaxParallel:   s.MaxParallel,
@@ -173,15 +173,15 @@ func subscriberToResponse(s db.Subscriber, subs []SubscriptionResponse) Subscrib
 	}
 }
 
-func listSubscribersHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func listSubscribersHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	// Verify admin secret
 	adminSecret := r.Header.Get("X-Slurpee-Admin-Secret")
-	if app.Config.AdminSecret == "" || adminSecret != app.Config.AdminSecret {
+	if slurpee.Config.AdminSecret == "" || adminSecret != slurpee.Config.AdminSecret {
 		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Invalid or missing admin secret"})
 		return
 	}
 
-	subscribers, err := app.DB.ListSubscribers(r.Context())
+	subscribers, err := slurpee.DB.ListSubscribers(r.Context())
 	if err != nil {
 		log(r.Context()).Error("Failed to list subscribers", "error", err)
 		writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to list subscribers"})
@@ -190,9 +190,9 @@ func listSubscribersHandler(app *app.Application, w http.ResponseWriter, r *http
 
 	var response []SubscriberResponse
 	for _, sub := range subscribers {
-		subs, err := app.DB.ListSubscriptionsForSubscriber(r.Context(), sub.ID)
+		subs, err := slurpee.DB.ListSubscriptionsForSubscriber(r.Context(), sub.ID)
 		if err != nil {
-			log(r.Context()).Error("Failed to list subscriptions for subscriber", "error", err, "subscriber_id", uuidToString(sub.ID))
+			log(r.Context()).Error("Failed to list subscriptions for subscriber", "error", err, "subscriber_id", app.UuidToString(sub.ID))
 			writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to list subscriptions"})
 			return
 		}
@@ -214,7 +214,7 @@ func listSubscribersHandler(app *app.Application, w http.ResponseWriter, r *http
 
 func subscriptionToResponse(s db.Subscription) SubscriptionResponse {
 	resp := SubscriptionResponse{
-		ID:             uuidToString(s.ID),
+		ID:             app.UuidToString(s.ID),
 		SubjectPattern: s.SubjectPattern,
 		CreatedAt:      s.CreatedAt.Time,
 		UpdatedAt:      s.UpdatedAt.Time,

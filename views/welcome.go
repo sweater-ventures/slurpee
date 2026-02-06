@@ -12,7 +12,7 @@ func init() {
 	})
 }
 
-func WelcomeHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func WelcomeHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	err := WelcomeTemplate().Render(r.Context(), w)
 	if err != nil {
 		log(r.Context()).Error("Error rendering welcome view: ", "err", err)

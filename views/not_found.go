@@ -12,7 +12,7 @@ func init() {
 	})
 }
 
-func notFound(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func notFound(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
 		// forward to events page
 		w.Header().Set("Location", "/events")
