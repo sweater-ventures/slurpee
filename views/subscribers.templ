@@ -1,0 +1,53 @@
+package views
+
+import (
+	"fmt"
+	"github.com/sweater-ventures/slurpee/components"
+)
+
+type SubscriberRow struct {
+	ID                string
+	Name              string
+	EndpointURL       string
+	MaxParallel       int32
+	SubscriptionCount int
+	CreatedAt         string
+}
+
+templ SubscribersListTemplate(subscribers []SubscriberRow) {
+	@components.SimplePage("Subscribers", "/subscribers") {
+		<div class="overflow-x-auto">
+			<table class="table table-zebra w-full">
+				<thead>
+					<tr>
+						<th>Name</th>
+						<th>Endpoint URL</th>
+						<th>Max Parallel</th>
+						<th>Subscriptions</th>
+						<th>Created At</th>
+					</tr>
+				</thead>
+				<tbody>
+					if len(subscribers) == 0 {
+						<tr>
+							<td colspan="5" class="text-center text-base-content/60 py-8">No subscribers registered</td>
+						</tr>
+					}
+					for _, sub := range subscribers {
+						<tr class="hover cursor-pointer" onclick={ goToSubscriber(sub.ID) }>
+							<td class="font-semibold">{ sub.Name }</td>
+							<td class="font-mono text-sm">{ sub.EndpointURL }</td>
+							<td>{ fmt.Sprintf("%d", sub.MaxParallel) }</td>
+							<td>{ fmt.Sprintf("%d", sub.SubscriptionCount) }</td>
+							<td>{ sub.CreatedAt }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+script goToSubscriber(id string) {
+	window.location.href = "/subscribers/" + id;
+}

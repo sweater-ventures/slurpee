@@ -55,6 +55,15 @@ func (q *Queries) DeleteSubscriber(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
+const deleteSubscription = `-- name: DeleteSubscription :exec
+DELETE FROM subscriptions WHERE id = $1
+`
+
+func (q *Queries) DeleteSubscription(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSubscription, id)
+	return err
+}
+
 const deleteSubscriptionsForSubscriber = `-- name: DeleteSubscriptionsForSubscriber :exec
 DELETE FROM subscriptions WHERE subscriber_id = $1
 `
@@ -166,6 +175,54 @@ func (q *Queries) ListSubscribers(ctx context.Context) ([]Subscriber, error) {
 	return items, nil
 }
 
+const listSubscribersWithCounts = `-- name: ListSubscribersWithCounts :many
+SELECT s.id, s.name, s.endpoint_url, s.auth_secret, s.max_parallel, s.created_at, s.updated_at, COUNT(sub.id)::int AS subscription_count
+FROM subscribers s
+LEFT JOIN subscriptions sub ON sub.subscriber_id = s.id
+GROUP BY s.id
+ORDER BY s.created_at DESC
+`
+
+type ListSubscribersWithCountsRow struct {
+	ID                pgtype.UUID
+	Name              string
+	EndpointUrl       string
+	AuthSecret        string
+	MaxParallel       int32
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+	SubscriptionCount int32
+}
+
+func (q *Queries) ListSubscribersWithCounts(ctx context.Context) ([]ListSubscribersWithCountsRow, error) {
+	rows, err := q.db.Query(ctx, listSubscribersWithCounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSubscribersWithCountsRow
+	for rows.Next() {
+		var i ListSubscribersWithCountsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.EndpointUrl,
+			&i.AuthSecret,
+			&i.MaxParallel,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.SubscriptionCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSubscriptionsForSubscriber = `-- name: ListSubscriptionsForSubscriber :many
 SELECT id, subscriber_id, subject_pattern, filter, max_retries, created_at, updated_at FROM subscriptions WHERE subscriber_id = $1 ORDER BY created_at
 `
@@ -196,6 +253,43 @@ func (q *Queries) ListSubscriptionsForSubscriber(ctx context.Context, subscriber
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateSubscriber = `-- name: UpdateSubscriber :one
+UPDATE subscribers SET
+    name = $1,
+    auth_secret = $2,
+    max_parallel = $3,
+    updated_at = now()
+WHERE id = $4
+RETURNING id, name, endpoint_url, auth_secret, max_parallel, created_at, updated_at
+`
+
+type UpdateSubscriberParams struct {
+	Name        string
+	AuthSecret  string
+	MaxParallel int32
+	ID          pgtype.UUID
+}
+
+func (q *Queries) UpdateSubscriber(ctx context.Context, arg UpdateSubscriberParams) (Subscriber, error) {
+	row := q.db.QueryRow(ctx, updateSubscriber,
+		arg.Name,
+		arg.AuthSecret,
+		arg.MaxParallel,
+		arg.ID,
+	)
+	var i Subscriber
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.EndpointUrl,
+		&i.AuthSecret,
+		&i.MaxParallel,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const upsertSubscriber = `-- name: UpsertSubscriber :one

@@ -26,6 +26,9 @@ Started: Wed Feb  4 15:46:59 MST 2026
 - HTMX partial rendering: extract content into a separate templ component, use hx-target/hx-swap to replace just that section
 - DaisyUI modal: `<dialog class="modal">` with `.showModal()`/`.close()`, `<form method="dialog">` for cancel button
 - Templ `script` keyword for type-safe JS functions callable from `onclick={ funcName(args) }`
+- HTMX edit pattern: use `hx-put` for updates, `hx-delete` for deletes, `hx-post` for creates; all target a shared content div
+- `hx-confirm` attribute provides simple browser-native confirmation dialogs — simpler than DaisyUI modals for destructive actions
+- Shared `buildXxxDetailView()` helper pattern: extract DB fetch + transform logic to reduce duplication across detail/update/create/delete handlers
 
 ---
 
@@ -391,4 +394,72 @@ Started: Wed Feb  4 15:46:59 MST 2026
   - For HTMX partial updates to work with dynamically-set `hx-post`, call `htmx.process(element)` after setting the attribute via JS
   - Exporting delivery functions from api package (e.g., ReplayToSubscriber) allows views to trigger delivery without reimplementing HTTP client logic
   - Route registration order matters: `POST /events/{id}/replay` and `POST /events/{id}/replay/{subscriberId}` must be registered before `GET /events/{id}` to avoid the wildcard catching POST requests (Go 1.22+ method prefix helps but literal paths still need priority)
+---
+
+## 2026-02-05 16:30 MST - US-025
+- Built subscribers list page at /subscribers with table showing name, endpoint URL, max parallel, subscription count, and created at timestamp
+- Templ template in views/subscribers.templ with SubscriberRow struct and goToSubscriber script for clickable rows
+- Go handler in views/subscribers.go using init() route registration and routeHandler wrapper pattern
+- For each subscriber, fetches subscription count via ListSubscriptionsForSubscriber query
+- Empty state shows "No subscribers registered" message
+- Files changed: views/subscribers.templ (new), views/subscribers_templ.go (generated), views/subscribers.go (new)
+- **Learnings for future iterations:**
+  - Subscriber list page follows exact same pattern as events list page but simpler (no pagination/filtering needed since subscribers are typically few)
+  - Subscription count requires a per-subscriber query (ListSubscriptionsForSubscriber) — for large subscriber counts a dedicated COUNT query would be more efficient
+  - The pgtypeUUIDToString helper from events.go is accessible across the views package since all files share the same package
+  - goToSubscriber script in .templ file mirrors the goToEvent pattern for clickable table rows
+---
+
+## 2026-02-05 16:40 MST - US-026
+- Built subscriber detail page at /subscribers/{id} showing full subscriber configuration and subscriptions table
+- Templ template in views/subscriber_detail.templ with SubscriberDetail and SubscriptionRow structs
+- Subscriber info card displays: ID, name, endpoint URL, auth secret (masked with reveal toggle), max parallel, created/updated timestamps
+- Auth secret uses show/hide toggle via toggleSecret() templ script function with DOM manipulation
+- Subscriptions table shows: subject pattern, filter (pretty-printed JSON if present), max retries (with "global default" fallback text)
+- Go handler in views/subscribers.go: subscriberDetailHandler fetches subscriber via GetSubscriberByID and subscriptions via ListSubscriptionsForSubscriber
+- Uses prettyJSON helper from events.go for formatting subscription filter JSONB
+- Files changed: views/subscriber_detail.templ (new), views/subscriber_detail_templ.go (generated), views/subscribers.go (added handler, imports, route)
+- **Learnings for future iterations:**
+  - Subscriber detail follows same pattern as event detail page: back button, card with grid layout, related items table below
+  - Auth secret masking uses paired elements with hidden class toggling — simpler than input type switching
+  - Subscription Filter is []byte from JSONB; check `len(filter) > 0 && string(filter) != "null"` to distinguish real filters from null/empty
+  - pgtype.Int4.Valid check needed for nullable max_retries before formatting as string
+  - prettyJSON helper from events.go is available across views package — no need to duplicate
+---
+
+## 2026-02-05 16:50 MST - US-027
+- Built subscriber edit functionality on the subscriber detail page (/subscribers/{id})
+- Editable fields: name, auth secret, max parallel via DaisyUI form inputs with save button
+- Endpoint URL and subscriber ID displayed as read-only (not editable)
+- Add new subscriptions via DaisyUI modal dialog with subject pattern, optional filter JSON, and optional max_retries
+- Delete existing subscriptions with per-row delete button using hx-confirm for confirmation
+- All changes persist via HTMX (PUT for subscriber update, POST for add subscription, DELETE for remove subscription) — no full page reload
+- Success/error messages displayed via alert banners after each operation
+- Added new sqlc queries: UpdateSubscriber (update by ID), DeleteSubscription (delete single subscription by ID)
+- Refactored subscriberDetailHandler to use shared buildSubscriberDetailView() helper, reducing code duplication across 4 handlers
+- Files changed: queries/subscribers.sql (added 2 queries), db/subscribers.sql.go (generated), views/subscriber_detail.templ (rewritten with edit forms), views/subscriber_detail_templ.go (generated), views/subscribers.go (added 3 handlers + 2 helpers)
+- **Learnings for future iterations:**
+  - HTMX partial rendering for edit operations: use `subscriberDetailContent` (inner content) for HTMX responses and `SubscriberDetailTemplate` (full page) for initial GET — same pattern as events list with EventsTablePartial
+  - hx-confirm attribute provides simple browser-native confirmation dialogs without needing DaisyUI modals — simpler for delete operations
+  - PUT method for updates: `hx-put` in form tag triggers PUT request; route registered as `"PUT /subscribers/{id}"` in Go 1.22+ ServeMux
+  - For edit forms, display read-only fields (ID, endpoint URL, timestamps) as plain text outside the form, editable fields as form inputs inside
+  - `buildSubscriberDetailView()` helper pattern avoids repeating subscriber + subscriptions fetch + transform logic across detail, update, create-subscription, and delete-subscription handlers
+  - sqlc `UpdateSubscriber` query uses `sqlc.arg(name)` for clean Go struct field names in the generated UpdateSubscriberParams
+---
+
+## 2026-02-05 17:00 MST - US-028
+- Built logging configuration page at /logging with full CRUD operations
+- Table view showing all log configurations: subject and logged properties (comma-separated)
+- Add new log config via DaisyUI modal dialog: subject (text input) and properties (comma-separated text input for JSON property paths)
+- Edit existing log config via DaisyUI modal dialog: pre-populated with current subject and properties, saves via PUT using upsert
+- Delete log config with per-row delete button using hx-confirm for confirmation
+- All operations use HTMX partial rendering (hx-target="#logging-content") with success/error alert banners — no full page reload
+- Leveraged existing sqlc-generated log_config queries: UpsertLogConfig, ListLogConfigs, DeleteLogConfigForSubject
+- Files changed: views/logging.templ (new template with table, add/edit modals), views/logging_templ.go (generated), views/logging.go (new handlers: list, create, update, delete + helpers)
+- **Learnings for future iterations:**
+  - Templ `script` keyword for JS interop: used `showEditModal(subject, properties)` to pre-populate edit modal fields before opening — type-safe callable from `onclick={ showEditModal(args) }`
+  - UpsertLogConfig works for both create and update since log_config has a unique constraint on subject — ON CONFLICT (subject) DO UPDATE
+  - DELETE route uses path parameter for subject: `"DELETE /logging/{subject}"` + `r.PathValue("subject")` — works for subject values without slashes
+  - Comma-separated input for properties is simpler than JSON array input for the user — parse with strings.Split and trim whitespace
+  - The logging page is the simplest CRUD page in the app (no foreign keys, no pagination) — good reference for future simple config pages
 ---
