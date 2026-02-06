@@ -1,0 +1,177 @@
+{
+  "project": "Slurpee Event Broker",
+  "branchName": "ralph/api-secrets",
+  "description": "Add pre-shared API secrets with scoped access control. Each secret has a subject_pattern limiting event sends and a set of associated subscribers it can manage. Session-based UI auth with 24h TTL. Admin secret (env var) controls secrets management.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "API secrets database schema and queries",
+      "description": "As a developer, I need database tables for API secrets and their subscriber associations so the system can store and query scoped credentials.",
+      "acceptanceCriteria": [
+        "New migration file creates `api_secrets` table: id (UUID PK), name (TEXT NOT NULL), secret_hash (TEXT NOT NULL), subject_pattern (TEXT NOT NULL), created_at (TIMESTAMPTZ NOT NULL DEFAULT now())",
+        "New migration file creates `api_secret_subscribers` join table: api_secret_id (UUID FK to api_secrets ON DELETE CASCADE), subscriber_id (UUID FK to subscribers ON DELETE CASCADE), PRIMARY KEY (api_secret_id, subscriber_id)",
+        "sqlc queries in queries/api_secrets.sql: InsertApiSecret, ListApiSecrets, DeleteApiSecret, GetApiSecretByID, AddApiSecretSubscriber, RemoveApiSecretSubscriber, ListSubscribersForApiSecret, ListApiSecretsForSubscriber",
+        "ListApiSecrets query joins to api_secret_subscribers and subscribers to include subscriber names",
+        "sqlc generate runs successfully",
+        "go build ./... passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Secret generation, hashing, and validation helpers",
+      "description": "As a developer, I need utility functions to generate, hash, and validate API secrets so authentication logic is centralized and reusable.",
+      "acceptanceCriteria": [
+        "New file app/secrets.go with all helper functions",
+        "GenerateSecret() returns a 32+ character URL-safe base64 string using crypto/rand",
+        "HashSecret(plaintext) returns bcrypt hash with cost 10",
+        "ValidateSecret(ctx, db, plaintext) iterates all stored secret hashes, returns matching db.ApiSecret record or error if none match",
+        "CheckSubscriberScope(ctx, db, secretID, subscriberID) returns bool by querying the join table",
+        "CheckSendScope(subjectPattern, subject) returns bool using Go-side SQL LIKE pattern matching (% = any sequence, _ = single char)",
+        "MatchLikePattern(pattern, value) helper implements SQL LIKE semantics in Go with proper % and _ handling",
+        "go build ./... and go vet ./... pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Protect API event endpoints with secret validation",
+      "description": "As an API consumer, I must provide a valid X-Slurpee-Secret header to access event API endpoints so unauthorized callers are rejected.",
+      "acceptanceCriteria": [
+        "POST /api/events requires X-Slurpee-Secret header; validates secret via ValidateSecret, then checks event subject against secret's subject_pattern via CheckSendScope",
+        "Returns 401 JSON error if secret is missing or invalid, 403 JSON error if subject doesn't match pattern",
+        "GET /api/events/{id} requires any valid X-Slurpee-Secret header (read-only, any scope); returns 401 if invalid",
+        "POST /api/subscribers and GET /api/subscribers continue requiring X-Slurpee-Admin-Secret (no change)",
+        "Log failed authentication attempts with slog warning",
+        "go build ./... and go vet ./... pass"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "In-memory session store",
+      "description": "As a developer, I need a session store to track authenticated UI sessions so users don't re-enter their secret on every request.",
+      "acceptanceCriteria": [
+        "New file app/sessions.go with SessionStore struct",
+        "SessionInfo struct with fields: SecretID (UUID), SubjectPattern (string), SubscriberIDs ([]UUID), IsAdmin (bool), ExpiresAt (time.Time)",
+        "SessionStore uses sync.RWMutex protecting a map[string]SessionInfo (key is session token)",
+        "CreateSession(info SessionInfo) generates a crypto/rand token (32 bytes, hex encoded), stores with 24h expiry, returns token",
+        "GetSession(token) returns *SessionInfo or nil if expired/missing; deletes expired sessions on access",
+        "DeleteSession(token) removes from map",
+        "go build ./... and go vet ./... pass"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Login and logout page with handlers",
+      "description": "As a UI user, I want a login page where I enter my secret once and stay authenticated for 24 hours.",
+      "acceptanceCriteria": [
+        "New file views/login.templ with login page: simple form with secret input (type=password) and Submit button, styled with DaisyUI card centered on page",
+        "Login page shows error message banner when authentication fails",
+        "GET /login renders the login page (no SimplePage wrapper, standalone layout)",
+        "POST /login validates secret against stored hashes via ValidateSecret; on match, creates session with subscriber IDs from join table, sets slurpee_session cookie (HttpOnly, SameSite=Lax, Path=/, no Secure flag), redirects to /events",
+        "POST /login also checks against ADMIN_SECRET env var; if match, creates admin session (IsAdmin=true, empty SubjectPattern and SubscriberIDs)",
+        "Log failed login attempts with slog warning including request IP",
+        "POST /logout deletes session and clears cookie, redirects to /login",
+        "go build ./... and go vet ./... pass"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "UI auth middleware",
+      "description": "As a system operator, I want all UI routes protected by session authentication so unauthenticated users cannot access any data.",
+      "acceptanceCriteria": [
+        "New middleware function in middleware/ package that checks slurpee_session cookie against SessionStore",
+        "Exempt routes: GET /login, POST /login, GET /version, and static assets (paths starting with /static/)",
+        "Unauthenticated requests redirect to /login with 302",
+        "On valid session, injects SessionInfo into request context via context.WithValue using a package-level context key type",
+        "Helper function GetSessionFromContext(ctx) returns *SessionInfo from context",
+        "Add middleware to the middleware stack in main.go (must have access to app.Application for SessionStore)",
+        "Add logout link to sidebar component (visible when authenticated)",
+        "go build ./... and go vet ./... pass"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Secrets management list page",
+      "description": "As an administrator, I want a page to view all API secrets so I can manage access credentials.",
+      "acceptanceCriteria": [
+        "GET /secrets route registered in views package",
+        "Handler checks session IsAdmin flag; returns 403 for non-admin sessions",
+        "Page uses SimplePage wrapper with title 'API Secrets' and currentPath '/secrets'",
+        "Table lists all secrets: name, subject_pattern, associated subscriber names (comma-separated), created_at formatted date",
+        "Each row has Edit and Delete buttons (delete with DaisyUI modal confirmation dialog)",
+        "DELETE handler removes the secret from DB via DeleteApiSecret query",
+        "Navigation link to /secrets in sidebar, only visible when session IsAdmin is true",
+        "go build ./... and go vet ./... pass"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Create secret form",
+      "description": "As an administrator, I want to create new API secrets with a subject pattern and subscriber associations so I can onboard API consumers.",
+      "acceptanceCriteria": [
+        "Create form on the /secrets page (or as a section below the table): name text input, subject_pattern text input (placeholder: order.% or % for all), subscriber multi-select checkboxes listing all existing subscribers",
+        "Subscriber association constraint: all selected subscribers must share the same host:port (parsed from endpoint_url). Show validation error if mismatched.",
+        "Empty subscriber selection is allowed (send-only key)",
+        "POST /secrets handler: generates secret via GenerateSecret, hashes via HashSecret, inserts via InsertApiSecret, creates join table entries via AddApiSecretSubscriber for each selected subscriber",
+        "After creation, display plaintext secret ONCE in a DaisyUI alert-success banner with a copy-to-clipboard button and warning that it won't be shown again",
+        "go build ./... and go vet ./... pass"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Edit secret subscriber associations and subject pattern",
+      "description": "As an administrator, I want to edit a secret's subject pattern and subscriber associations without regenerating the secret itself.",
+      "acceptanceCriteria": [
+        "GET /secrets/{id}/edit renders an edit form pre-populated with current name, subject_pattern, and subscriber checkboxes (checked for currently associated subscribers)",
+        "PUT /secrets/{id} updates name and subject_pattern in api_secrets table, replaces subscriber associations (delete all + re-add selected)",
+        "Same host:port constraint on subscriber selection as create form",
+        "On success, redirects back to /secrets with success message",
+        "On validation error, re-renders form with error message",
+        "go build ./... and go vet ./... pass"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Scope-aware UI controls and write operation enforcement",
+      "description": "As a UI user with a scoped session, I want to see edit controls only for resources I have access to, and write operations should be rejected server-side if out of scope.",
+      "acceptanceCriteria": [
+        "Subscriber list page: edit links only shown for subscribers in session's SubscriberIDs list; admin sees all edit controls",
+        "Subscriber detail page: edit form and subscription add/delete buttons hidden when subscriber is not in session's SubscriberIDs list; admin sees all controls",
+        "subscriberUpdateHandler, subscriptionCreateHandler, subscriptionDeleteHandler: check session scope via CheckSubscriberScope before processing; return 403 if not authorized (admin bypasses)",
+        "eventCreateSubmitHandler: check event subject against session's SubjectPattern via CheckSendScope; show form error if not authorized (admin bypasses)",
+        "Event replay buttons: visible only when session SubjectPattern matches event subject or session is admin",
+        "eventReplayAllHandler and eventReplaySubscriberHandler: check session scope; return 403 if not authorized",
+        "go build ./... and go vet ./... pass"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

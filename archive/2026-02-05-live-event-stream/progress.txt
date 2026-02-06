@@ -1,0 +1,157 @@
+# Ralph Progress Log
+Started: Thu Feb  5 19:29:35 MST 2026
+
+## Codebase Patterns
+- Use `IF NOT EXISTS` for all CREATE TABLE and CREATE INDEX statements in migrations
+- sql-migrate uses `-- +migrate Up` and `-- +migrate Down` comment markers
+- Source .env before running sql-migrate: `set -a && source .env && set +a && sql-migrate up`
+- sqlc config at sqlc.yaml uses pgx/v5 driver with custom type overrides for timestamptz and nullable text
+- Build with `go build ./...` to verify no compilation errors
+- Use `sqlc.arg(name)` for named parameters in sqlc queries to get clean Go struct field names
+- JSONB containment search: `WHERE data @> $1` with `@>` operator
+- Go 1.22+ method routing: use `"POST /events"` pattern in ServeMux for method-restricted routes
+- API routes register under `/events` (not `/api/events`) — the `/api` prefix is stripped by AddApis()
+- Use `pgtype.UUID{Valid: false}` for nullable UUID columns (SQL NULL); `json.RawMessage` for JSONB round-tripping
+- Path parameters: `"GET /events/{id}"` route pattern + `r.PathValue("id")` to extract
+- Async delivery: `deliverEvent(app, event)` in api/delivery.go triggers background goroutine; uses `context.Background()` not request context
+- SimplePage requires two params: `SimplePage(title, currentPath)` — currentPath enables active sidebar highlighting
+- Templ generate: `go tool templ generate -f <file>` for specific files; `go build ./...` after to verify
+- HTMX partial rendering: extract content into a separate templ component, use hx-target/hx-swap to replace just that section
+- DaisyUI modal: `<dialog class="modal">` with `.showModal()`/`.close()`, `<form method="dialog">` for cancel button
+- Templ `script` keyword for type-safe JS functions callable from `onclick={ funcName(args) }`
+- HTMX edit pattern: use `hx-put` for updates, `hx-delete` for deletes, `hx-post` for creates; all target a shared content div
+- EventBus: in-memory pub/sub in app/eventbus.go; Subscribe() returns (<-chan BusMessage, unsubscribe func); Publish() does non-blocking fan-out with monotonic IDs
+- EventBus publishing: all event creation paths publish BusMessageCreated; updateEventStatus publishes BusMessageStatusChanged; deliverToSubscriber/recordFailedAttempt publish BusMessageDeliveryAttempt
+- Package shadowing workaround: when `app` parameter shadows `app` package, use package-level helpers with `a` parameter name
+- SSE endpoint: GET /events/stream must be registered before GET /events/{id} to avoid wildcard capture; use http.Flusher for streaming
+- SSE ID format: `<monotonic_id>:<unix_nano>` encodes timestamp for Last-Event-ID reconnection without server-side state
+- htmx.ajax('GET', url, {target, swap}) for programmatic HTMX requests from JS (e.g., restoring normal view after live mode)
+- Inline `<script>` in templ for complex JS; templ `script` keyword for type-safe Go→JS parameter passing
+- Live mode filter intercept: use addEventListener/removeEventListener on form submit and Clear link click to override HTMX behavior during live mode
+- In-place SSE updates: add `data-event-id` attribute to dynamic rows, then query `tr[data-event-id="..."]` for status badge updates
+- Toast notifications: fixed container at bottom-right, DaisyUI alert classes, auto-dismiss with setTimeout + opacity fade
+- Named SSE events (`event: missed`) require `addEventListener('missed', handler)` not `onmessage`; track `e.lastEventId` for reconnection state
+- Missed events endpoint: `GET /events/stream/missed?after=<unix_nano>` returns HTML rows for loading missed events after reconnection
+---
+
+## 2026-02-05 19:30 MST - US-001
+- Implemented EventBus struct in app/eventbus.go with Subscribe/Publish methods and monotonically increasing message IDs (atomic.Uint64)
+- BusMessage struct includes: ID, Type (created|status_changed|delivery_attempt), EventID, Subject, DeliveryStatus, Timestamp, and optional delivery attempt fields
+- Subscriber channels have buffer capacity of 64; Publish drops messages for slow consumers (non-blocking send)
+- Added EventBus field to Application struct and initialize in NewApp
+- Files changed: app/eventbus.go (new), app/application.go (modified)
+- **Learnings for future iterations:**
+  - EventBus uses sync.RWMutex: RLock for Publish (concurrent reads), full Lock for Subscribe/Unsubscribe
+  - atomic.Uint64 for thread-safe monotonic ID generation without locking
+  - Non-blocking send pattern: `select { case ch <- msg: default: }` drops for slow consumers
+  - When function parameter name shadows a package import (e.g. `func handler(app *app.Application)`), create a package-level helper function to access the package types
+---
+
+## 2026-02-05 19:37 MST - US-002
+- Published EventBus messages from all event creation and delivery pipeline code paths
+- `eventCreateSubmitHandler` in views/events.go: publishes 'created' message via helper `publishCreatedEvent`
+- `createEventHandler` in api/events.go: publishes 'created' message via helper `publishCreatedEvent`
+- `updateEventStatus` in api/delivery.go: publishes 'status_changed' message after updating DB
+- `deliverToSubscriber` in api/delivery.go: publishes 'delivery_attempt' message after recording attempt (includes endpoint, status, response code)
+- `recordFailedAttempt` in api/delivery.go: publishes 'delivery_attempt' message for pre-response failures
+- Files changed: views/events.go, api/events.go, api/delivery.go
+- **Learnings for future iterations:**
+  - Parameter name `app` shadows the `app` package import in handler functions — use a package-level helper function to construct types from the shadowed package
+  - Helper pattern: `publishCreatedEvent(a *app.Application, event db.Event)` can be called from shadowed scope since it uses `a` not `app` as parameter name
+  - All bus publish calls should happen after the DB operation succeeds (not before) to ensure consistency
+  - `recordFailedAttempt` also needs a bus publish for delivery_attempt — don't forget error path publishing
+---
+
+## 2026-02-05 20:10 MST - US-003
+- Implemented GET /events/stream SSE endpoint in views/events.go
+- Route registered in init() as `GET /events/stream` (before the catch-all `GET /events/{id}` to avoid routing conflicts)
+- Sets SSE headers: Content-Type text/event-stream, Cache-Control no-cache, Connection keep-alive
+- Subscribes to EventBus on connection, defers unsubscribe for cleanup on client disconnect (context cancellation)
+- SSE message format: `id:<monotonic_id>:<unix_nano>\ndata:<json>\n\n` — timestamp encoded in ID for Last-Event-ID reconnection
+- Server-side filtering via `matchesStreamFilters()` supports: subject (case-insensitive contains), status (exact match), date_from/date_to range
+- Last-Event-ID reconnection: parses `<id>:<unix_nano>` format, queries `CountEventsAfterTimestamp` with active filters, sends `event: missed` with count
+- Keepalive comment (`: keepalive`) sent every 15 seconds via time.Ticker
+- Uses http.Flusher to flush after each SSE message and keepalive
+- Added `CountEventsAfterTimestamp` SQL query in queries/events.sql with filter support (subject, status, data containment)
+- Files changed: views/events.go, queries/events.sql, db/events.sql.go (generated)
+- **Learnings for future iterations:**
+  - SSE route `GET /events/stream` must be registered before `GET /events/{id}` in the ServeMux to avoid the `{id}` wildcard capturing "stream"
+  - SSE ID format `<monotonic_id>:<unix_nano>` allows reconstructing the timestamp on reconnection without storing state in the EventBus
+  - http.Flusher type assertion is required for SSE — standard ResponseWriter buffers output
+  - `sqlc.narg()` for nullable params vs `sqlc.arg()` for non-nullable; use empty string sentinel for optional text filters
+  - Content filter on bus messages is not feasible since BusMessage doesn't carry event data payload — filter only applies to DB queries
+---
+
+## 2026-02-05 20:15 MST - US-004
+- Implemented live mode toggle UI on the events page
+- Added "Go Live" button next to the "New Event" button in the events page header
+- Clicking "Go Live" opens an EventSource connection to /events/stream (with current filter params), clears table rows, and shows "Waiting for events..." placeholder
+- Button changes to "Stop" with pulsing green dot indicator while live mode is active
+- New 'created' events from SSE stream are prepended to the table as new rows matching the normal table format (subject, truncated ID, timestamp, status badge)
+- Each row is clickable and navigates to /events/{id}
+- Live mode caps visible table at 100 rows, removing oldest rows when exceeded
+- Pagination controls are hidden during live mode
+- Clicking "Stop" closes EventSource and reloads normal paginated view via htmx.ajax GET /events
+- Used an IIFE pattern for the JavaScript to avoid polluting global scope; only `toggleLiveMode` is exposed globally
+- Files changed: views/events.templ, views/events_templ.go (generated)
+- **Learnings for future iterations:**
+  - templ `<script>` blocks (non-templ-script) render inline JS without templ's type-safe script handling — use for complex JS that doesn't need Go parameter interpolation
+  - htmx.ajax('GET', url, {target, swap}) programmatically triggers HTMX requests, useful for restoring normal page state after JS-driven interactions
+  - EventSource `onmessage` only fires for events without an `event:` field or with type 'message'; named events (like 'missed') need addEventListener
+  - Only 'created' type bus messages should generate new rows in live mode; status_changed/delivery_attempt are for in-place updates (US-006)
+  - Pagination hiding uses direct style manipulation on the flex container; it gets fully replaced on HTMX reload so no cleanup needed
+---
+
+## 2026-02-05 20:20 MST - US-005
+- Implemented live filtering integration: filter form Search and Clear buttons now work during live mode
+- When live mode is active, clicking Search intercepts the HTMX form submit, closes the current EventSource, and opens a new one with updated filter query parameters
+- Clicking Clear during live mode resets form fields and reconnects EventSource without any filter parameters
+- Refactored startLive() to extract `reconnectWithFilters()` and `attachEventSourceHandlers()` helper functions for reuse
+- Added/removed event listeners on form submit and Clear link click when entering/exiting live mode
+- Server-side filtering was already implemented in US-003 (matchesStreamFilters for subject/status, CountEventsAfterTimestamp for content)
+- Files changed: views/events.templ, views/events_templ.go (generated)
+- **Learnings for future iterations:**
+  - Use `e.preventDefault()` + `e.stopPropagation()` to fully intercept HTMX-driven form submissions from JavaScript
+  - The Clear link is an `<a href="/events">` inside the form — select it with `form[hx-get="/events"] a[href="/events"]` to distinguish from other links
+  - `form.reset()` clears all inputs back to their default values, simpler than manually resetting each field
+  - Extracting EventSource setup into a reusable `reconnectWithFilters()` function keeps the live filter reconnection DRY
+---
+
+## 2026-02-05 20:25 MST - US-006
+- Implemented delivery status updates in the live event stream
+- `status_changed` messages now update the status badge in-place for existing rows (matched by `data-event-id` attribute on `<tr>`)
+- `delivery_attempt` messages show toast notifications at the bottom-right with endpoint and result
+- Toast notifications auto-dismiss after 3 seconds with a fade-out transition
+- Toast uses `alert-success` for successful deliveries and `alert-error` for failures, including HTTP status code when available
+- Added a fixed `#toast-container` div to the events page layout
+- Added `data-event-id` attribute to dynamically created table rows for status_changed lookups
+- Files changed: views/events.templ, views/events_templ.go (generated)
+- **Learnings for future iterations:**
+  - Use `data-*` attributes on dynamic rows to enable in-place updates from subsequent SSE messages targeting the same entity
+  - DaisyUI `alert` classes with `alert-success`/`alert-error` work well for toast notifications
+  - For auto-dismiss toasts: setTimeout for removal, with an opacity transition for smooth fade-out before DOM removal
+  - The `onmessage` handler receives all SSE messages without an `event:` field — branch on `data.type` in JSON payload to handle different message types
+  - Named SSE events (e.g., `event: missed`) require `source.addEventListener('missed', ...)` — `onmessage` won't fire for them
+  - Missed events endpoint: `/events/stream/missed?after=<unix_nano>` returns HTML table rows for prepending to the live table
+---
+
+## 2026-02-05 20:30 MST - US-007
+- Implemented reconnection with missed event indicator
+- Added `ListEventsAfterTimestamp` SQL query in queries/events.sql to fetch events created after a given timestamp (with filter support)
+- Added `GET /events/stream/missed` handler in views/events.go that returns missed events as HTML table rows (`MissedEventsRows` templ component)
+- Added `MissedEventsRows` templ component rendering rows with a subtle `bg-info/10` highlight
+- Added `showMissedBanner()` function that displays "You missed X events while away" banner at the top of the live table with Load and dismiss (X) buttons
+- Added `loadMissedEvents()` function that fetches missed events via fetch() and prepends HTML rows to the live table tbody
+- Added `removeMissedBanner()` function for dismissing the banner without loading events
+- Added `addEventListener('missed', ...)` to EventSource handlers to listen for the named `missed` SSE event
+- Tracks `lastReconnectNanos` from SSE message IDs (`<monotonic_id>:<unix_nano>` format) to pass as the `after` parameter when loading missed events
+- New events from the stream insert after the missed banner (if present) instead of at the very top
+- `reconnectWithFilters()` resets `lastReconnectNanos` and removes the missed banner to avoid stale state on intentional reconnections
+- Files changed: queries/events.sql, db/events.sql.go (generated), views/events.go, views/events.templ, views/events_templ.go (generated)
+- **Learnings for future iterations:**
+  - Named SSE events (`event: missed\ndata: ...`) require explicit `addEventListener('missed', handler)` on the EventSource — `onmessage` only fires for unnamed/default message type events
+  - Track SSE `lastEventId` from `e.lastEventId` in the `onmessage` handler to maintain reconnection state client-side
+  - Use `fetch()` instead of `htmx.ajax()` when you need to insert raw HTML fragments into specific positions in the DOM (e.g., prepending rows to a tbody)
+  - `insertBefore(row, referenceNode.nextSibling)` pattern inserts after a specific element (used to insert new rows after the missed banner)
+  - Add a separate SQL query for listing (not just counting) events after a timestamp — the count query is for the SSE missed event, the list query is for the Load button
+---
