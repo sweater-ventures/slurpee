@@ -8,6 +8,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ApiSecret struct {
+	ID             pgtype.UUID
+	Name           string
+	SecretHash     string
+	SubjectPattern string
+	CreatedAt      pgtype.Timestamptz
+}
+
+type ApiSecretSubscriber struct {
+	ApiSecretID  pgtype.UUID
+	SubscriberID pgtype.UUID
+}
+
 type DeliveryAttempt struct {
 	ID                 pgtype.UUID
 	EventID            pgtype.UUID
