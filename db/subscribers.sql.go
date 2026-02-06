@@ -175,6 +175,54 @@ func (q *Queries) ListSubscribers(ctx context.Context) ([]Subscriber, error) {
 	return items, nil
 }
 
+const listSubscribersWithCounts = `-- name: ListSubscribersWithCounts :many
+SELECT s.id, s.name, s.endpoint_url, s.auth_secret, s.max_parallel, s.created_at, s.updated_at, COUNT(sub.id)::int AS subscription_count
+FROM subscribers s
+LEFT JOIN subscriptions sub ON sub.subscriber_id = s.id
+GROUP BY s.id
+ORDER BY s.created_at DESC
+`
+
+type ListSubscribersWithCountsRow struct {
+	ID                pgtype.UUID
+	Name              string
+	EndpointUrl       string
+	AuthSecret        string
+	MaxParallel       int32
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+	SubscriptionCount int32
+}
+
+func (q *Queries) ListSubscribersWithCounts(ctx context.Context) ([]ListSubscribersWithCountsRow, error) {
+	rows, err := q.db.Query(ctx, listSubscribersWithCounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSubscribersWithCountsRow
+	for rows.Next() {
+		var i ListSubscribersWithCountsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.EndpointUrl,
+			&i.AuthSecret,
+			&i.MaxParallel,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.SubscriptionCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSubscriptionsForSubscriber = `-- name: ListSubscriptionsForSubscriber :many
 SELECT id, subscriber_id, subject_pattern, filter, max_retries, created_at, updated_at FROM subscriptions WHERE subscriber_id = $1 ORDER BY created_at
 `

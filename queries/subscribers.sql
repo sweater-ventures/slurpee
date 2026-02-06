@@ -17,6 +17,13 @@ SELECT * FROM subscribers WHERE endpoint_url = $1;
 -- name: ListSubscribers :many
 SELECT * FROM subscribers ORDER BY created_at DESC;
 
+-- name: ListSubscribersWithCounts :many
+SELECT s.*, COUNT(sub.id)::int AS subscription_count
+FROM subscribers s
+LEFT JOIN subscriptions sub ON sub.subscriber_id = s.id
+GROUP BY s.id
+ORDER BY s.created_at DESC;
+
 -- name: DeleteSubscriber :exec
 DELETE FROM subscribers WHERE id = $1;
 

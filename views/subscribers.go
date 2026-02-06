@@ -25,7 +25,7 @@ func init() {
 }
 
 func subscribersListHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
-	subscribers, err := app.DB.ListSubscribers(r.Context())
+	subscribers, err := app.DB.ListSubscribersWithCounts(r.Context())
 	if err != nil {
 		log(r.Context()).Error("Error listing subscribers", "err", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -34,19 +34,12 @@ func subscribersListHandler(app *app.Application, w http.ResponseWriter, r *http
 
 	rows := make([]SubscriberRow, len(subscribers))
 	for i, s := range subscribers {
-		// Count subscriptions for this subscriber
-		subscriptions, subErr := app.DB.ListSubscriptionsForSubscriber(r.Context(), s.ID)
-		subCount := 0
-		if subErr == nil {
-			subCount = len(subscriptions)
-		}
-
 		rows[i] = SubscriberRow{
 			ID:                pgtypeUUIDToString(s.ID),
 			Name:              s.Name,
 			EndpointURL:       s.EndpointUrl,
 			MaxParallel:       s.MaxParallel,
-			SubscriptionCount: subCount,
+			SubscriptionCount: int(s.SubscriptionCount),
 			CreatedAt:         s.CreatedAt.Time.Format("2006-01-02 15:04:05 MST"),
 		}
 	}
