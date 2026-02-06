@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -38,6 +39,25 @@ type EventResponse struct {
 	RetryCount      int32           `json:"retry_count"`
 	DeliveryStatus  string          `json:"delivery_status"`
 	StatusUpdatedAt *time.Time      `json:"status_updated_at"`
+}
+
+func LogEvent(ctx context.Context, slurpee *app.Application, event db.Event) {
+	// Log event with configured data properties
+	var dataObj map[string]any
+	if err := json.Unmarshal(event.Data, &dataObj); err != nil {
+		log(ctx).Error("Failed to unmarshal event data for logging", "error", err)
+		return
+	}
+	logAttrs := []any{"event_id", uuidToString(event.ID), "subject", event.Subject}
+	logConfig, err := slurpee.DB.GetLogConfigBySubject(ctx, event.Subject)
+	if err == nil {
+		for _, prop := range logConfig.LogProperties {
+			if val, ok := dataObj[prop]; ok {
+				logAttrs = append(logAttrs, prop, val)
+			}
+		}
+	}
+	log(ctx).Info("Event received", logAttrs...)
 }
 
 func createEventHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
@@ -111,18 +131,7 @@ func createEventHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Log event with configured data properties
-	logAttrs := []any{"event_id", uuidToString(event.ID), "subject", event.Subject}
-	logConfig, err := app.DB.GetLogConfigBySubject(r.Context(), req.Subject)
-	if err == nil {
-		for _, prop := range logConfig.LogProperties {
-			if val, ok := dataObj[prop]; ok {
-				logAttrs = append(logAttrs, prop, val)
-			}
-		}
-	}
-	log(r.Context()).Info("Event received", logAttrs...)
-
+	LogEvent(r.Context(), app, event)
 	// Send to delivery dispatcher for asynchronous delivery
 	app.DeliveryChan <- event
 

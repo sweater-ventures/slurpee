@@ -406,7 +406,7 @@ func eventCreateSubmitHandler(app *app.Application, w http.ResponseWriter, r *ht
 		}
 		return
 	}
-
+	api.LogEvent(r.Context(), app, event)
 	// Trigger async delivery
 	app.DeliveryChan <- event
 
