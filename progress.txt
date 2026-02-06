@@ -27,6 +27,7 @@ Started: Thu Feb  5 19:29:35 MST 2026
 - SSE ID format: `<monotonic_id>:<unix_nano>` encodes timestamp for Last-Event-ID reconnection without server-side state
 - htmx.ajax('GET', url, {target, swap}) for programmatic HTMX requests from JS (e.g., restoring normal view after live mode)
 - Inline `<script>` in templ for complex JS; templ `script` keyword for type-safe Go→JS parameter passing
+- Live mode filter intercept: use addEventListener/removeEventListener on form submit and Clear link click to override HTMX behavior during live mode
 ---
 
 ## 2026-02-05 19:30 MST - US-001
@@ -95,4 +96,19 @@ Started: Thu Feb  5 19:29:35 MST 2026
   - EventSource `onmessage` only fires for events without an `event:` field or with type 'message'; named events (like 'missed') need addEventListener
   - Only 'created' type bus messages should generate new rows in live mode; status_changed/delivery_attempt are for in-place updates (US-006)
   - Pagination hiding uses direct style manipulation on the flex container; it gets fully replaced on HTMX reload so no cleanup needed
+---
+
+## 2026-02-05 20:20 MST - US-005
+- Implemented live filtering integration: filter form Search and Clear buttons now work during live mode
+- When live mode is active, clicking Search intercepts the HTMX form submit, closes the current EventSource, and opens a new one with updated filter query parameters
+- Clicking Clear during live mode resets form fields and reconnects EventSource without any filter parameters
+- Refactored startLive() to extract `reconnectWithFilters()` and `attachEventSourceHandlers()` helper functions for reuse
+- Added/removed event listeners on form submit and Clear link click when entering/exiting live mode
+- Server-side filtering was already implemented in US-003 (matchesStreamFilters for subject/status, CountEventsAfterTimestamp for content)
+- Files changed: views/events.templ, views/events_templ.go (generated)
+- **Learnings for future iterations:**
+  - Use `e.preventDefault()` + `e.stopPropagation()` to fully intercept HTMX-driven form submissions from JavaScript
+  - The Clear link is an `<a href="/events">` inside the form — select it with `form[hx-get="/events"] a[href="/events"]` to distinguish from other links
+  - `form.reset()` clears all inputs back to their default values, simpler than manually resetting each field
+  - Extracting EventSource setup into a reusable `reconnectWithFilters()` function keeps the live filter reconnection DRY
 ---
