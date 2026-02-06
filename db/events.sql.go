@@ -11,6 +11,33 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countEventsAfterTimestamp = `-- name: CountEventsAfterTimestamp :one
+SELECT count(*) FROM events
+WHERE timestamp > $1::timestamptz
+  AND ($2::text = '' OR subject LIKE $2)
+  AND ($3::text = '' OR delivery_status = $3)
+  AND ($4::jsonb IS NULL OR data @> $4)
+`
+
+type CountEventsAfterTimestampParams struct {
+	AfterTimestamp pgtype.Timestamptz
+	SubjectFilter  string
+	StatusFilter   string
+	DataFilter     []byte
+}
+
+func (q *Queries) CountEventsAfterTimestamp(ctx context.Context, arg CountEventsAfterTimestampParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countEventsAfterTimestamp,
+		arg.AfterTimestamp,
+		arg.SubjectFilter,
+		arg.StatusFilter,
+		arg.DataFilter,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getEventByID = `-- name: GetEventByID :one
 SELECT id, subject, timestamp, trace_id, data, retry_count, delivery_status, status_updated_at FROM events WHERE id = $1
 `

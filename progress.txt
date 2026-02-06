@@ -23,6 +23,8 @@ Started: Thu Feb  5 19:29:35 MST 2026
 - EventBus: in-memory pub/sub in app/eventbus.go; Subscribe() returns (<-chan BusMessage, unsubscribe func); Publish() does non-blocking fan-out with monotonic IDs
 - EventBus publishing: all event creation paths publish BusMessageCreated; updateEventStatus publishes BusMessageStatusChanged; deliverToSubscriber/recordFailedAttempt publish BusMessageDeliveryAttempt
 - Package shadowing workaround: when `app` parameter shadows `app` package, use package-level helpers with `a` parameter name
+- SSE endpoint: GET /events/stream must be registered before GET /events/{id} to avoid wildcard capture; use http.Flusher for streaming
+- SSE ID format: `<monotonic_id>:<unix_nano>` encodes timestamp for Last-Event-ID reconnection without server-side state
 ---
 
 ## 2026-02-05 19:30 MST - US-001
@@ -51,4 +53,24 @@ Started: Thu Feb  5 19:29:35 MST 2026
   - Helper pattern: `publishCreatedEvent(a *app.Application, event db.Event)` can be called from shadowed scope since it uses `a` not `app` as parameter name
   - All bus publish calls should happen after the DB operation succeeds (not before) to ensure consistency
   - `recordFailedAttempt` also needs a bus publish for delivery_attempt — don't forget error path publishing
+---
+
+## 2026-02-05 20:10 MST - US-003
+- Implemented GET /events/stream SSE endpoint in views/events.go
+- Route registered in init() as `GET /events/stream` (before the catch-all `GET /events/{id}` to avoid routing conflicts)
+- Sets SSE headers: Content-Type text/event-stream, Cache-Control no-cache, Connection keep-alive
+- Subscribes to EventBus on connection, defers unsubscribe for cleanup on client disconnect (context cancellation)
+- SSE message format: `id:<monotonic_id>:<unix_nano>\ndata:<json>\n\n` — timestamp encoded in ID for Last-Event-ID reconnection
+- Server-side filtering via `matchesStreamFilters()` supports: subject (case-insensitive contains), status (exact match), date_from/date_to range
+- Last-Event-ID reconnection: parses `<id>:<unix_nano>` format, queries `CountEventsAfterTimestamp` with active filters, sends `event: missed` with count
+- Keepalive comment (`: keepalive`) sent every 15 seconds via time.Ticker
+- Uses http.Flusher to flush after each SSE message and keepalive
+- Added `CountEventsAfterTimestamp` SQL query in queries/events.sql with filter support (subject, status, data containment)
+- Files changed: views/events.go, queries/events.sql, db/events.sql.go (generated)
+- **Learnings for future iterations:**
+  - SSE route `GET /events/stream` must be registered before `GET /events/{id}` in the ServeMux to avoid the `{id}` wildcard capturing "stream"
+  - SSE ID format `<monotonic_id>:<unix_nano>` allows reconstructing the timestamp on reconnection without storing state in the EventBus
+  - http.Flusher type assertion is required for SSE — standard ResponseWriter buffers output
+  - `sqlc.narg()` for nullable params vs `sqlc.arg()` for non-nullable; use empty string sentinel for optional text filters
+  - Content filter on bus messages is not feasible since BusMessage doesn't carry event data payload — filter only applies to DB queries
 ---

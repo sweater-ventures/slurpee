@@ -31,5 +31,12 @@ WHERE
   AND (sqlc.narg(data_filter)::jsonb IS NULL OR data @> sqlc.narg(data_filter))
 ORDER BY timestamp DESC LIMIT $1 OFFSET $2;
 
+-- name: CountEventsAfterTimestamp :one
+SELECT count(*) FROM events
+WHERE timestamp > sqlc.arg(after_timestamp)::timestamptz
+  AND (sqlc.arg(subject_filter)::text = '' OR subject LIKE sqlc.arg(subject_filter))
+  AND (sqlc.arg(status_filter)::text = '' OR delivery_status = sqlc.arg(status_filter))
+  AND (sqlc.narg(data_filter)::jsonb IS NULL OR data @> sqlc.narg(data_filter));
+
 -- name: UpdateEventDeliveryStatus :one
 UPDATE events SET delivery_status = $1, retry_count = $2, status_updated_at = $3 WHERE id = $4 RETURNING *;

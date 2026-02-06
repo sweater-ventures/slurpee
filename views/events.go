@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,6 +23,7 @@ func init() {
 		router.Handle("POST /events/new", routeHandler(slurpee, eventCreateSubmitHandler))
 		router.Handle("POST /events/{id}/replay", routeHandler(slurpee, eventReplayAllHandler))
 		router.Handle("POST /events/{id}/replay/{subscriberId}", routeHandler(slurpee, eventReplaySubscriberHandler))
+		router.Handle("GET /events/stream", routeHandler(slurpee, eventsStreamHandler))
 		router.Handle("GET /events", routeHandler(slurpee, eventsListHandler))
 		router.Handle("GET /events/{id}", routeHandler(slurpee, eventDetailHandler))
 	})
@@ -414,6 +416,112 @@ func eventCreateSubmitHandler(slurpee *app.Application, w http.ResponseWriter, r
 
 	// Redirect to the newly created event detail page
 	http.Redirect(w, r, "/events/"+pgtypeUUIDToString(event.ID), http.StatusSeeOther)
+}
+
+func eventsStreamHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	// Parse filters from query parameters
+	filters := parseFilters(r)
+
+	// Subscribe to the EventBus
+	ch, unsubscribe := slurpee.EventBus.Subscribe()
+	defer unsubscribe()
+
+	// Handle Last-Event-ID reconnection
+	if lastID := r.Header.Get("Last-Event-ID"); lastID != "" {
+		// ID format: <monotonic_id>:<unix_nano>
+		parts := strings.SplitN(lastID, ":", 2)
+		if len(parts) == 2 {
+			if nanos, err := strconv.ParseInt(parts[1], 10, 64); err == nil {
+				ts := time.Unix(0, nanos).UTC()
+				params := db.CountEventsAfterTimestampParams{
+					AfterTimestamp: pgtype.Timestamptz{Time: ts, Valid: true},
+				}
+				if filters.Subject != "" {
+					params.SubjectFilter = "%" + filters.Subject + "%"
+				}
+				if filters.Status != "" {
+					params.StatusFilter = filters.Status
+				}
+				if filters.Content != "" && json.Valid([]byte(filters.Content)) {
+					params.DataFilter = []byte(filters.Content)
+				}
+				count, err := slurpee.DB.CountEventsAfterTimestamp(r.Context(), params)
+				if err == nil && count > 0 {
+					missedData, _ := json.Marshal(map[string]int64{"count": count})
+					fmt.Fprintf(w, "event: missed\ndata: %s\n\n", missedData)
+					flusher.Flush()
+				}
+			}
+		}
+	}
+
+	// Keepalive ticker
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	ctx := r.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			fmt.Fprintf(w, ": keepalive\n\n")
+			flusher.Flush()
+		case msg, ok := <-ch:
+			if !ok {
+				return
+			}
+			if !matchesStreamFilters(msg, filters) {
+				continue
+			}
+			data, err := json.Marshal(msg)
+			if err != nil {
+				continue
+			}
+			sseID := fmt.Sprintf("%d:%d", msg.ID, msg.Timestamp.UnixNano())
+			fmt.Fprintf(w, "id:%s\ndata:%s\n\n", sseID, data)
+			flusher.Flush()
+		}
+	}
+}
+
+// matchesStreamFilters checks if a bus message passes the active stream filters.
+func matchesStreamFilters(msg app.BusMessage, filters eventFilters) bool {
+	if filters.Subject != "" {
+		if !strings.Contains(strings.ToLower(msg.Subject), strings.ToLower(filters.Subject)) {
+			return false
+		}
+	}
+	if filters.Status != "" {
+		if msg.DeliveryStatus != filters.Status {
+			return false
+		}
+	}
+	if filters.DateFrom != "" {
+		t, err := time.Parse("2006-01-02", filters.DateFrom)
+		if err == nil && msg.Timestamp.Before(t) {
+			return false
+		}
+	}
+	if filters.DateTo != "" {
+		t, err := time.Parse("2006-01-02", filters.DateTo)
+		if err == nil && msg.Timestamp.After(t.Add(24*time.Hour-time.Second)) {
+			return false
+		}
+	}
+	// Content filter: not applicable to bus messages (they don't carry full event data)
+	return true
 }
 
 func prettyJSON(data []byte) string {
