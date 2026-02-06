@@ -407,11 +407,24 @@ func eventCreateSubmitHandler(app *app.Application, w http.ResponseWriter, r *ht
 		return
 	}
 	api.LogEvent(r.Context(), app, event)
+	// Publish 'created' message to the event bus for SSE clients
+	publishCreatedEvent(app, event)
 	// Trigger async delivery
 	app.DeliveryChan <- event
 
 	// Redirect to the newly created event detail page
 	http.Redirect(w, r, "/events/"+pgtypeUUIDToString(event.ID), http.StatusSeeOther)
+}
+
+// publishCreatedEvent publishes a 'created' bus message for SSE clients.
+func publishCreatedEvent(a *app.Application, event db.Event) {
+	a.EventBus.Publish(app.BusMessage{
+		Type:           app.BusMessageCreated,
+		EventID:        pgtypeUUIDToString(event.ID),
+		Subject:        event.Subject,
+		DeliveryStatus: event.DeliveryStatus,
+		Timestamp:      event.Timestamp.Time,
+	})
 }
 
 func prettyJSON(data []byte) string {

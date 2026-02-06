@@ -132,6 +132,8 @@ func createEventHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 	}
 
 	LogEvent(r.Context(), app, event)
+	// Publish 'created' message to the event bus for SSE clients
+	publishCreatedEvent(app, event)
 	// Send to delivery dispatcher for asynchronous delivery
 	app.DeliveryChan <- event
 

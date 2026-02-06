@@ -430,6 +430,18 @@ func deliverToSubscriber(ctx context.Context, a *app.Application, event db.Event
 		logger.Error("Failed to record delivery attempt", "error", err, "subscriber_id", uuidToString(subscriber.ID))
 	}
 
+	// Publish 'delivery_attempt' message to the event bus for SSE clients
+	a.EventBus.Publish(app.BusMessage{
+		Type:               app.BusMessageDeliveryAttempt,
+		EventID:            uuidToString(event.ID),
+		Subject:            event.Subject,
+		DeliveryStatus:     event.DeliveryStatus,
+		Timestamp:          now,
+		SubscriberEndpoint: subscriber.EndpointUrl,
+		AttemptStatus:      status,
+		ResponseStatusCode: resp.StatusCode,
+	})
+
 	if status == "succeeded" {
 		logger.Info("Delivery succeeded",
 			"subscriber_id", uuidToString(subscriber.ID),
@@ -464,6 +476,28 @@ func recordFailedAttempt(ctx context.Context, a *app.Application, attemptID pgty
 	if err != nil {
 		slog.Error("Failed to record failed delivery attempt", "error", err, "subscriber_id", uuidToString(subscriber.ID))
 	}
+	// Publish 'delivery_attempt' message to the event bus for SSE clients
+	a.EventBus.Publish(app.BusMessage{
+		Type:               app.BusMessageDeliveryAttempt,
+		EventID:            uuidToString(event.ID),
+		Subject:            event.Subject,
+		DeliveryStatus:     event.DeliveryStatus,
+		Timestamp:          attemptedAt,
+		SubscriberEndpoint: subscriber.EndpointUrl,
+		AttemptStatus:      "failed",
+		ResponseStatusCode: 0,
+	})
+}
+
+// publishCreatedEvent publishes a 'created' bus message for SSE clients.
+func publishCreatedEvent(a *app.Application, event db.Event) {
+	a.EventBus.Publish(app.BusMessage{
+		Type:           app.BusMessageCreated,
+		EventID:        uuidToString(event.ID),
+		Subject:        event.Subject,
+		DeliveryStatus: event.DeliveryStatus,
+		Timestamp:      event.Timestamp.Time,
+	})
 }
 
 // ReplayToSubscriber delivers an event to a single subscriber as a replay.
@@ -495,5 +529,13 @@ func updateEventStatus(ctx context.Context, a *app.Application, eventID pgtype.U
 	})
 	if err != nil {
 		slog.Error("Failed to update event delivery status", "error", err, "event_id", uuidToString(eventID))
+		return
 	}
+	// Publish 'status_changed' message to the event bus for SSE clients
+	a.EventBus.Publish(app.BusMessage{
+		Type:           app.BusMessageStatusChanged,
+		EventID:        uuidToString(eventID),
+		DeliveryStatus: status,
+		Timestamp:      time.Now().UTC(),
+	})
 }
