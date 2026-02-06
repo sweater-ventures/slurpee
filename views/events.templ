@@ -206,8 +206,12 @@ templ liveStreamScript() {
 			var isLive = false;
 			var MAX_ROWS = 100;
 
+			function getFilterForm() {
+				return document.querySelector('form[hx-get="/events"]');
+			}
+
 			function getFilterParams() {
-				var form = document.querySelector('form[hx-get="/events"]');
+				var form = getFilterForm();
 				if (!form) return '';
 				var params = new URLSearchParams(new FormData(form));
 				// Remove empty values
@@ -270,12 +274,59 @@ templ liveStreamScript() {
 				return tr;
 			}
 
-			function startLive() {
+			function reconnectWithFilters() {
+				// Close existing connection
+				if (evtSource) {
+					evtSource.close();
+					evtSource = null;
+				}
+
+				// Clear table for fresh stream
+				var tbody = document.querySelector('#events-results tbody');
+				if (tbody) {
+					tbody.innerHTML = '<tr><td colspan="4" class="text-center text-base-content/60 py-8">Waiting for events...</td></tr>';
+				}
+
+				// Open new connection with current filter params
 				var url = '/events/stream';
 				var params = getFilterParams();
 				if (params) url += '?' + params;
 
 				evtSource = new EventSource(url);
+				attachEventSourceHandlers(evtSource);
+			}
+
+			function attachEventSourceHandlers(source) {
+				var receivedFirst = false;
+
+				source.onmessage = function(e) {
+					var data;
+					try { data = JSON.parse(e.data); } catch (_) { return; }
+
+					// Only add rows for 'created' events (new events)
+					if (data.type !== 'created') return;
+
+					var tbody = document.querySelector('#events-results tbody');
+					if (!receivedFirst) {
+						receivedFirst = true;
+						if (tbody) tbody.innerHTML = '';
+					}
+
+					var row = createEventRow(data);
+					if (tbody) {
+						tbody.insertBefore(row, tbody.firstChild);
+						while (tbody.children.length > MAX_ROWS) {
+							tbody.removeChild(tbody.lastChild);
+						}
+					}
+				};
+
+				source.onerror = function() {
+					// EventSource auto-reconnects; no action needed
+				};
+			}
+
+			function startLive() {
 				isLive = true;
 
 				// Update button
@@ -293,34 +344,25 @@ templ liveStreamScript() {
 				var pagination = document.querySelector('#events-results .flex.justify-center');
 				if (pagination) pagination.style.display = 'none';
 
-				var receivedFirst = false;
+				// Open EventSource with current filter params
+				var url = '/events/stream';
+				var params = getFilterParams();
+				if (params) url += '?' + params;
 
-				evtSource.onmessage = function(e) {
-					var data;
-					try { data = JSON.parse(e.data); } catch (_) { return; }
+				evtSource = new EventSource(url);
+				attachEventSourceHandlers(evtSource);
 
-					// Only add rows for 'created' events (new events)
-					if (data.type !== 'created') return;
+				// Intercept filter form submit during live mode
+				var form = getFilterForm();
+				if (form) {
+					form.addEventListener('submit', liveSearchHandler);
+				}
 
-					if (!receivedFirst) {
-						receivedFirst = true;
-						// Clear the "Waiting for events" message
-						if (tbody) tbody.innerHTML = '';
-					}
-
-					var row = createEventRow(data);
-					if (tbody) {
-						tbody.insertBefore(row, tbody.firstChild);
-						// Cap at MAX_ROWS
-						while (tbody.children.length > MAX_ROWS) {
-							tbody.removeChild(tbody.lastChild);
-						}
-					}
-				};
-
-				evtSource.onerror = function() {
-					// EventSource auto-reconnects; no action needed
-				};
+				// Intercept Clear link during live mode
+				var clearLink = document.querySelector('form[hx-get="/events"] a[href="/events"]');
+				if (clearLink) {
+					clearLink.addEventListener('click', liveClearHandler);
+				}
 			}
 
 			function stopLive() {
@@ -330,6 +372,16 @@ templ liveStreamScript() {
 				}
 				isLive = false;
 
+				// Remove live mode event listeners
+				var form = getFilterForm();
+				if (form) {
+					form.removeEventListener('submit', liveSearchHandler);
+				}
+				var clearLink = document.querySelector('form[hx-get="/events"] a[href="/events"]');
+				if (clearLink) {
+					clearLink.removeEventListener('click', liveClearHandler);
+				}
+
 				// Restore button
 				var btn = document.getElementById('live-toggle-btn');
 				btn.className = 'btn btn-outline btn-success btn-sm';
@@ -337,6 +389,21 @@ templ liveStreamScript() {
 
 				// Reload the normal paginated view
 				htmx.ajax('GET', '/events', {target: '#events-results', swap: 'innerHTML'});
+			}
+
+			function liveSearchHandler(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				reconnectWithFilters();
+			}
+
+			function liveClearHandler(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				// Reset form fields
+				var form = getFilterForm();
+				if (form) form.reset();
+				reconnectWithFilters();
 			}
 
 			window.toggleLiveMode = function() {
