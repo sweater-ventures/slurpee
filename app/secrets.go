@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sweater-ventures/slurpee/db"
 	"golang.org/x/crypto/bcrypt"
@@ -29,9 +30,23 @@ func HashSecret(plaintext string) (string, error) {
 	return string(hash), nil
 }
 
-// ValidateSecret iterates all stored secret hashes and returns the matching
-// db.ApiSecret record, or an error if none match.
-func ValidateSecret(ctx context.Context, queries *db.Queries, plaintext string) (db.ListAllApiSecretHashesRow, error) {
+// ValidateSecretByID fetches a single secret by UUID and validates the plaintext
+// against its stored hash. Returns the full ApiSecret record or an error.
+func ValidateSecretByID(ctx context.Context, queries *db.Queries, secretID uuid.UUID, plaintext string) (db.ApiSecret, error) {
+	secret, err := queries.GetApiSecretByID(ctx, pgtype.UUID{Bytes: secretID, Valid: true})
+	if err != nil {
+		return db.ApiSecret{}, fmt.Errorf("secret not found")
+	}
+	if bcrypt.CompareHashAndPassword([]byte(secret.SecretHash), []byte(plaintext)) != nil {
+		return db.ApiSecret{}, fmt.Errorf("invalid secret")
+	}
+	return secret, nil
+}
+
+// ValidateSecretForLogin iterates all stored secret hashes and returns the matching
+// secret record, or an error if none match. Used by the login flow where the
+// caller doesn't know the secret ID.
+func ValidateSecretForLogin(ctx context.Context, queries *db.Queries, plaintext string) (db.ListAllApiSecretHashesRow, error) {
 	secrets, err := queries.ListAllApiSecretHashes(ctx)
 	if err != nil {
 		return db.ListAllApiSecretHashesRow{}, fmt.Errorf("listing secrets: %w", err)

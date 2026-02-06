@@ -54,7 +54,7 @@ func loginSubmitHandler(slurpee *app.Application, w http.ResponseWriter, r *http
 	}
 
 	// Validate against stored API secrets
-	matched, err := app.ValidateSecret(r.Context(), slurpee.DB, secret)
+	matched, err := app.ValidateSecretForLogin(r.Context(), slurpee.DB, secret)
 	if err != nil {
 		slog.Warn("Failed login attempt", "remote_addr", r.RemoteAddr)
 		LoginPage("Invalid secret").Render(r.Context(), w)
