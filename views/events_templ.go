@@ -111,7 +111,7 @@ func EventsListTemplate(events []EventRow, page int, hasNext bool, subject, stat
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><div id=\"toast-container\" class=\"fixed bottom-4 right-4 z-50 flex flex-col gap-2\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -186,7 +186,7 @@ func eventsFilterBar(subject, status, dateFrom, dateTo, content string) templ.Co
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(subject)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 92, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 93, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -239,7 +239,7 @@ func eventsFilterBar(subject, status, dateFrom, dateTo, content string) templ.Co
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(dateFrom)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 116, Col: 21}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 117, Col: 21}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -252,7 +252,7 @@ func eventsFilterBar(subject, status, dateFrom, dateTo, content string) templ.Co
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(dateTo)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 127, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 128, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -265,7 +265,7 @@ func eventsFilterBar(subject, status, dateFrom, dateTo, content string) templ.Co
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(content)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 138, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 139, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -278,7 +278,7 @@ func eventsFilterBar(subject, status, dateFrom, dateTo, content string) templ.Co
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(`{"key":"value"}`)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 139, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 140, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -344,7 +344,7 @@ func eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(event.Subject)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 170, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 171, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -357,7 +357,7 @@ func eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(truncateID(event.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 171, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 172, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -370,7 +370,7 @@ func eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(event.Timestamp)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 172, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 173, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -405,7 +405,7 @@ func eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(event.DeliveryStatus)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 173, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 174, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -428,7 +428,7 @@ func eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject
 			var templ_7745c5c3_Var18 templ.SafeURL
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page-1)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 182, Col: 108}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 183, Col: 108}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -441,7 +441,7 @@ func eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page-1))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 183, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 184, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -459,7 +459,7 @@ func eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("Page %d", page))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 189, Col: 80}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 190, Col: 80}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -477,7 +477,7 @@ func eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject
 			var templ_7745c5c3_Var21 templ.SafeURL
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page+1)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 192, Col: 108}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 193, Col: 108}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -490,7 +490,7 @@ func eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page+1))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 193, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 194, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -530,7 +530,7 @@ func liveStreamScript() templ.Component {
 			templ_7745c5c3_Var23 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<script>\n\t\t(function() {\n\t\t\tvar evtSource = null;\n\t\t\tvar isLive = false;\n\t\t\tvar MAX_ROWS = 100;\n\n\t\t\tfunction getFilterForm() {\n\t\t\t\treturn document.querySelector('form[hx-get=\"/events\"]');\n\t\t\t}\n\n\t\t\tfunction getFilterParams() {\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (!form) return '';\n\t\t\t\tvar params = new URLSearchParams(new FormData(form));\n\t\t\t\t// Remove empty values\n\t\t\t\tvar clean = new URLSearchParams();\n\t\t\t\tparams.forEach(function(v, k) {\n\t\t\t\t\tif (v) clean.append(k, v);\n\t\t\t\t});\n\t\t\t\treturn clean.toString();\n\t\t\t}\n\n\t\t\tfunction statusBadgeClass(status) {\n\t\t\t\tswitch (status) {\n\t\t\t\t\tcase 'delivered': return 'badge badge-success';\n\t\t\t\t\tcase 'failed': return 'badge badge-error';\n\t\t\t\t\tcase 'pending': return 'badge badge-warning';\n\t\t\t\t\tcase 'partial': return 'badge badge-info';\n\t\t\t\t\tdefault: return 'badge badge-ghost';\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction truncateID(id) {\n\t\t\t\tif (id && id.length > 8) return id.substring(0, 8) + '...';\n\t\t\t\treturn id || '';\n\t\t\t}\n\n\t\t\tfunction formatTimestamp(ts) {\n\t\t\t\tvar d = new Date(ts);\n\t\t\t\tif (isNaN(d.getTime())) return ts;\n\t\t\t\tvar pad = function(n) { return n < 10 ? '0' + n : n; };\n\t\t\t\treturn d.getUTCFullYear() + '-' + pad(d.getUTCMonth()+1) + '-' + pad(d.getUTCDate()) +\n\t\t\t\t\t' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds()) + ' UTC';\n\t\t\t}\n\n\t\t\tfunction createEventRow(data) {\n\t\t\t\tvar tr = document.createElement('tr');\n\t\t\t\ttr.className = 'hover cursor-pointer';\n\t\t\t\ttr.onclick = function() { window.location.href = '/events/' + data.event_id; };\n\n\t\t\t\tvar tdSubject = document.createElement('td');\n\t\t\t\ttdSubject.className = 'font-mono';\n\t\t\t\ttdSubject.textContent = data.subject || '';\n\n\t\t\t\tvar tdID = document.createElement('td');\n\t\t\t\ttdID.className = 'font-mono text-sm';\n\t\t\t\ttdID.textContent = truncateID(data.event_id);\n\n\t\t\t\tvar tdTimestamp = document.createElement('td');\n\t\t\t\ttdTimestamp.textContent = formatTimestamp(data.timestamp);\n\n\t\t\t\tvar tdStatus = document.createElement('td');\n\t\t\t\tvar badge = document.createElement('span');\n\t\t\t\tbadge.className = statusBadgeClass(data.delivery_status);\n\t\t\t\tbadge.textContent = data.delivery_status || '';\n\t\t\t\ttdStatus.appendChild(badge);\n\n\t\t\t\ttr.appendChild(tdSubject);\n\t\t\t\ttr.appendChild(tdID);\n\t\t\t\ttr.appendChild(tdTimestamp);\n\t\t\t\ttr.appendChild(tdStatus);\n\t\t\t\treturn tr;\n\t\t\t}\n\n\t\t\tfunction reconnectWithFilters() {\n\t\t\t\t// Close existing connection\n\t\t\t\tif (evtSource) {\n\t\t\t\t\tevtSource.close();\n\t\t\t\t\tevtSource = null;\n\t\t\t\t}\n\n\t\t\t\t// Clear table for fresh stream\n\t\t\t\tvar tbody = document.querySelector('#events-results tbody');\n\t\t\t\tif (tbody) {\n\t\t\t\t\ttbody.innerHTML = '<tr><td colspan=\"4\" class=\"text-center text-base-content/60 py-8\">Waiting for events...</td></tr>';\n\t\t\t\t}\n\n\t\t\t\t// Open new connection with current filter params\n\t\t\t\tvar url = '/events/stream';\n\t\t\t\tvar params = getFilterParams();\n\t\t\t\tif (params) url += '?' + params;\n\n\t\t\t\tevtSource = new EventSource(url);\n\t\t\t\tattachEventSourceHandlers(evtSource);\n\t\t\t}\n\n\t\t\tfunction attachEventSourceHandlers(source) {\n\t\t\t\tvar receivedFirst = false;\n\n\t\t\t\tsource.onmessage = function(e) {\n\t\t\t\t\tvar data;\n\t\t\t\t\ttry { data = JSON.parse(e.data); } catch (_) { return; }\n\n\t\t\t\t\t// Only add rows for 'created' events (new events)\n\t\t\t\t\tif (data.type !== 'created') return;\n\n\t\t\t\t\tvar tbody = document.querySelector('#events-results tbody');\n\t\t\t\t\tif (!receivedFirst) {\n\t\t\t\t\t\treceivedFirst = true;\n\t\t\t\t\t\tif (tbody) tbody.innerHTML = '';\n\t\t\t\t\t}\n\n\t\t\t\t\tvar row = createEventRow(data);\n\t\t\t\t\tif (tbody) {\n\t\t\t\t\t\ttbody.insertBefore(row, tbody.firstChild);\n\t\t\t\t\t\twhile (tbody.children.length > MAX_ROWS) {\n\t\t\t\t\t\t\ttbody.removeChild(tbody.lastChild);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t};\n\n\t\t\t\tsource.onerror = function() {\n\t\t\t\t\t// EventSource auto-reconnects; no action needed\n\t\t\t\t};\n\t\t\t}\n\n\t\t\tfunction startLive() {\n\t\t\t\tisLive = true;\n\n\t\t\t\t// Update button\n\t\t\t\tvar btn = document.getElementById('live-toggle-btn');\n\t\t\t\tbtn.className = 'btn btn-error btn-sm';\n\t\t\t\tbtn.innerHTML = '<span class=\"inline-block w-2 h-2 rounded-full bg-success animate-pulse mr-2\"></span>Stop';\n\n\t\t\t\t// Clear table body and set up for live mode\n\t\t\t\tvar tbody = document.querySelector('#events-results tbody');\n\t\t\t\tif (tbody) {\n\t\t\t\t\ttbody.innerHTML = '<tr><td colspan=\"4\" class=\"text-center text-base-content/60 py-8\">Waiting for events...</td></tr>';\n\t\t\t\t}\n\n\t\t\t\t// Hide pagination\n\t\t\t\tvar pagination = document.querySelector('#events-results .flex.justify-center');\n\t\t\t\tif (pagination) pagination.style.display = 'none';\n\n\t\t\t\t// Open EventSource with current filter params\n\t\t\t\tvar url = '/events/stream';\n\t\t\t\tvar params = getFilterParams();\n\t\t\t\tif (params) url += '?' + params;\n\n\t\t\t\tevtSource = new EventSource(url);\n\t\t\t\tattachEventSourceHandlers(evtSource);\n\n\t\t\t\t// Intercept filter form submit during live mode\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) {\n\t\t\t\t\tform.addEventListener('submit', liveSearchHandler);\n\t\t\t\t}\n\n\t\t\t\t// Intercept Clear link during live mode\n\t\t\t\tvar clearLink = document.querySelector('form[hx-get=\"/events\"] a[href=\"/events\"]');\n\t\t\t\tif (clearLink) {\n\t\t\t\t\tclearLink.addEventListener('click', liveClearHandler);\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction stopLive() {\n\t\t\t\tif (evtSource) {\n\t\t\t\t\tevtSource.close();\n\t\t\t\t\tevtSource = null;\n\t\t\t\t}\n\t\t\t\tisLive = false;\n\n\t\t\t\t// Remove live mode event listeners\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) {\n\t\t\t\t\tform.removeEventListener('submit', liveSearchHandler);\n\t\t\t\t}\n\t\t\t\tvar clearLink = document.querySelector('form[hx-get=\"/events\"] a[href=\"/events\"]');\n\t\t\t\tif (clearLink) {\n\t\t\t\t\tclearLink.removeEventListener('click', liveClearHandler);\n\t\t\t\t}\n\n\t\t\t\t// Restore button\n\t\t\t\tvar btn = document.getElementById('live-toggle-btn');\n\t\t\t\tbtn.className = 'btn btn-outline btn-success btn-sm';\n\t\t\t\tbtn.innerHTML = 'Go Live';\n\n\t\t\t\t// Reload the normal paginated view\n\t\t\t\thtmx.ajax('GET', '/events', {target: '#events-results', swap: 'innerHTML'});\n\t\t\t}\n\n\t\t\tfunction liveSearchHandler(e) {\n\t\t\t\te.preventDefault();\n\t\t\t\te.stopPropagation();\n\t\t\t\treconnectWithFilters();\n\t\t\t}\n\n\t\t\tfunction liveClearHandler(e) {\n\t\t\t\te.preventDefault();\n\t\t\t\te.stopPropagation();\n\t\t\t\t// Reset form fields\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) form.reset();\n\t\t\t\treconnectWithFilters();\n\t\t\t}\n\n\t\t\twindow.toggleLiveMode = function() {\n\t\t\t\tif (isLive) {\n\t\t\t\t\tstopLive();\n\t\t\t\t} else {\n\t\t\t\t\tstartLive();\n\t\t\t\t}\n\t\t\t};\n\t\t})();\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<script>\n\t\t(function() {\n\t\t\tvar evtSource = null;\n\t\t\tvar isLive = false;\n\t\t\tvar MAX_ROWS = 100;\n\n\t\t\tfunction getFilterForm() {\n\t\t\t\treturn document.querySelector('form[hx-get=\"/events\"]');\n\t\t\t}\n\n\t\t\tfunction getFilterParams() {\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (!form) return '';\n\t\t\t\tvar params = new URLSearchParams(new FormData(form));\n\t\t\t\t// Remove empty values\n\t\t\t\tvar clean = new URLSearchParams();\n\t\t\t\tparams.forEach(function(v, k) {\n\t\t\t\t\tif (v) clean.append(k, v);\n\t\t\t\t});\n\t\t\t\treturn clean.toString();\n\t\t\t}\n\n\t\t\tfunction statusBadgeClass(status) {\n\t\t\t\tswitch (status) {\n\t\t\t\t\tcase 'delivered': return 'badge badge-success';\n\t\t\t\t\tcase 'failed': return 'badge badge-error';\n\t\t\t\t\tcase 'pending': return 'badge badge-warning';\n\t\t\t\t\tcase 'partial': return 'badge badge-info';\n\t\t\t\t\tdefault: return 'badge badge-ghost';\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction truncateID(id) {\n\t\t\t\tif (id && id.length > 8) return id.substring(0, 8) + '...';\n\t\t\t\treturn id || '';\n\t\t\t}\n\n\t\t\tfunction formatTimestamp(ts) {\n\t\t\t\tvar d = new Date(ts);\n\t\t\t\tif (isNaN(d.getTime())) return ts;\n\t\t\t\tvar pad = function(n) { return n < 10 ? '0' + n : n; };\n\t\t\t\treturn d.getUTCFullYear() + '-' + pad(d.getUTCMonth()+1) + '-' + pad(d.getUTCDate()) +\n\t\t\t\t\t' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds()) + ' UTC';\n\t\t\t}\n\n\t\t\tfunction createEventRow(data) {\n\t\t\t\tvar tr = document.createElement('tr');\n\t\t\t\ttr.className = 'hover cursor-pointer';\n\t\t\t\ttr.setAttribute('data-event-id', data.event_id);\n\t\t\t\ttr.onclick = function() { window.location.href = '/events/' + data.event_id; };\n\n\t\t\t\tvar tdSubject = document.createElement('td');\n\t\t\t\ttdSubject.className = 'font-mono';\n\t\t\t\ttdSubject.textContent = data.subject || '';\n\n\t\t\t\tvar tdID = document.createElement('td');\n\t\t\t\ttdID.className = 'font-mono text-sm';\n\t\t\t\ttdID.textContent = truncateID(data.event_id);\n\n\t\t\t\tvar tdTimestamp = document.createElement('td');\n\t\t\t\ttdTimestamp.textContent = formatTimestamp(data.timestamp);\n\n\t\t\t\tvar tdStatus = document.createElement('td');\n\t\t\t\tvar badge = document.createElement('span');\n\t\t\t\tbadge.className = statusBadgeClass(data.delivery_status);\n\t\t\t\tbadge.textContent = data.delivery_status || '';\n\t\t\t\ttdStatus.appendChild(badge);\n\n\t\t\t\ttr.appendChild(tdSubject);\n\t\t\t\ttr.appendChild(tdID);\n\t\t\t\ttr.appendChild(tdTimestamp);\n\t\t\t\ttr.appendChild(tdStatus);\n\t\t\t\treturn tr;\n\t\t\t}\n\n\t\t\tfunction updateStatusBadge(data) {\n\t\t\t\tvar row = document.querySelector('#events-results tr[data-event-id=\"' + data.event_id + '\"]');\n\t\t\t\tif (!row) return;\n\t\t\t\tvar badge = row.querySelector('td:last-child span');\n\t\t\t\tif (badge) {\n\t\t\t\t\tbadge.className = statusBadgeClass(data.delivery_status);\n\t\t\t\t\tbadge.textContent = data.delivery_status || '';\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction showDeliveryToast(data) {\n\t\t\t\tvar container = document.getElementById('toast-container');\n\t\t\t\tif (!container) return;\n\n\t\t\t\tvar toast = document.createElement('div');\n\t\t\t\ttoast.className = 'alert alert-sm shadow-lg max-w-sm animate-fade-in';\n\n\t\t\t\tvar isSuccess = data.attempt_status === 'success';\n\t\t\t\tif (isSuccess) {\n\t\t\t\t\ttoast.classList.add('alert-success');\n\t\t\t\t\ttoast.textContent = 'Delivered to ' + data.subscriber_endpoint;\n\t\t\t\t} else {\n\t\t\t\t\ttoast.classList.add('alert-error');\n\t\t\t\t\tvar msg = 'Failed delivery to ' + data.subscriber_endpoint;\n\t\t\t\t\tif (data.response_status_code) {\n\t\t\t\t\t\tmsg += ' - ' + data.response_status_code;\n\t\t\t\t\t}\n\t\t\t\t\ttoast.textContent = msg;\n\t\t\t\t}\n\n\t\t\t\tcontainer.appendChild(toast);\n\n\t\t\t\tsetTimeout(function() {\n\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\ttoast.style.transition = 'opacity 0.3s';\n\t\t\t\t\tsetTimeout(function() {\n\t\t\t\t\t\tif (toast.parentNode) toast.parentNode.removeChild(toast);\n\t\t\t\t\t}, 300);\n\t\t\t\t}, 3000);\n\t\t\t}\n\n\t\t\tfunction reconnectWithFilters() {\n\t\t\t\t// Close existing connection\n\t\t\t\tif (evtSource) {\n\t\t\t\t\tevtSource.close();\n\t\t\t\t\tevtSource = null;\n\t\t\t\t}\n\n\t\t\t\t// Clear table for fresh stream\n\t\t\t\tvar tbody = document.querySelector('#events-results tbody');\n\t\t\t\tif (tbody) {\n\t\t\t\t\ttbody.innerHTML = '<tr><td colspan=\"4\" class=\"text-center text-base-content/60 py-8\">Waiting for events...</td></tr>';\n\t\t\t\t}\n\n\t\t\t\t// Open new connection with current filter params\n\t\t\t\tvar url = '/events/stream';\n\t\t\t\tvar params = getFilterParams();\n\t\t\t\tif (params) url += '?' + params;\n\n\t\t\t\tevtSource = new EventSource(url);\n\t\t\t\tattachEventSourceHandlers(evtSource);\n\t\t\t}\n\n\t\t\tfunction attachEventSourceHandlers(source) {\n\t\t\t\tvar receivedFirst = false;\n\n\t\t\t\tsource.onmessage = function(e) {\n\t\t\t\t\tvar data;\n\t\t\t\t\ttry { data = JSON.parse(e.data); } catch (_) { return; }\n\n\t\t\t\t\tif (data.type === 'created') {\n\t\t\t\t\t\tvar tbody = document.querySelector('#events-results tbody');\n\t\t\t\t\t\tif (!receivedFirst) {\n\t\t\t\t\t\t\treceivedFirst = true;\n\t\t\t\t\t\t\tif (tbody) tbody.innerHTML = '';\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tvar row = createEventRow(data);\n\t\t\t\t\t\tif (tbody) {\n\t\t\t\t\t\t\ttbody.insertBefore(row, tbody.firstChild);\n\t\t\t\t\t\t\twhile (tbody.children.length > MAX_ROWS) {\n\t\t\t\t\t\t\t\ttbody.removeChild(tbody.lastChild);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t} else if (data.type === 'status_changed') {\n\t\t\t\t\t\tupdateStatusBadge(data);\n\t\t\t\t\t} else if (data.type === 'delivery_attempt') {\n\t\t\t\t\t\tshowDeliveryToast(data);\n\t\t\t\t\t}\n\t\t\t\t};\n\n\t\t\t\tsource.onerror = function() {\n\t\t\t\t\t// EventSource auto-reconnects; no action needed\n\t\t\t\t};\n\t\t\t}\n\n\t\t\tfunction startLive() {\n\t\t\t\tisLive = true;\n\n\t\t\t\t// Update button\n\t\t\t\tvar btn = document.getElementById('live-toggle-btn');\n\t\t\t\tbtn.className = 'btn btn-error btn-sm';\n\t\t\t\tbtn.innerHTML = '<span class=\"inline-block w-2 h-2 rounded-full bg-success animate-pulse mr-2\"></span>Stop';\n\n\t\t\t\t// Clear table body and set up for live mode\n\t\t\t\tvar tbody = document.querySelector('#events-results tbody');\n\t\t\t\tif (tbody) {\n\t\t\t\t\ttbody.innerHTML = '<tr><td colspan=\"4\" class=\"text-center text-base-content/60 py-8\">Waiting for events...</td></tr>';\n\t\t\t\t}\n\n\t\t\t\t// Hide pagination\n\t\t\t\tvar pagination = document.querySelector('#events-results .flex.justify-center');\n\t\t\t\tif (pagination) pagination.style.display = 'none';\n\n\t\t\t\t// Open EventSource with current filter params\n\t\t\t\tvar url = '/events/stream';\n\t\t\t\tvar params = getFilterParams();\n\t\t\t\tif (params) url += '?' + params;\n\n\t\t\t\tevtSource = new EventSource(url);\n\t\t\t\tattachEventSourceHandlers(evtSource);\n\n\t\t\t\t// Intercept filter form submit during live mode\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) {\n\t\t\t\t\tform.addEventListener('submit', liveSearchHandler);\n\t\t\t\t}\n\n\t\t\t\t// Intercept Clear link during live mode\n\t\t\t\tvar clearLink = document.querySelector('form[hx-get=\"/events\"] a[href=\"/events\"]');\n\t\t\t\tif (clearLink) {\n\t\t\t\t\tclearLink.addEventListener('click', liveClearHandler);\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction stopLive() {\n\t\t\t\tif (evtSource) {\n\t\t\t\t\tevtSource.close();\n\t\t\t\t\tevtSource = null;\n\t\t\t\t}\n\t\t\t\tisLive = false;\n\n\t\t\t\t// Remove live mode event listeners\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) {\n\t\t\t\t\tform.removeEventListener('submit', liveSearchHandler);\n\t\t\t\t}\n\t\t\t\tvar clearLink = document.querySelector('form[hx-get=\"/events\"] a[href=\"/events\"]');\n\t\t\t\tif (clearLink) {\n\t\t\t\t\tclearLink.removeEventListener('click', liveClearHandler);\n\t\t\t\t}\n\n\t\t\t\t// Restore button\n\t\t\t\tvar btn = document.getElementById('live-toggle-btn');\n\t\t\t\tbtn.className = 'btn btn-outline btn-success btn-sm';\n\t\t\t\tbtn.innerHTML = 'Go Live';\n\n\t\t\t\t// Reload the normal paginated view\n\t\t\t\thtmx.ajax('GET', '/events', {target: '#events-results', swap: 'innerHTML'});\n\t\t\t}\n\n\t\t\tfunction liveSearchHandler(e) {\n\t\t\t\te.preventDefault();\n\t\t\t\te.stopPropagation();\n\t\t\t\treconnectWithFilters();\n\t\t\t}\n\n\t\t\tfunction liveClearHandler(e) {\n\t\t\t\te.preventDefault();\n\t\t\t\te.stopPropagation();\n\t\t\t\t// Reset form fields\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) form.reset();\n\t\t\t\treconnectWithFilters();\n\t\t\t}\n\n\t\t\twindow.toggleLiveMode = function() {\n\t\t\t\tif (isLive) {\n\t\t\t\t\tstopLive();\n\t\t\t\t} else {\n\t\t\t\t\tstartLive();\n\t\t\t\t}\n\t\t\t};\n\t\t})();\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -66,6 +66,7 @@ templ EventsListTemplate(events []EventRow, page int, hasNext bool, subject, sta
 		<div id="events-results">
 			@eventsTableAndPagination(events, page, hasNext, subject, status, dateFrom, dateTo, content)
 		</div>
+		<div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
 		@liveStreamScript()
 	}
 }
@@ -248,6 +249,7 @@ templ liveStreamScript() {
 			function createEventRow(data) {
 				var tr = document.createElement('tr');
 				tr.className = 'hover cursor-pointer';
+				tr.setAttribute('data-event-id', data.event_id);
 				tr.onclick = function() { window.location.href = '/events/' + data.event_id; };
 
 				var tdSubject = document.createElement('td');
@@ -272,6 +274,47 @@ templ liveStreamScript() {
 				tr.appendChild(tdTimestamp);
 				tr.appendChild(tdStatus);
 				return tr;
+			}
+
+			function updateStatusBadge(data) {
+				var row = document.querySelector('#events-results tr[data-event-id="' + data.event_id + '"]');
+				if (!row) return;
+				var badge = row.querySelector('td:last-child span');
+				if (badge) {
+					badge.className = statusBadgeClass(data.delivery_status);
+					badge.textContent = data.delivery_status || '';
+				}
+			}
+
+			function showDeliveryToast(data) {
+				var container = document.getElementById('toast-container');
+				if (!container) return;
+
+				var toast = document.createElement('div');
+				toast.className = 'alert alert-sm shadow-lg max-w-sm animate-fade-in';
+
+				var isSuccess = data.attempt_status === 'success';
+				if (isSuccess) {
+					toast.classList.add('alert-success');
+					toast.textContent = 'Delivered to ' + data.subscriber_endpoint;
+				} else {
+					toast.classList.add('alert-error');
+					var msg = 'Failed delivery to ' + data.subscriber_endpoint;
+					if (data.response_status_code) {
+						msg += ' - ' + data.response_status_code;
+					}
+					toast.textContent = msg;
+				}
+
+				container.appendChild(toast);
+
+				setTimeout(function() {
+					toast.style.opacity = '0';
+					toast.style.transition = 'opacity 0.3s';
+					setTimeout(function() {
+						if (toast.parentNode) toast.parentNode.removeChild(toast);
+					}, 300);
+				}, 3000);
 			}
 
 			function reconnectWithFilters() {
@@ -303,21 +346,24 @@ templ liveStreamScript() {
 					var data;
 					try { data = JSON.parse(e.data); } catch (_) { return; }
 
-					// Only add rows for 'created' events (new events)
-					if (data.type !== 'created') return;
-
-					var tbody = document.querySelector('#events-results tbody');
-					if (!receivedFirst) {
-						receivedFirst = true;
-						if (tbody) tbody.innerHTML = '';
-					}
-
-					var row = createEventRow(data);
-					if (tbody) {
-						tbody.insertBefore(row, tbody.firstChild);
-						while (tbody.children.length > MAX_ROWS) {
-							tbody.removeChild(tbody.lastChild);
+					if (data.type === 'created') {
+						var tbody = document.querySelector('#events-results tbody');
+						if (!receivedFirst) {
+							receivedFirst = true;
+							if (tbody) tbody.innerHTML = '';
 						}
+
+						var row = createEventRow(data);
+						if (tbody) {
+							tbody.insertBefore(row, tbody.firstChild);
+							while (tbody.children.length > MAX_ROWS) {
+								tbody.removeChild(tbody.lastChild);
+							}
+						}
+					} else if (data.type === 'status_changed') {
+						updateStatusBadge(data);
+					} else if (data.type === 'delivery_attempt') {
+						showDeliveryToast(data);
 					}
 				};
 
