@@ -24,6 +24,7 @@ type deliveryTask struct {
 	subscriber   db.Subscriber
 	attemptNum   int // 0-indexed attempt number (0 = first attempt)
 	maxRetries   int // effective max retries for this subscription
+	tracker      *eventTracker
 }
 
 // deliveryResult represents the final outcome of a delivery to a subscription.
@@ -33,11 +34,52 @@ type deliveryResult struct {
 	exhausted      bool // true if max retries exhausted without success
 }
 
+// eventTracker collects delivery results for a single event.
+// Workers write results directly; no collector goroutine needed.
+type eventTracker struct {
+	event    db.Event
+	expected int
+	results  map[[16]byte]deliveryResult
+	mu       sync.Mutex
+	logger   *slog.Logger
+}
+
+// record stores a delivery result and returns true exactly once —
+// when all expected results have been collected.
+func (t *eventTracker) record(r deliveryResult) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.results[r.subscriptionID.Bytes] = r
+	return len(t.results) == t.expected
+}
+
+// eventRegistry is a concurrency-safe map of in-flight event trackers.
+type eventRegistry struct {
+	mu       sync.Mutex
+	trackers map[[16]byte]*eventTracker
+}
+
+func newEventRegistry() *eventRegistry {
+	return &eventRegistry{trackers: make(map[[16]byte]*eventTracker)}
+}
+
+func (r *eventRegistry) register(id [16]byte, t *eventTracker) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.trackers[id] = t
+}
+
+func (r *eventRegistry) remove(id [16]byte) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.trackers, id)
+}
+
 // StartDispatcher launches the centralized event delivery dispatcher.
-// It reads events from app.DeliveryChan and delivers them to matching subscribers,
-// enforcing per-subscriber concurrency limits via persistent semaphores.
+// It reads events from app.DeliveryChan and delivers them to matching subscribers
+// using a fixed-size worker pool with non-blocking retries.
 func StartDispatcher(slurpee *Application) {
-	var globalWg sync.WaitGroup
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 
 	// Persistent per-subscriber semaphores keyed by UUID bytes
 	var semMu sync.Mutex
@@ -55,29 +97,55 @@ func StartDispatcher(slurpee *Application) {
 		return sem
 	}
 
+	taskQueue := make(chan deliveryTask, slurpee.Config.DeliveryQueueSize)
+	registry := newEventRegistry()
+
+	var inflightWg sync.WaitGroup
+	var workerWg sync.WaitGroup
+
+	// Start worker goroutines
+	numWorkers := slurpee.Config.DeliveryWorkers
+	workerWg.Add(numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			defer workerWg.Done()
+			for task := range taskQueue {
+				processDeliveryTask(shutdownCtx, slurpee, task, getSemaphore, &inflightWg, taskQueue, registry)
+			}
+		}()
+	}
+
 	done := make(chan struct{})
 
+	// Dispatcher goroutine: reads events from DeliveryChan and dispatches them
 	go func() {
 		defer close(done)
 
 		for event := range slurpee.DeliveryChan {
-			dispatchEvent(slurpee, event, getSemaphore, &globalWg)
+			dispatchEvent(slurpee, event, &inflightWg, taskQueue, registry)
 		}
 
-		// Channel closed — wait for all in-flight deliveries
+		// Channel closed — wait for all in-flight tasks (including pending retry timers)
 		slog.Info("Delivery channel closed, waiting for in-flight deliveries")
-		globalWg.Wait()
+		inflightWg.Wait()
+
+		// All sends are done — safe to close the queue
+		close(taskQueue)
+
+		// Wait for workers to drain any remaining queued tasks
+		workerWg.Wait()
 		slog.Info("All deliveries complete")
 	}()
 
 	slurpee.SetStopDelivery(func() {
+		shutdownCancel() // signal retry timers to abandon
 		close(slurpee.DeliveryChan)
 		<-done
 	})
 }
 
-// dispatchEvent finds matching subscriptions for an event and spawns delivery workers.
-func dispatchEvent(slurpee *Application, event db.Event, getSemaphore func([16]byte, int32) chan struct{}, globalWg *sync.WaitGroup) {
+// dispatchEvent finds matching subscriptions for an event and enqueues delivery tasks.
+func dispatchEvent(slurpee *Application, event db.Event, inflightWg *sync.WaitGroup, taskQueue chan<- deliveryTask, registry *eventRegistry) {
 	ctx := context.Background()
 	logger := slog.Default().With("event_id", UuidToString(event.ID), "subject", event.Subject)
 
@@ -153,105 +221,75 @@ func dispatchEvent(slurpee *Application, event db.Event, getSemaphore func([16]b
 		return
 	}
 
-	resultsChan := make(chan deliveryResult, len(tasks))
-
-	// Track all in-flight tasks for this event
-	var eventWg sync.WaitGroup
-
-	// Process initial deliveries
-	for _, task := range tasks {
-		eventWg.Add(1)
-		globalWg.Add(1)
-
-		go func(t deliveryTask) {
-			defer eventWg.Done()
-			defer globalWg.Done()
-
-			processDeliveryTask(ctx, slurpee, t, getSemaphore, globalWg, resultsChan, logger)
-		}(task)
+	// Create tracker for this event
+	tracker := &eventTracker{
+		event:    event,
+		expected: len(tasks),
+		results:  make(map[[16]byte]deliveryResult),
+		logger:   logger,
 	}
+	registry.register(event.ID.Bytes, tracker)
 
-	// Wait for all deliveries and determine final status
-	globalWg.Add(1)
-	go func() {
-		defer globalWg.Done()
-		eventWg.Wait()
-		close(resultsChan)
-
-		// Collect results
-		results := make(map[[16]byte]deliveryResult)
-		for r := range resultsChan {
-			// Only keep the final result for each subscription
-			results[r.subscriptionID.Bytes] = r
-		}
-
-		// Determine final status
-		allSucceeded := true
-		anyFailed := false
-		for _, r := range results {
-			if !r.succeeded {
-				allSucceeded = false
-				if r.exhausted {
-					anyFailed = true
-				}
-			}
-		}
-
-		var finalStatus string
-		if allSucceeded {
-			finalStatus = "delivered"
-		} else if anyFailed {
-			finalStatus = "failed"
-		} else {
-			// This shouldn't happen in normal flow but handle it
-			finalStatus = "failed"
-		}
-
-		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, finalStatus)
-		logger.Info("Event delivery complete", "status", finalStatus)
-	}()
+	// Enqueue all tasks
+	for i := range tasks {
+		tasks[i].tracker = tracker
+		inflightWg.Add(1)
+		taskQueue <- tasks[i]
+	}
 }
 
 // processDeliveryTask handles a single delivery attempt with retry logic.
+// Called by worker goroutines — not spawned in its own goroutine.
 func processDeliveryTask(
-	ctx context.Context,
+	shutdownCtx context.Context,
 	slurpee *Application,
 	task deliveryTask,
 	getSemaphore func([16]byte, int32) chan struct{},
-	globalWg *sync.WaitGroup,
-	resultsChan chan<- deliveryResult,
-	logger *slog.Logger,
+	inflightWg *sync.WaitGroup,
+	taskQueue chan<- deliveryTask,
+	registry *eventRegistry,
 ) {
+	defer inflightWg.Done()
+
+	ctx := context.Background()
+	logger := task.tracker.logger
+
 	sem := getSemaphore(task.subscriber.ID.Bytes, task.subscriber.MaxParallel)
 
 	// Acquire semaphore
 	sem <- struct{}{}
-	defer func() { <-sem }()
 
 	succeeded := deliverToSubscriber(ctx, slurpee, task.event, task.subscriber, task.attemptNum, logger)
 
+	// Release semaphore immediately — don't hold during queue operations
+	<-sem
+
 	if succeeded {
-		resultsChan <- deliveryResult{
+		result := deliveryResult{
 			subscriptionID: task.subscription.ID,
 			succeeded:      true,
-			exhausted:      false,
+		}
+		if task.tracker.record(result) {
+			finalizeEvent(ctx, slurpee, task.tracker, registry)
 		}
 		return
 	}
 
-	// Delivery failed - check if we should retry
+	// Delivery failed — check if we should retry
 	if task.attemptNum >= task.maxRetries {
-		// Max retries exhausted
 		logger.Warn("Max retries exhausted",
 			"subscriber_id", UuidToString(task.subscriber.ID),
 			"endpoint_url", task.subscriber.EndpointUrl,
 			"attempt", task.attemptNum+1,
 			"max_retries", task.maxRetries,
 		)
-		resultsChan <- deliveryResult{
+		result := deliveryResult{
 			subscriptionID: task.subscription.ID,
 			succeeded:      false,
 			exhausted:      true,
+		}
+		if task.tracker.record(result) {
+			finalizeEvent(ctx, slurpee, task.tracker, registry)
 		}
 		return
 	}
@@ -269,29 +307,57 @@ func processDeliveryTask(
 	// Update event status to partial while retrying
 	updateEventStatus(ctx, slurpee, task.event.ID, task.event.RetryCount+1, "partial")
 
-	// Increment retry count on the event
-	task.event.RetryCount++
+	// Build next attempt task
+	nextTask := deliveryTask{
+		event:        task.event,
+		subscription: task.subscription,
+		subscriber:   task.subscriber,
+		attemptNum:   task.attemptNum + 1,
+		maxRetries:   task.maxRetries,
+		tracker:      task.tracker,
+	}
+	nextTask.event.RetryCount++
 
-	// Schedule the retry in a new goroutine
-	globalWg.Add(1)
-	go func() {
-		defer globalWg.Done()
-
-		// Wait for backoff delay
-		time.Sleep(delay)
-
-		// Create next attempt task
-		nextTask := deliveryTask{
-			event:        task.event,
-			subscription: task.subscription,
-			subscriber:   task.subscriber,
-			attemptNum:   task.attemptNum + 1,
-			maxRetries:   task.maxRetries,
+	// Non-blocking retry: increment inflight before scheduling timer
+	inflightWg.Add(1)
+	time.AfterFunc(delay, func() {
+		if shutdownCtx.Err() != nil {
+			inflightWg.Done() // abandon retry on shutdown
+			return
 		}
+		taskQueue <- nextTask
+	})
+}
 
-		// Process the retry
-		processDeliveryTask(ctx, slurpee, nextTask, getSemaphore, globalWg, resultsChan, logger)
-	}()
+// finalizeEvent determines the final event status from tracker results
+// and updates the database.
+func finalizeEvent(ctx context.Context, slurpee *Application, tracker *eventTracker, registry *eventRegistry) {
+	tracker.mu.Lock()
+	allSucceeded := true
+	anyFailed := false
+	for _, r := range tracker.results {
+		if !r.succeeded {
+			allSucceeded = false
+			if r.exhausted {
+				anyFailed = true
+			}
+		}
+	}
+	tracker.mu.Unlock()
+
+	var finalStatus string
+	if allSucceeded {
+		finalStatus = "delivered"
+	} else if anyFailed {
+		finalStatus = "failed"
+	} else {
+		finalStatus = "failed"
+	}
+
+	updateEventStatus(ctx, slurpee, tracker.event.ID, tracker.event.RetryCount, finalStatus)
+	tracker.logger.Info("Event delivery complete", "status", finalStatus)
+
+	registry.remove(tracker.event.ID.Bytes)
 }
 
 // matchesFilter evaluates whether an event's data matches a subscription's filter.

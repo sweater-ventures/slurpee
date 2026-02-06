@@ -29,7 +29,7 @@ func NewApp(config *config.AppConfig) (*Application, error) {
 	return &Application{
 		Config:       *config,
 		DB:           queries,
-		DeliveryChan: make(chan db.Event, 1000),
+		DeliveryChan: make(chan db.Event, config.DeliveryChanSize),
 		EventBus:     NewEventBus(),
 		Sessions:     NewSessionStore(),
 		dbconn:       conn,

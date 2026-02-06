@@ -14,8 +14,19 @@ type SubscriberRow struct {
 	CreatedAt         string
 }
 
-templ SubscribersListTemplate(subscribers []SubscriberRow) {
+templ SubscribersListTemplate(subscribers []SubscriberRow, successMsg string, errorMsg string) {
 	@components.SimplePage("Subscribers", "/subscribers") {
+		if successMsg != "" {
+			<div class="alert alert-success mb-4">{ successMsg }</div>
+		}
+		if errorMsg != "" {
+			<div class="alert alert-error mb-4">{ errorMsg }</div>
+		}
+		if isSessionAdmin(ctx) {
+			<div class="flex justify-end mb-4">
+				<button class="btn btn-primary btn-sm" onclick="document.getElementById('add-subscriber-modal').showModal()">Add Subscriber</button>
+			</div>
+		}
 		<div class="overflow-x-auto">
 			<table class="table table-zebra w-full">
 				<thead>
@@ -45,6 +56,46 @@ templ SubscribersListTemplate(subscribers []SubscriberRow) {
 				</tbody>
 			</table>
 		</div>
+		if isSessionAdmin(ctx) {
+			<dialog id="add-subscriber-modal" class="modal">
+				<div class="modal-box">
+					<h3 class="text-lg font-bold">Add Subscriber</h3>
+					<form method="POST" action="/subscribers" class="mt-4">
+						<div class="form-control mb-4">
+							<label class="label">
+								<span class="label-text">Name</span>
+							</label>
+							<input type="text" name="name" class="input input-bordered w-full" placeholder="e.g., My Service" required/>
+						</div>
+						<div class="form-control mb-4">
+							<label class="label">
+								<span class="label-text">Endpoint URL</span>
+							</label>
+							<input type="url" name="endpoint_url" class="input input-bordered w-full font-mono" placeholder="https://example.com/webhook" required/>
+						</div>
+						<div class="form-control mb-4">
+							<label class="label">
+								<span class="label-text">Auth Secret</span>
+							</label>
+							<input type="text" name="auth_secret" class="input input-bordered w-full font-mono" placeholder="Bearer token or shared secret" required/>
+						</div>
+						<div class="form-control mb-4">
+							<label class="label">
+								<span class="label-text">Max Parallel</span>
+							</label>
+							<input type="number" name="max_parallel" class="input input-bordered w-full" min="1" value="1"/>
+						</div>
+						<div class="modal-action">
+							<button type="button" class="btn btn-ghost" onclick="document.getElementById('add-subscriber-modal').close()">Cancel</button>
+							<button type="submit" class="btn btn-primary">Create</button>
+						</div>
+					</form>
+				</div>
+				<form method="dialog" class="modal-backdrop">
+					<button>close</button>
+				</form>
+			</dialog>
+		}
 	}
 }
 
