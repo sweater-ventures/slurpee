@@ -10,7 +10,7 @@ import (
 	"github.com/sweater-ventures/slurpee/config"
 )
 
-type routeRegistrationFunc func(app *app.Application, router *http.ServeMux)
+type routeRegistrationFunc func(slurpee *app.Application, router *http.ServeMux)
 
 var routes []routeRegistrationFunc
 
@@ -18,11 +18,11 @@ func registerRoute(r routeRegistrationFunc) {
 	routes = append(routes, r)
 }
 
-func AddApis(app *app.Application, router *http.ServeMux) {
+func AddApis(slurpee *app.Application, router *http.ServeMux) {
 	slog.Debug("Registering all API Endpoints", "count", len(routes))
 	apiRouter := http.NewServeMux()
 	for _, r := range routes {
-		r(app, apiRouter)
+		r(slurpee, apiRouter)
 	}
 	router.Handle("/api/", http.StripPrefix("/api", apiRouter))
 }
@@ -36,11 +36,11 @@ func log(ctx context.Context) *slog.Logger {
 	}
 }
 
-type appHandler func(app *app.Application, w http.ResponseWriter, r *http.Request)
+type appHandler func(slurpee *app.Application, w http.ResponseWriter, r *http.Request)
 
-func routeHandler(app *app.Application, handler appHandler) http.Handler {
+func routeHandler(slurpee *app.Application, handler appHandler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handler(app, w, r)
+		handler(slurpee, w, r)
 	})
 }
 

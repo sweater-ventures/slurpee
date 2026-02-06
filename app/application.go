@@ -35,6 +35,6 @@ func NewApp(config *config.AppConfig) (*Application, error) {
 	}, nil
 }
 
-func (a *Application) SetStopDelivery(fn func()) {
-	a.stopDelivery = fn
+func (slurpee *Application) SetStopDelivery(fn func()) {
+	slurpee.stopDelivery = fn
 }

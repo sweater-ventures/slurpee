@@ -19,8 +19,8 @@ func init() {
 	})
 }
 
-func loggingListHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
-	configs, err := app.DB.ListLogConfigs(r.Context())
+func loggingListHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
+	configs, err := slurpee.DB.ListLogConfigs(r.Context())
 	if err != nil {
 		log(r.Context()).Error("Error listing log configs", "err", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -35,7 +35,7 @@ func loggingListHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 	}
 }
 
-func loggingCreateHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func loggingCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
 		return
@@ -45,28 +45,28 @@ func loggingCreateHandler(app *app.Application, w http.ResponseWriter, r *http.R
 	propertiesStr := strings.TrimSpace(r.FormValue("properties"))
 
 	if subject == "" || propertiesStr == "" {
-		renderLoggingWithError(app, w, r, "Subject and properties are required")
+		renderLoggingWithError(slurpee, w, r, "Subject and properties are required")
 		return
 	}
 
 	properties := parseProperties(propertiesStr)
 
 	configID := pgtype.UUID{Bytes: uuid.Must(uuid.NewV7()), Valid: true}
-	_, err := app.DB.UpsertLogConfig(r.Context(), db.UpsertLogConfigParams{
+	_, err := slurpee.DB.UpsertLogConfig(r.Context(), db.UpsertLogConfigParams{
 		ID:            configID,
 		Subject:       subject,
 		LogProperties: properties,
 	})
 	if err != nil {
 		log(r.Context()).Error("Error creating log config", "err", err)
-		renderLoggingWithError(app, w, r, "Failed to create logging configuration")
+		renderLoggingWithError(slurpee, w, r, "Failed to create logging configuration")
 		return
 	}
 
-	renderLoggingWithSuccess(app, w, r, "Logging configuration added")
+	renderLoggingWithSuccess(slurpee, w, r, "Logging configuration added")
 }
 
-func loggingUpdateHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func loggingUpdateHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
 		return
@@ -76,7 +76,7 @@ func loggingUpdateHandler(app *app.Application, w http.ResponseWriter, r *http.R
 	propertiesStr := strings.TrimSpace(r.FormValue("properties"))
 
 	if subject == "" || propertiesStr == "" {
-		renderLoggingWithError(app, w, r, "Subject and properties are required")
+		renderLoggingWithError(slurpee, w, r, "Subject and properties are required")
 		return
 	}
 
@@ -84,35 +84,35 @@ func loggingUpdateHandler(app *app.Application, w http.ResponseWriter, r *http.R
 
 	// Upsert will update existing config for this subject
 	configID := pgtype.UUID{Bytes: uuid.Must(uuid.NewV7()), Valid: true}
-	_, err := app.DB.UpsertLogConfig(r.Context(), db.UpsertLogConfigParams{
+	_, err := slurpee.DB.UpsertLogConfig(r.Context(), db.UpsertLogConfigParams{
 		ID:            configID,
 		Subject:       subject,
 		LogProperties: properties,
 	})
 	if err != nil {
 		log(r.Context()).Error("Error updating log config", "err", err)
-		renderLoggingWithError(app, w, r, "Failed to update logging configuration")
+		renderLoggingWithError(slurpee, w, r, "Failed to update logging configuration")
 		return
 	}
 
-	renderLoggingWithSuccess(app, w, r, "Logging configuration updated")
+	renderLoggingWithSuccess(slurpee, w, r, "Logging configuration updated")
 }
 
-func loggingDeleteHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func loggingDeleteHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	subject := r.PathValue("subject")
 	if subject == "" {
-		renderLoggingWithError(app, w, r, "Subject is required")
+		renderLoggingWithError(slurpee, w, r, "Subject is required")
 		return
 	}
 
-	err := app.DB.DeleteLogConfigForSubject(r.Context(), subject)
+	err := slurpee.DB.DeleteLogConfigForSubject(r.Context(), subject)
 	if err != nil {
 		log(r.Context()).Error("Error deleting log config", "err", err)
-		renderLoggingWithError(app, w, r, "Failed to delete logging configuration")
+		renderLoggingWithError(slurpee, w, r, "Failed to delete logging configuration")
 		return
 	}
 
-	renderLoggingWithSuccess(app, w, r, "Logging configuration deleted")
+	renderLoggingWithSuccess(slurpee, w, r, "Logging configuration deleted")
 }
 
 func buildLogConfigRows(configs []db.LogConfig) []LogConfigRow {
@@ -138,8 +138,8 @@ func parseProperties(input string) []string {
 	return properties
 }
 
-func renderLoggingWithSuccess(app *app.Application, w http.ResponseWriter, r *http.Request, msg string) {
-	configs, err := app.DB.ListLogConfigs(r.Context())
+func renderLoggingWithSuccess(slurpee *app.Application, w http.ResponseWriter, r *http.Request, msg string) {
+	configs, err := slurpee.DB.ListLogConfigs(r.Context())
 	if err != nil {
 		log(r.Context()).Error("Error listing log configs", "err", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -152,8 +152,8 @@ func renderLoggingWithSuccess(app *app.Application, w http.ResponseWriter, r *ht
 	}
 }
 
-func renderLoggingWithError(app *app.Application, w http.ResponseWriter, r *http.Request, msg string) {
-	configs, err := app.DB.ListLogConfigs(r.Context())
+func renderLoggingWithError(slurpee *app.Application, w http.ResponseWriter, r *http.Request, msg string) {
+	configs, err := slurpee.DB.ListLogConfigs(r.Context())
 	if err != nil {
 		log(r.Context()).Error("Error listing log configs", "err", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)

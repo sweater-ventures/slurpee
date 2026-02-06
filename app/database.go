@@ -36,7 +36,7 @@ func connectToDB(config *config.AppConfig) (*pgxpool.Pool, error) {
 	return pool, err
 }
 
-func (a *Application) Close() {
-	a.stopDelivery()
-	a.dbconn.Close()
+func (slurpee *Application) Close() {
+	slurpee.stopDelivery()
+	slurpee.dbconn.Close()
 }

@@ -24,8 +24,8 @@ func init() {
 	})
 }
 
-func subscribersListHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
-	subscribers, err := app.DB.ListSubscribersWithCounts(r.Context())
+func subscribersListHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
+	subscribers, err := slurpee.DB.ListSubscribersWithCounts(r.Context())
 	if err != nil {
 		log(r.Context()).Error("Error listing subscribers", "err", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -50,7 +50,7 @@ func subscribersListHandler(app *app.Application, w http.ResponseWriter, r *http
 	}
 }
 
-func subscriberDetailHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func subscriberDetailHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {
@@ -59,7 +59,7 @@ func subscriberDetailHandler(app *app.Application, w http.ResponseWriter, r *htt
 	}
 	pgID := pgtype.UUID{Bytes: parsed, Valid: true}
 
-	detail, subRows, err := buildSubscriberDetailView(app, r, pgID)
+	detail, subRows, err := buildSubscriberDetailView(slurpee, r, pgID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "Subscriber not found", http.StatusNotFound)
@@ -75,7 +75,7 @@ func subscriberDetailHandler(app *app.Application, w http.ResponseWriter, r *htt
 	}
 }
 
-func subscriberUpdateHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func subscriberUpdateHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {
@@ -94,17 +94,17 @@ func subscriberUpdateHandler(app *app.Application, w http.ResponseWriter, r *htt
 	maxParallelStr := r.FormValue("max_parallel")
 
 	if name == "" || authSecret == "" {
-		renderSubscriberDetailWithError(app, w, r, pgID, "Name and auth secret are required")
+		renderSubscriberDetailWithError(slurpee, w, r, pgID, "Name and auth secret are required")
 		return
 	}
 
 	maxParallel, err := strconv.ParseInt(maxParallelStr, 10, 32)
 	if err != nil || maxParallel < 1 {
-		renderSubscriberDetailWithError(app, w, r, pgID, "Max parallel must be a positive integer")
+		renderSubscriberDetailWithError(slurpee, w, r, pgID, "Max parallel must be a positive integer")
 		return
 	}
 
-	_, err = app.DB.UpdateSubscriber(r.Context(), db.UpdateSubscriberParams{
+	_, err = slurpee.DB.UpdateSubscriber(r.Context(), db.UpdateSubscriberParams{
 		ID:          pgID,
 		Name:        name,
 		AuthSecret:  authSecret,
@@ -112,11 +112,11 @@ func subscriberUpdateHandler(app *app.Application, w http.ResponseWriter, r *htt
 	})
 	if err != nil {
 		log(r.Context()).Error("Error updating subscriber", "err", err)
-		renderSubscriberDetailWithError(app, w, r, pgID, "Failed to update subscriber")
+		renderSubscriberDetailWithError(slurpee, w, r, pgID, "Failed to update subscriber")
 		return
 	}
 
-	detail, subRows, err := buildSubscriberDetailView(app, r, pgID)
+	detail, subRows, err := buildSubscriberDetailView(slurpee, r, pgID)
 	if err != nil {
 		return
 	}
@@ -127,7 +127,7 @@ func subscriberUpdateHandler(app *app.Application, w http.ResponseWriter, r *htt
 	}
 }
 
-func subscriptionCreateHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func subscriptionCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {
@@ -146,14 +146,14 @@ func subscriptionCreateHandler(app *app.Application, w http.ResponseWriter, r *h
 	maxRetriesStr := r.FormValue("max_retries")
 
 	if subjectPattern == "" {
-		renderSubscriberDetailWithError(app, w, r, pgID, "Subject pattern is required")
+		renderSubscriberDetailWithError(slurpee, w, r, pgID, "Subject pattern is required")
 		return
 	}
 
 	var filter []byte
 	if filterStr != "" {
 		if !json.Valid([]byte(filterStr)) {
-			renderSubscriberDetailWithError(app, w, r, pgID, "Filter must be valid JSON")
+			renderSubscriberDetailWithError(slurpee, w, r, pgID, "Filter must be valid JSON")
 			return
 		}
 		filter = []byte(filterStr)
@@ -163,14 +163,14 @@ func subscriptionCreateHandler(app *app.Application, w http.ResponseWriter, r *h
 	if maxRetriesStr != "" {
 		val, err := strconv.ParseInt(maxRetriesStr, 10, 32)
 		if err != nil || val < 0 {
-			renderSubscriberDetailWithError(app, w, r, pgID, "Max retries must be a non-negative integer")
+			renderSubscriberDetailWithError(slurpee, w, r, pgID, "Max retries must be a non-negative integer")
 			return
 		}
 		maxRetries = pgtype.Int4{Int32: int32(val), Valid: true}
 	}
 
 	subID := pgtype.UUID{Bytes: uuid.Must(uuid.NewV7()), Valid: true}
-	_, err = app.DB.CreateSubscription(r.Context(), db.CreateSubscriptionParams{
+	_, err = slurpee.DB.CreateSubscription(r.Context(), db.CreateSubscriptionParams{
 		ID:             subID,
 		SubscriberID:   pgID,
 		SubjectPattern: subjectPattern,
@@ -179,11 +179,11 @@ func subscriptionCreateHandler(app *app.Application, w http.ResponseWriter, r *h
 	})
 	if err != nil {
 		log(r.Context()).Error("Error creating subscription", "err", err)
-		renderSubscriberDetailWithError(app, w, r, pgID, "Failed to create subscription")
+		renderSubscriberDetailWithError(slurpee, w, r, pgID, "Failed to create subscription")
 		return
 	}
 
-	detail, subRows, err := buildSubscriberDetailView(app, r, pgID)
+	detail, subRows, err := buildSubscriberDetailView(slurpee, r, pgID)
 	if err != nil {
 		return
 	}
@@ -194,7 +194,7 @@ func subscriptionCreateHandler(app *app.Application, w http.ResponseWriter, r *h
 	}
 }
 
-func subscriptionDeleteHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func subscriptionDeleteHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {
@@ -211,14 +211,14 @@ func subscriptionDeleteHandler(app *app.Application, w http.ResponseWriter, r *h
 	}
 	subPgID := pgtype.UUID{Bytes: subParsed, Valid: true}
 
-	err = app.DB.DeleteSubscription(r.Context(), subPgID)
+	err = slurpee.DB.DeleteSubscription(r.Context(), subPgID)
 	if err != nil {
 		log(r.Context()).Error("Error deleting subscription", "err", err)
-		renderSubscriberDetailWithError(app, w, r, pgID, "Failed to delete subscription")
+		renderSubscriberDetailWithError(slurpee, w, r, pgID, "Failed to delete subscription")
 		return
 	}
 
-	detail, subRows, err := buildSubscriberDetailView(app, r, pgID)
+	detail, subRows, err := buildSubscriberDetailView(slurpee, r, pgID)
 	if err != nil {
 		return
 	}
@@ -229,8 +229,8 @@ func subscriptionDeleteHandler(app *app.Application, w http.ResponseWriter, r *h
 	}
 }
 
-func buildSubscriberDetailView(app *app.Application, r *http.Request, pgID pgtype.UUID) (SubscriberDetail, []SubscriptionRow, error) {
-	subscriber, err := app.DB.GetSubscriberByID(r.Context(), pgID)
+func buildSubscriberDetailView(slurpee *app.Application, r *http.Request, pgID pgtype.UUID) (SubscriberDetail, []SubscriptionRow, error) {
+	subscriber, err := slurpee.DB.GetSubscriberByID(r.Context(), pgID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return SubscriberDetail{}, nil, err
@@ -239,7 +239,7 @@ func buildSubscriberDetailView(app *app.Application, r *http.Request, pgID pgtyp
 		return SubscriberDetail{}, nil, err
 	}
 
-	subscriptions, err := app.DB.ListSubscriptionsForSubscriber(r.Context(), pgID)
+	subscriptions, err := slurpee.DB.ListSubscriptionsForSubscriber(r.Context(), pgID)
 	if err != nil {
 		log(r.Context()).Error("Error fetching subscriptions", "err", err)
 		return SubscriberDetail{}, nil, err
@@ -273,8 +273,8 @@ func buildSubscriberDetailView(app *app.Application, r *http.Request, pgID pgtyp
 	return detail, subRows, nil
 }
 
-func renderSubscriberDetailWithError(app *app.Application, w http.ResponseWriter, r *http.Request, pgID pgtype.UUID, errorMsg string) {
-	detail, subRows, err := buildSubscriberDetailView(app, r, pgID)
+func renderSubscriberDetailWithError(slurpee *app.Application, w http.ResponseWriter, r *http.Request, pgID pgtype.UUID, errorMsg string) {
+	detail, subRows, err := buildSubscriberDetailView(slurpee, r, pgID)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return

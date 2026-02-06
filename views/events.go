@@ -51,7 +51,7 @@ func parseFilters(r *http.Request) eventFilters {
 	}
 }
 
-func eventsListHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func eventsListHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	page := 1
 	if p := r.URL.Query().Get("page"); p != "" {
 		parsed, err := strconv.Atoi(p)
@@ -105,9 +105,9 @@ func eventsListHandler(app *app.Application, w http.ResponseWriter, r *http.Requ
 			}
 		}
 
-		events, err = app.DB.SearchEventsFiltered(r.Context(), params)
+		events, err = slurpee.DB.SearchEventsFiltered(r.Context(), params)
 	} else {
-		events, err = app.DB.ListEvents(r.Context(), db.ListEventsParams{
+		events, err = slurpee.DB.ListEvents(r.Context(), db.ListEventsParams{
 			Limit:  eventsPerPage + 1,
 			Offset: offset,
 		})
@@ -146,7 +146,7 @@ func eventsListHandler(app *app.Application, w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func eventDetailHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func eventDetailHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {
@@ -155,7 +155,7 @@ func eventDetailHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 	}
 	pgID := pgtype.UUID{Bytes: parsed, Valid: true}
 
-	event, err := app.DB.GetEventByID(r.Context(), pgID)
+	event, err := slurpee.DB.GetEventByID(r.Context(), pgID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "Event not found", http.StatusNotFound)
@@ -166,7 +166,7 @@ func eventDetailHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	attempts, err := app.DB.ListDeliveryAttemptsForEvent(r.Context(), pgID)
+	attempts, err := slurpee.DB.ListDeliveryAttemptsForEvent(r.Context(), pgID)
 	if err != nil {
 		log(r.Context()).Error("Error fetching delivery attempts", "err", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -181,7 +181,7 @@ func eventDetailHandler(app *app.Application, w http.ResponseWriter, r *http.Req
 	}
 }
 
-func eventReplayAllHandler(a *app.Application, w http.ResponseWriter, r *http.Request) {
+func eventReplayAllHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {
@@ -190,7 +190,7 @@ func eventReplayAllHandler(a *app.Application, w http.ResponseWriter, r *http.Re
 	}
 	pgID := pgtype.UUID{Bytes: parsed, Valid: true}
 
-	event, err := a.DB.GetEventByID(r.Context(), pgID)
+	event, err := slurpee.DB.GetEventByID(r.Context(), pgID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "Event not found", http.StatusNotFound)
@@ -202,11 +202,11 @@ func eventReplayAllHandler(a *app.Application, w http.ResponseWriter, r *http.Re
 	}
 
 	// Reset event status to pending and send to delivery channel
-	a.DeliveryChan <- event
+	slurpee.DeliveryChan <- event
 
 	// Re-fetch the event and delivery attempts for the updated view
-	event, _ = a.DB.GetEventByID(r.Context(), pgID)
-	attempts, _ := a.DB.ListDeliveryAttemptsForEvent(r.Context(), pgID)
+	event, _ = slurpee.DB.GetEventByID(r.Context(), pgID)
+	attempts, _ := slurpee.DB.ListDeliveryAttemptsForEvent(r.Context(), pgID)
 
 	detail, attemptRows := buildEventDetailView(event, attempts)
 	if err := deliveryAttemptsSection(detail, attemptRows).Render(r.Context(), w); err != nil {
@@ -215,7 +215,7 @@ func eventReplayAllHandler(a *app.Application, w http.ResponseWriter, r *http.Re
 	}
 }
 
-func eventReplaySubscriberHandler(a *app.Application, w http.ResponseWriter, r *http.Request) {
+func eventReplaySubscriberHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {
@@ -232,7 +232,7 @@ func eventReplaySubscriberHandler(a *app.Application, w http.ResponseWriter, r *
 	}
 	subscriberPgID := pgtype.UUID{Bytes: subscriberParsed, Valid: true}
 
-	event, err := a.DB.GetEventByID(r.Context(), pgID)
+	event, err := slurpee.DB.GetEventByID(r.Context(), pgID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "Event not found", http.StatusNotFound)
@@ -243,7 +243,7 @@ func eventReplaySubscriberHandler(a *app.Application, w http.ResponseWriter, r *
 		return
 	}
 
-	subscriber, err := a.DB.GetSubscriberByID(r.Context(), subscriberPgID)
+	subscriber, err := slurpee.DB.GetSubscriberByID(r.Context(), subscriberPgID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, "Subscriber not found", http.StatusNotFound)
@@ -255,11 +255,11 @@ func eventReplaySubscriberHandler(a *app.Application, w http.ResponseWriter, r *
 	}
 
 	// Replay delivery to the single subscriber in a background goroutine
-	go api.ReplayToSubscriber(a, event, subscriber)
+	go app.ReplayToSubscriber(slurpee, event, subscriber)
 
 	// Re-fetch the event and delivery attempts for the updated view
-	event, _ = a.DB.GetEventByID(r.Context(), pgID)
-	attempts, _ := a.DB.ListDeliveryAttemptsForEvent(r.Context(), pgID)
+	event, _ = slurpee.DB.GetEventByID(r.Context(), pgID)
+	attempts, _ := slurpee.DB.ListDeliveryAttemptsForEvent(r.Context(), pgID)
 
 	detail, attemptRows := buildEventDetailView(event, attempts)
 	if err := deliveryAttemptsSection(detail, attemptRows).Render(r.Context(), w); err != nil {
@@ -322,7 +322,7 @@ func buildEventDetailView(event db.Event, attempts []db.DeliveryAttempt) (EventD
 	return detail, attemptRows
 }
 
-func eventCreateFormHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func eventCreateFormHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	form := EventCreateForm{Errors: map[string]string{}}
 	if err := EventCreateTemplate(form).Render(r.Context(), w); err != nil {
 		log(r.Context()).Error("Error rendering event create view", "err", err)
@@ -330,7 +330,7 @@ func eventCreateFormHandler(app *app.Application, w http.ResponseWriter, r *http
 	}
 }
 
-func eventCreateSubmitHandler(app *app.Application, w http.ResponseWriter, r *http.Request) {
+func eventCreateSubmitHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
 		return
@@ -387,7 +387,7 @@ func eventCreateSubmitHandler(app *app.Application, w http.ResponseWriter, r *ht
 	now := time.Now().UTC()
 	eventID := pgtype.UUID{Bytes: uuid.Must(uuid.NewV7()), Valid: true}
 
-	event, err := app.DB.InsertEvent(r.Context(), db.InsertEventParams{
+	event, err := slurpee.DB.InsertEvent(r.Context(), db.InsertEventParams{
 		ID:              eventID,
 		Subject:         subject,
 		Timestamp:       pgtype.Timestamptz{Time: now, Valid: true},
@@ -406,25 +406,14 @@ func eventCreateSubmitHandler(app *app.Application, w http.ResponseWriter, r *ht
 		}
 		return
 	}
-	api.LogEvent(r.Context(), app, event)
+	api.LogEvent(r.Context(), slurpee, event)
 	// Publish 'created' message to the event bus for SSE clients
-	publishCreatedEvent(app, event)
+	app.PublishCreatedEvent(slurpee, event)
 	// Trigger async delivery
-	app.DeliveryChan <- event
+	slurpee.DeliveryChan <- event
 
 	// Redirect to the newly created event detail page
 	http.Redirect(w, r, "/events/"+pgtypeUUIDToString(event.ID), http.StatusSeeOther)
-}
-
-// publishCreatedEvent publishes a 'created' bus message for SSE clients.
-func publishCreatedEvent(a *app.Application, event db.Event) {
-	a.EventBus.Publish(app.BusMessage{
-		Type:           app.BusMessageCreated,
-		EventID:        pgtypeUUIDToString(event.ID),
-		Subject:        event.Subject,
-		DeliveryStatus: event.DeliveryStatus,
-		Timestamp:      event.Timestamp.Time,
-	})
 }
 
 func prettyJSON(data []byte) string {
