@@ -30,6 +30,8 @@ Started: Thu Feb  5 19:29:35 MST 2026
 - Live mode filter intercept: use addEventListener/removeEventListener on form submit and Clear link click to override HTMX behavior during live mode
 - In-place SSE updates: add `data-event-id` attribute to dynamic rows, then query `tr[data-event-id="..."]` for status badge updates
 - Toast notifications: fixed container at bottom-right, DaisyUI alert classes, auto-dismiss with setTimeout + opacity fade
+- Named SSE events (`event: missed`) require `addEventListener('missed', handler)` not `onmessage`; track `e.lastEventId` for reconnection state
+- Missed events endpoint: `GET /events/stream/missed?after=<unix_nano>` returns HTML rows for loading missed events after reconnection
 ---
 
 ## 2026-02-05 19:30 MST - US-001
@@ -129,4 +131,27 @@ Started: Thu Feb  5 19:29:35 MST 2026
   - DaisyUI `alert` classes with `alert-success`/`alert-error` work well for toast notifications
   - For auto-dismiss toasts: setTimeout for removal, with an opacity transition for smooth fade-out before DOM removal
   - The `onmessage` handler receives all SSE messages without an `event:` field — branch on `data.type` in JSON payload to handle different message types
+  - Named SSE events (e.g., `event: missed`) require `source.addEventListener('missed', ...)` — `onmessage` won't fire for them
+  - Missed events endpoint: `/events/stream/missed?after=<unix_nano>` returns HTML table rows for prepending to the live table
+---
+
+## 2026-02-05 20:30 MST - US-007
+- Implemented reconnection with missed event indicator
+- Added `ListEventsAfterTimestamp` SQL query in queries/events.sql to fetch events created after a given timestamp (with filter support)
+- Added `GET /events/stream/missed` handler in views/events.go that returns missed events as HTML table rows (`MissedEventsRows` templ component)
+- Added `MissedEventsRows` templ component rendering rows with a subtle `bg-info/10` highlight
+- Added `showMissedBanner()` function that displays "You missed X events while away" banner at the top of the live table with Load and dismiss (X) buttons
+- Added `loadMissedEvents()` function that fetches missed events via fetch() and prepends HTML rows to the live table tbody
+- Added `removeMissedBanner()` function for dismissing the banner without loading events
+- Added `addEventListener('missed', ...)` to EventSource handlers to listen for the named `missed` SSE event
+- Tracks `lastReconnectNanos` from SSE message IDs (`<monotonic_id>:<unix_nano>` format) to pass as the `after` parameter when loading missed events
+- New events from the stream insert after the missed banner (if present) instead of at the very top
+- `reconnectWithFilters()` resets `lastReconnectNanos` and removes the missed banner to avoid stale state on intentional reconnections
+- Files changed: queries/events.sql, db/events.sql.go (generated), views/events.go, views/events.templ, views/events_templ.go (generated)
+- **Learnings for future iterations:**
+  - Named SSE events (`event: missed\ndata: ...`) require explicit `addEventListener('missed', handler)` on the EventSource — `onmessage` only fires for unnamed/default message type events
+  - Track SSE `lastEventId` from `e.lastEventId` in the `onmessage` handler to maintain reconnection state client-side
+  - Use `fetch()` instead of `htmx.ajax()` when you need to insert raw HTML fragments into specific positions in the DOM (e.g., prepending rows to a tbody)
+  - `insertBefore(row, referenceNode.nextSibling)` pattern inserts after a specific element (used to insert new rows after the missed banner)
+  - Add a separate SQL query for listing (not just counting) events after a timestamp — the count query is for the SSE missed event, the list query is for the Load button
 ---
