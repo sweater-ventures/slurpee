@@ -28,6 +28,8 @@ Started: Thu Feb  5 19:29:35 MST 2026
 - htmx.ajax('GET', url, {target, swap}) for programmatic HTMX requests from JS (e.g., restoring normal view after live mode)
 - Inline `<script>` in templ for complex JS; templ `script` keyword for type-safe Go→JS parameter passing
 - Live mode filter intercept: use addEventListener/removeEventListener on form submit and Clear link click to override HTMX behavior during live mode
+- In-place SSE updates: add `data-event-id` attribute to dynamic rows, then query `tr[data-event-id="..."]` for status badge updates
+- Toast notifications: fixed container at bottom-right, DaisyUI alert classes, auto-dismiss with setTimeout + opacity fade
 ---
 
 ## 2026-02-05 19:30 MST - US-001
@@ -111,4 +113,20 @@ Started: Thu Feb  5 19:29:35 MST 2026
   - The Clear link is an `<a href="/events">` inside the form — select it with `form[hx-get="/events"] a[href="/events"]` to distinguish from other links
   - `form.reset()` clears all inputs back to their default values, simpler than manually resetting each field
   - Extracting EventSource setup into a reusable `reconnectWithFilters()` function keeps the live filter reconnection DRY
+---
+
+## 2026-02-05 20:25 MST - US-006
+- Implemented delivery status updates in the live event stream
+- `status_changed` messages now update the status badge in-place for existing rows (matched by `data-event-id` attribute on `<tr>`)
+- `delivery_attempt` messages show toast notifications at the bottom-right with endpoint and result
+- Toast notifications auto-dismiss after 3 seconds with a fade-out transition
+- Toast uses `alert-success` for successful deliveries and `alert-error` for failures, including HTTP status code when available
+- Added a fixed `#toast-container` div to the events page layout
+- Added `data-event-id` attribute to dynamically created table rows for status_changed lookups
+- Files changed: views/events.templ, views/events_templ.go (generated)
+- **Learnings for future iterations:**
+  - Use `data-*` attributes on dynamic rows to enable in-place updates from subsequent SSE messages targeting the same entity
+  - DaisyUI `alert` classes with `alert-success`/`alert-error` work well for toast notifications
+  - For auto-dismiss toasts: setTimeout for removal, with an opacity transition for smooth fade-out before DOM removal
+  - The `onmessage` handler receives all SSE messages without an `event:` field — branch on `data.type` in JSON payload to handle different message types
 ---
