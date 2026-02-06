@@ -47,13 +47,51 @@ templ subscriberDetailContent(subscriber SubscriberDetail, subscriptions []Subsc
 	<div class="card bg-base-200 shadow-md mb-6">
 		<div class="card-body">
 			<h2 class="card-title text-lg">Subscriber Configuration</h2>
-			<form
-				hx-put={ fmt.Sprintf("/subscribers/%s", subscriber.ID) }
-				hx-target="#subscriber-detail"
-				hx-swap="innerHTML"
-				class="mt-4"
-			>
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			if isSubscriberEditable(ctx, subscriber.ID) {
+				<form
+					hx-put={ fmt.Sprintf("/subscribers/%s", subscriber.ID) }
+					hx-target="#subscriber-detail"
+					hx-swap="innerHTML"
+					class="mt-4"
+				>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div>
+							<label class="text-sm text-base-content/60">Subscriber ID</label>
+							<p class="font-mono text-sm mt-1">{ subscriber.ID }</p>
+						</div>
+						<div>
+							<label class="text-sm text-base-content/60">Endpoint URL</label>
+							<p class="font-mono text-sm mt-1">{ subscriber.EndpointURL }</p>
+						</div>
+						<div class="form-control">
+							<label class="label">
+								<span class="label-text">Name</span>
+							</label>
+							<input type="text" name="name" value={ subscriber.Name } class="input input-bordered w-full" required/>
+						</div>
+						<div class="form-control">
+							<label class="label">
+								<span class="label-text">Auth Secret</span>
+							</label>
+							<input type="text" name="auth_secret" value={ subscriber.AuthSecret } class="input input-bordered w-full font-mono" required/>
+						</div>
+						<div class="form-control">
+							<label class="label">
+								<span class="label-text">Max Parallel</span>
+							</label>
+							<input type="number" name="max_parallel" value={ fmt.Sprintf("%d", subscriber.MaxParallel) } class="input input-bordered w-full" min="1" required/>
+						</div>
+						<div>
+							<label class="text-sm text-base-content/60">Created At</label>
+							<p class="mt-1">{ subscriber.CreatedAt }</p>
+						</div>
+					</div>
+					<div class="mt-4 flex justify-end">
+						<button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+					</div>
+				</form>
+			} else {
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
 					<div>
 						<label class="text-sm text-base-content/60">Subscriber ID</label>
 						<p class="font-mono text-sm mt-1">{ subscriber.ID }</p>
@@ -62,33 +100,20 @@ templ subscriberDetailContent(subscriber SubscriberDetail, subscriptions []Subsc
 						<label class="text-sm text-base-content/60">Endpoint URL</label>
 						<p class="font-mono text-sm mt-1">{ subscriber.EndpointURL }</p>
 					</div>
-					<div class="form-control">
-						<label class="label">
-							<span class="label-text">Name</span>
-						</label>
-						<input type="text" name="name" value={ subscriber.Name } class="input input-bordered w-full" required/>
+					<div>
+						<label class="text-sm text-base-content/60">Name</label>
+						<p class="mt-1">{ subscriber.Name }</p>
 					</div>
-					<div class="form-control">
-						<label class="label">
-							<span class="label-text">Auth Secret</span>
-						</label>
-						<input type="text" name="auth_secret" value={ subscriber.AuthSecret } class="input input-bordered w-full font-mono" required/>
-					</div>
-					<div class="form-control">
-						<label class="label">
-							<span class="label-text">Max Parallel</span>
-						</label>
-						<input type="number" name="max_parallel" value={ fmt.Sprintf("%d", subscriber.MaxParallel) } class="input input-bordered w-full" min="1" required/>
+					<div>
+						<label class="text-sm text-base-content/60">Max Parallel</label>
+						<p class="mt-1">{ fmt.Sprintf("%d", subscriber.MaxParallel) }</p>
 					</div>
 					<div>
 						<label class="text-sm text-base-content/60">Created At</label>
 						<p class="mt-1">{ subscriber.CreatedAt }</p>
 					</div>
 				</div>
-				<div class="mt-4 flex justify-end">
-					<button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
-				</div>
-			</form>
+			}
 		</div>
 	</div>
 	<div>
@@ -97,9 +122,11 @@ templ subscriberDetailContent(subscriber SubscriberDetail, subscriptions []Subsc
 				Subscriptions
 				<span class="badge badge-ghost ml-2">{ fmt.Sprintf("%d", len(subscriptions)) }</span>
 			</h3>
-			<button class="btn btn-primary btn-sm" onclick="document.getElementById('add-subscription-modal').showModal()">
-				Add Subscription
-			</button>
+			if isSubscriberEditable(ctx, subscriber.ID) {
+				<button class="btn btn-primary btn-sm" onclick="document.getElementById('add-subscription-modal').showModal()">
+					Add Subscription
+				</button>
+			}
 		</div>
 		if len(subscriptions) == 0 {
 			<div class="text-base-content/60 text-center py-8">No subscriptions configured</div>
@@ -133,15 +160,17 @@ templ subscriberDetailContent(subscriber SubscriberDetail, subscriptions []Subsc
 									}
 								</td>
 								<td>
-									<button
-										class="btn btn-ghost btn-xs text-error"
-										hx-delete={ fmt.Sprintf("/subscribers/%s/subscriptions/%s", subscriber.ID, sub.ID) }
-										hx-target="#subscriber-detail"
-										hx-swap="innerHTML"
-										hx-confirm="Are you sure you want to delete this subscription?"
-									>
-										Delete
-									</button>
+									if isSubscriberEditable(ctx, subscriber.ID) {
+										<button
+											class="btn btn-ghost btn-xs text-error"
+											hx-delete={ fmt.Sprintf("/subscribers/%s/subscriptions/%s", subscriber.ID, sub.ID) }
+											hx-target="#subscriber-detail"
+											hx-swap="innerHTML"
+											hx-confirm="Are you sure you want to delete this subscription?"
+										>
+											Delete
+										</button>
+									}
 								</td>
 							</tr>
 						}
