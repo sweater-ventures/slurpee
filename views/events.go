@@ -30,7 +30,7 @@ func init() {
 	})
 }
 
-const eventsPerPage = 50
+const eventsPerPage = 25
 
 type eventFilters struct {
 	Subject  string
