@@ -138,6 +138,57 @@ func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]Event
 	return items, nil
 }
 
+const listEventsAfterTimestamp = `-- name: ListEventsAfterTimestamp :many
+SELECT id, subject, timestamp, trace_id, data, retry_count, delivery_status, status_updated_at FROM events
+WHERE timestamp > $1::timestamptz
+  AND ($2::text = '' OR subject LIKE $2)
+  AND ($3::text = '' OR delivery_status = $3)
+  AND ($4::jsonb IS NULL OR data @> $4)
+ORDER BY timestamp DESC
+LIMIT 200
+`
+
+type ListEventsAfterTimestampParams struct {
+	AfterTimestamp pgtype.Timestamptz
+	SubjectFilter  string
+	StatusFilter   string
+	DataFilter     []byte
+}
+
+func (q *Queries) ListEventsAfterTimestamp(ctx context.Context, arg ListEventsAfterTimestampParams) ([]Event, error) {
+	rows, err := q.db.Query(ctx, listEventsAfterTimestamp,
+		arg.AfterTimestamp,
+		arg.SubjectFilter,
+		arg.StatusFilter,
+		arg.DataFilter,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Event
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.ID,
+			&i.Subject,
+			&i.Timestamp,
+			&i.TraceID,
+			&i.Data,
+			&i.RetryCount,
+			&i.DeliveryStatus,
+			&i.StatusUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchEventsByDataContent = `-- name: SearchEventsByDataContent :many
 SELECT id, subject, timestamp, trace_id, data, retry_count, delivery_status, status_updated_at FROM events WHERE data @> $1 ORDER BY timestamp DESC LIMIT $2 OFFSET $3
 `

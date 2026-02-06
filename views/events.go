@@ -23,6 +23,7 @@ func init() {
 		router.Handle("POST /events/new", routeHandler(slurpee, eventCreateSubmitHandler))
 		router.Handle("POST /events/{id}/replay", routeHandler(slurpee, eventReplayAllHandler))
 		router.Handle("POST /events/{id}/replay/{subscriberId}", routeHandler(slurpee, eventReplaySubscriberHandler))
+		router.Handle("GET /events/stream/missed", routeHandler(slurpee, eventsMissedHandler))
 		router.Handle("GET /events/stream", routeHandler(slurpee, eventsStreamHandler))
 		router.Handle("GET /events", routeHandler(slurpee, eventsListHandler))
 		router.Handle("GET /events/{id}", routeHandler(slurpee, eventDetailHandler))
@@ -416,6 +417,56 @@ func eventCreateSubmitHandler(slurpee *app.Application, w http.ResponseWriter, r
 
 	// Redirect to the newly created event detail page
 	http.Redirect(w, r, "/events/"+pgtypeUUIDToString(event.ID), http.StatusSeeOther)
+}
+
+func eventsMissedHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
+	afterStr := r.URL.Query().Get("after")
+	if afterStr == "" {
+		http.Error(w, "Missing 'after' parameter", http.StatusBadRequest)
+		return
+	}
+	nanos, err := strconv.ParseInt(afterStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid 'after' parameter", http.StatusBadRequest)
+		return
+	}
+	ts := time.Unix(0, nanos).UTC()
+
+	filters := parseFilters(r)
+	params := db.ListEventsAfterTimestampParams{
+		AfterTimestamp: pgtype.Timestamptz{Time: ts, Valid: true},
+	}
+	if filters.Subject != "" {
+		params.SubjectFilter = "%" + filters.Subject + "%"
+	}
+	if filters.Status != "" {
+		params.StatusFilter = filters.Status
+	}
+	if filters.Content != "" && json.Valid([]byte(filters.Content)) {
+		params.DataFilter = []byte(filters.Content)
+	}
+
+	events, err := slurpee.DB.ListEventsAfterTimestamp(r.Context(), params)
+	if err != nil {
+		log(r.Context()).Error("Error fetching missed events", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	rows := make([]EventRow, len(events))
+	for i, e := range events {
+		rows[i] = EventRow{
+			ID:             pgtypeUUIDToString(e.ID),
+			Subject:        e.Subject,
+			Timestamp:      e.Timestamp.Time.Format("2006-01-02 15:04:05 MST"),
+			DeliveryStatus: e.DeliveryStatus,
+		}
+	}
+
+	if err := MissedEventsRows(rows).Render(r.Context(), w); err != nil {
+		log(r.Context()).Error("Error rendering missed events rows", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 func eventsStreamHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {

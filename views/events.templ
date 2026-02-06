@@ -200,12 +200,24 @@ templ eventsTableAndPagination(events []EventRow, page int, hasNext bool, subjec
 	</div>
 }
 
+templ MissedEventsRows(events []EventRow) {
+	for _, event := range events {
+		<tr class="hover cursor-pointer bg-info/10" data-event-id={ event.ID } onclick={ goToEvent(event.ID) }>
+			<td class="font-mono">{ event.Subject }</td>
+			<td class="font-mono text-sm">{ truncateID(event.ID) }</td>
+			<td>{ event.Timestamp }</td>
+			<td><span class={ statusBadgeClass(event.DeliveryStatus) }>{ event.DeliveryStatus }</span></td>
+		</tr>
+	}
+}
+
 templ liveStreamScript() {
 	<script>
 		(function() {
 			var evtSource = null;
 			var isLive = false;
 			var MAX_ROWS = 100;
+			var lastReconnectNanos = null;
 
 			function getFilterForm() {
 				return document.querySelector('form[hx-get="/events"]');
@@ -317,12 +329,77 @@ templ liveStreamScript() {
 				}, 3000);
 			}
 
+			function showMissedBanner(count, afterNanos) {
+				removeMissedBanner();
+				var tbody = document.querySelector('#events-results tbody');
+				if (!tbody) return;
+				var tr = document.createElement('tr');
+				tr.id = 'missed-banner';
+				var td = document.createElement('td');
+				td.setAttribute('colspan', '4');
+				td.className = 'py-3 px-4 bg-warning/20 text-warning-content';
+				td.innerHTML = '<div class="flex items-center justify-between">' +
+					'<span>You missed <strong>' + count + '</strong> event' + (count !== 1 ? 's' : '') + ' while away</span>' +
+					'<div class="flex gap-2">' +
+					'<button class="btn btn-warning btn-xs" id="load-missed-btn">Load</button>' +
+					'<button class="btn btn-ghost btn-xs" id="dismiss-missed-btn">\u2715</button>' +
+					'</div></div>';
+				tbody.insertBefore(tr, tbody.firstChild);
+
+				document.getElementById('load-missed-btn').addEventListener('click', function() {
+					loadMissedEvents(afterNanos);
+				});
+				document.getElementById('dismiss-missed-btn').addEventListener('click', function() {
+					removeMissedBanner();
+				});
+			}
+
+			function removeMissedBanner() {
+				var banner = document.getElementById('missed-banner');
+				if (banner) banner.parentNode.removeChild(banner);
+			}
+
+			function loadMissedEvents(afterNanos) {
+				removeMissedBanner();
+				var url = '/events/stream/missed?after=' + afterNanos;
+				var params = getFilterParams();
+				if (params) url += '&' + params;
+
+				fetch(url)
+					.then(function(resp) { return resp.text(); })
+					.then(function(html) {
+						if (!html.trim()) return;
+						var tbody = document.querySelector('#events-results tbody');
+						if (!tbody) return;
+						// Remove "Waiting for events..." placeholder if present
+						var placeholder = tbody.querySelector('td[colspan="4"]');
+						if (placeholder) {
+							placeholder.closest('tr').remove();
+						}
+						// Insert missed rows at the top of the table
+						var temp = document.createElement('tbody');
+						temp.innerHTML = html;
+						var rows = Array.prototype.slice.call(temp.children);
+						for (var i = rows.length - 1; i >= 0; i--) {
+							tbody.insertBefore(rows[i], tbody.firstChild);
+						}
+						// Enforce max rows
+						while (tbody.children.length > MAX_ROWS) {
+							tbody.removeChild(tbody.lastChild);
+						}
+					});
+			}
+
 			function reconnectWithFilters() {
 				// Close existing connection
 				if (evtSource) {
 					evtSource.close();
 					evtSource = null;
 				}
+
+				// Reset reconnection state
+				lastReconnectNanos = null;
+				removeMissedBanner();
 
 				// Clear table for fresh stream
 				var tbody = document.querySelector('#events-results tbody');
@@ -346,6 +423,14 @@ templ liveStreamScript() {
 					var data;
 					try { data = JSON.parse(e.data); } catch (_) { return; }
 
+					// Track last event ID for reconnection
+					if (e.lastEventId) {
+						var parts = e.lastEventId.split(':');
+						if (parts.length === 2) {
+							lastReconnectNanos = parts[1];
+						}
+					}
+
 					if (data.type === 'created') {
 						var tbody = document.querySelector('#events-results tbody');
 						if (!receivedFirst) {
@@ -355,7 +440,13 @@ templ liveStreamScript() {
 
 						var row = createEventRow(data);
 						if (tbody) {
-							tbody.insertBefore(row, tbody.firstChild);
+							// Insert after the missed banner if present
+							var banner = document.getElementById('missed-banner');
+							if (banner && banner.nextSibling) {
+								tbody.insertBefore(row, banner.nextSibling);
+							} else {
+								tbody.insertBefore(row, tbody.firstChild);
+							}
 							while (tbody.children.length > MAX_ROWS) {
 								tbody.removeChild(tbody.lastChild);
 							}
@@ -366,6 +457,15 @@ templ liveStreamScript() {
 						showDeliveryToast(data);
 					}
 				};
+
+				// Listen for named 'missed' events (reconnection indicator)
+				source.addEventListener('missed', function(e) {
+					var data;
+					try { data = JSON.parse(e.data); } catch (_) { return; }
+					if (data.count && data.count > 0 && lastReconnectNanos) {
+						showMissedBanner(data.count, lastReconnectNanos);
+					}
+				});
 
 				source.onerror = function() {
 					// EventSource auto-reconnects; no action needed
