@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -61,6 +62,20 @@ func LogEvent(ctx context.Context, slurpee *app.Application, event db.Event) {
 }
 
 func createEventHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
+	// Validate API secret
+	secretHeader := r.Header.Get("X-Slurpee-Secret")
+	if secretHeader == "" {
+		slog.Warn("Missing API secret on POST /api/events", "remote_addr", r.RemoteAddr)
+		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Missing or invalid API secret"})
+		return
+	}
+	matchedSecret, err := app.ValidateSecret(r.Context(), slurpee.DB, secretHeader)
+	if err != nil {
+		slog.Warn("Invalid API secret on POST /api/events", "remote_addr", r.RemoteAddr)
+		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Missing or invalid API secret"})
+		return
+	}
+
 	var req CreateEventRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJsonResponse(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
@@ -69,6 +84,13 @@ func createEventHandler(slurpee *app.Application, w http.ResponseWriter, r *http
 
 	if req.Subject == "" {
 		writeJsonResponse(w, http.StatusBadRequest, map[string]string{"error": "subject is required"})
+		return
+	}
+
+	// Check subject against secret's subject_pattern
+	if !app.CheckSendScope(matchedSecret.SubjectPattern, req.Subject) {
+		slog.Warn("Subject not in scope for API secret", "remote_addr", r.RemoteAddr, "subject", req.Subject, "pattern", matchedSecret.SubjectPattern)
+		writeJsonResponse(w, http.StatusForbidden, map[string]string{"error": "Subject not permitted by API secret scope"})
 		return
 	}
 
@@ -141,6 +163,19 @@ func createEventHandler(slurpee *app.Application, w http.ResponseWriter, r *http
 }
 
 func getEventHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
+	// Validate API secret (read-only, any scope)
+	secretHeader := r.Header.Get("X-Slurpee-Secret")
+	if secretHeader == "" {
+		slog.Warn("Missing API secret on GET /api/events/{id}", "remote_addr", r.RemoteAddr)
+		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Missing or invalid API secret"})
+		return
+	}
+	if _, err := app.ValidateSecret(r.Context(), slurpee.DB, secretHeader); err != nil {
+		slog.Warn("Invalid API secret on GET /api/events/{id}", "remote_addr", r.RemoteAddr)
+		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Missing or invalid API secret"})
+		return
+	}
+
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {
