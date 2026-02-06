@@ -1,0 +1,51 @@
+package views
+
+templ LoginPage(errorMsg string) {
+	<!DOCTYPE html>
+	<html lang="en" data-theme="dark">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Login: Slurpee</title>
+			<link href="/static/daisyui.css" rel="stylesheet" type="text/css"/>
+			<script src="/static/tailwind.js"></script>
+			<link href="/static/theme.css" rel="stylesheet" type="text/css"/>
+		</head>
+		<body class="bg-base-100">
+			<div class="flex items-center justify-center min-h-screen">
+				<div class="card w-96 bg-base-200 shadow-xl">
+					<div class="card-body">
+						<div class="flex justify-center mb-4">
+							<img src="/static/slurpee-logo.png" alt="Slurpee" class="h-12"/>
+						</div>
+						<h2 class="card-title justify-center mb-4">Sign In</h2>
+						if errorMsg != "" {
+							<div class="alert alert-error mb-4">
+								<span>{ errorMsg }</span>
+							</div>
+						}
+						<form method="POST" action="/login">
+							<div class="form-control mb-4">
+								<label class="label" for="secret">
+									<span class="label-text">API Secret</span>
+								</label>
+								<input
+									type="password"
+									name="secret"
+									id="secret"
+									placeholder="Enter your API secret"
+									class="input input-bordered w-full"
+									required
+									autofocus
+								/>
+							</div>
+							<div class="form-control mt-6">
+								<button type="submit" class="btn btn-primary w-full">Sign In</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			</div>
+		</body>
+	</html>
+}
