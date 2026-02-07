@@ -68,7 +68,7 @@
         "All tests pass (`go test ./api/...`)"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "API handlers take (slurpee *app.Application, w, r). Construct Application with mock DB. ValidateSecretByID is called on the Querier. DeliveryChan is a buffered channel on Application — read from it to verify event dispatch."
     },
     {
@@ -84,7 +84,7 @@
         "All tests pass (`go test ./api/...`)"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "GET endpoint validates secret but does not check scope (read-only, any valid secret works)."
     },
     {

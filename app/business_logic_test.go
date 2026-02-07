@@ -16,16 +16,16 @@ func TestCheckSendScope(t *testing.T) {
 	}{
 		{"exact match", "events.user.created", "events.user.created", true},
 		{"no match", "events.user.created", "events.order.created", false},
-		{"percent wildcard matches suffix", "events.%", "events.user.created", true},
-		{"percent wildcard matches prefix", "%created", "events.user.created", true},
-		{"percent wildcard matches all", "%", "anything.goes.here", true},
+		{"glob wildcard matches suffix", "events.*", "events.user.created", true},
+		{"glob wildcard matches prefix", "*created", "events.user.created", true},
+		{"glob wildcard matches all", "*", "anything.goes.here", true},
 		{"underscore single char", "events._", "events.x", true},
 		{"underscore no match empty", "events._", "events.", false},
 		{"underscore no match multiple", "events._", "events.xy", false},
 		{"empty pattern empty subject", "", "", true},
 		{"empty pattern non-empty subject", "", "something", false},
-		{"non-empty pattern empty subject", "events.%", "", false},
-		{"percent matches empty string", "events.%", "events.", true},
+		{"non-empty pattern empty subject", "events.*", "", false},
+		{"glob matches empty string", "events.*", "events.", true},
 	}
 
 	for _, tt := range tests {
@@ -43,15 +43,15 @@ func TestMatchLikePattern(t *testing.T) {
 		value    string
 		expected bool
 	}{
-		// Percent wildcard
-		{"percent at end", "abc%", "abcdef", true},
-		{"percent at start", "%def", "abcdef", true},
-		{"percent in middle", "abc%def", "abcXYZdef", true},
-		{"percent matches empty", "abc%", "abc", true},
-		{"multiple percent", "%abc%def%", "XXabcYYdefZZ", true},
-		{"consecutive percent", "a%%b", "aXb", true},
-		{"only percent", "%", "anything", true},
-		{"percent matches empty string", "%", "", true},
+		// Glob wildcard
+		{"glob at end", "abc*", "abcdef", true},
+		{"glob at start", "*def", "abcdef", true},
+		{"glob in middle", "abc*def", "abcXYZdef", true},
+		{"glob matches empty", "abc*", "abc", true},
+		{"multiple glob", "*abc*def*", "XXabcYYdefZZ", true},
+		{"consecutive glob", "a**b", "aXb", true},
+		{"only glob", "*", "anything", true},
+		{"glob matches empty string", "*", "", true},
 
 		// Underscore wildcard
 		{"underscore matches one char", "a_c", "abc", true},
@@ -60,8 +60,8 @@ func TestMatchLikePattern(t *testing.T) {
 		{"multiple underscores", "a__c", "abbc", true},
 
 		// Combined wildcards
-		{"percent and underscore", "a_%", "abcdef", true},
-		{"underscore and percent", "_bc%", "abcdef", true},
+		{"glob and underscore", "a_*", "abcdef", true},
+		{"underscore and glob", "_bc*", "abcdef", true},
 
 		// No wildcards (literal match)
 		{"exact match", "abc", "abc", true},

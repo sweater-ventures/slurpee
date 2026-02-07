@@ -8,6 +8,9 @@ Started: Fri Feb  6 21:16:06 MST 2026
 - Functions that accept a DB parameter should use `db.Querier` interface type, not `*db.Queries`
 - `go build ./...` is the primary quality check; `go vet ./...` for additional static analysis
 - Unexported functions (`matchesFilter`, `calculateBackoff`) require `package app` test files, not `package app_test`
+- API handler tests: use `callHandler(t, slurpee, handler, req)` helper wrapping `routeHandler` — no full server needed
+- Happy-path POST /events tests must mock `GetLogConfigBySubject` (called by `LogEvent`) — return error to skip
+- GET handler tests need `req.SetPathValue("id", ...)` since `callHandler` bypasses the mux router
 
 ---
 
@@ -47,4 +50,41 @@ Started: Fri Feb  6 21:16:06 MST 2026
   - `matchesFilter` and `calculateBackoff` are unexported — tests must use `package app` (not `package app_test`) to access them
   - `matchesFilter` uses JSON marshal/unmarshal for type-safe comparison, so nested objects match correctly
   - `calculateBackoff` uses `math.Pow(2, attemptNum)` — attempt 0 = 1s, attempt 1 = 2s, etc.
+---
+
+## 2026-02-07 8:47 AM - US-004
+- Created `api/events_test.go` with 10 tests for POST /api/events endpoint
+- `TestCreateEvent_MissingSecretHeaders` — 401 when no X-Slurpee-Secret-ID header
+- `TestCreateEvent_MissingSecretValue` — 401 when X-Slurpee-Secret-ID present but no X-Slurpee-Secret
+- `TestCreateEvent_InvalidSecretIDFormat` — 400 when secret ID is not a valid UUID
+- `TestCreateEvent_WrongSecretValue` — 401 when bcrypt comparison fails (uses NewApiSecretWithHash)
+- `TestCreateEvent_SubjectOutOfScope` — 403 when subject doesn't match secret's subject_pattern
+- `TestCreateEvent_MissingSubject` — 400 when subject field is empty
+- `TestCreateEvent_MissingData` — 400 when data field is missing
+- `TestCreateEvent_InvalidJSONBody` — 400 when request body is nil/empty
+- `TestCreateEvent_Success` — 201 with correct response fields, event on DeliveryChan
+- `TestCreateEvent_SuccessResponseFormat` — verifies full EventResponse structure including timestamp, retry_count, data
+- Files changed: `api/events_test.go`
+- **Learnings for future iterations:**
+  - API handler tests use `callHandler` helper that wraps `routeHandler(slurpee, handler)` — avoids needing full HTTP server setup
+  - `LogEvent` calls `GetLogConfigBySubject` — must mock this in happy-path tests (return error to skip logging)
+  - `PublishCreatedEvent` publishes to EventBus which is safe with no subscribers in test
+  - `NewApiSecretWithHash("plaintext")` creates real bcrypt hash — pair with exact plaintext in `WithSecretHeaders`
+  - `mock.AnythingOfType("db.InsertEventParams")` matches the InsertEvent call without requiring exact param match
+---
+
+## 2026-02-07 8:50 AM - US-005
+- Created 6 tests for GET /api/events/{id} endpoint in `api/events_test.go`
+- `TestGetEvent_MissingSecretHeaders` — 401 when no X-Slurpee-Secret-ID header
+- `TestGetEvent_InvalidSecretIDFormat` — 400 when secret ID is not a valid UUID
+- `TestGetEvent_WrongSecretValue` — 401 when bcrypt comparison fails
+- `TestGetEvent_NonexistentEvent` — 404 when `GetEventByID` returns `pgx.ErrNoRows`
+- `TestGetEvent_Success` — 200 with correct event fields (ID, subject, status, retry count, data)
+- `TestGetEvent_SuccessResponseFormat` — verifies full EventResponse structure including TraceID and StatusUpdatedAt
+- Files changed: `api/events_test.go`
+- **Learnings for future iterations:**
+  - GET handler uses `r.PathValue("id")` which requires `req.SetPathValue("id", ...)` in tests since `callHandler` bypasses the mux
+  - GET endpoint does NOT check scope — any valid secret can read any event (read-only access)
+  - Added `pgx/v5` import for `pgx.ErrNoRows` in test file
+  - `eventToResponse` correctly handles optional TraceID and StatusUpdatedAt fields — test both present and absent cases
 ---
