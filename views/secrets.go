@@ -36,7 +36,7 @@ func loadSubscriberOptions(slurpee *app.Application, r *http.Request) ([]Subscri
 	return options, nil
 }
 
-func renderSecretsPage(slurpee *app.Application, w http.ResponseWriter, r *http.Request, successMsg, errorMsg, plaintextSecret string) {
+func renderSecretsPage(slurpee *app.Application, w http.ResponseWriter, r *http.Request, successMsg, errorMsg, createdSecretID, plaintextSecret string) {
 	secrets, err := slurpee.DB.ListApiSecrets(r.Context())
 	if err != nil {
 		log(r.Context()).Error("Error listing API secrets", "err", err)
@@ -62,19 +62,19 @@ func renderSecretsPage(slurpee *app.Application, w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := SecretsListTemplate(rows, subOptions, successMsg, errorMsg, plaintextSecret).Render(r.Context(), w); err != nil {
+	if err := SecretsListTemplate(rows, subOptions, successMsg, errorMsg, createdSecretID, plaintextSecret).Render(r.Context(), w); err != nil {
 		log(r.Context()).Error("Error rendering secrets list view", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
 func secretsListHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
-	renderSecretsPage(slurpee, w, r, "", "", "")
+	renderSecretsPage(slurpee, w, r, "", "", "", "")
 }
 
 func secretCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		renderSecretsPage(slurpee, w, r, "", "Invalid form data", "")
+		renderSecretsPage(slurpee, w, r, "", "Invalid form data", "", "")
 		return
 	}
 
@@ -83,7 +83,7 @@ func secretCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 	subscriberIDs := r.Form["subscriber_ids"]
 
 	if name == "" || subjectPattern == "" {
-		renderSecretsPage(slurpee, w, r, "", "Name and subject pattern are required", "")
+		renderSecretsPage(slurpee, w, r, "", "Name and subject pattern are required", "", "")
 		return
 	}
 
@@ -92,7 +92,7 @@ func secretCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 		subscribers, err := slurpee.DB.ListSubscribers(r.Context())
 		if err != nil {
 			log(r.Context()).Error("Error listing subscribers for validation", "err", err)
-			renderSecretsPage(slurpee, w, r, "", "Internal error", "")
+			renderSecretsPage(slurpee, w, r, "", "Internal error", "", "")
 			return
 		}
 		subMap := make(map[string]string) // id -> endpoint_url
@@ -110,7 +110,7 @@ func secretCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 			if hostPort == "" {
 				hostPort = hp
 			} else if hp != hostPort {
-				renderSecretsPage(slurpee, w, r, "", "All selected subscribers must share the same host:port", "")
+				renderSecretsPage(slurpee, w, r, "", "All selected subscribers must share the same host:port", "", "")
 				return
 			}
 		}
@@ -120,14 +120,14 @@ func secretCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 	plaintext, err := app.GenerateSecret()
 	if err != nil {
 		log(r.Context()).Error("Error generating secret", "err", err)
-		renderSecretsPage(slurpee, w, r, "", "Failed to generate secret", "")
+		renderSecretsPage(slurpee, w, r, "", "Failed to generate secret", "", "")
 		return
 	}
 
 	hash, err := app.HashSecret(plaintext)
 	if err != nil {
 		log(r.Context()).Error("Error hashing secret", "err", err)
-		renderSecretsPage(slurpee, w, r, "", "Failed to create secret", "")
+		renderSecretsPage(slurpee, w, r, "", "Failed to create secret", "", "")
 		return
 	}
 
@@ -140,7 +140,7 @@ func secretCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 	})
 	if err != nil {
 		log(r.Context()).Error("Error inserting API secret", "err", err)
-		renderSecretsPage(slurpee, w, r, "", "Failed to create secret", "")
+		renderSecretsPage(slurpee, w, r, "", "Failed to create secret", "", "")
 		return
 	}
 
@@ -156,7 +156,7 @@ func secretCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 		})
 	}
 
-	renderSecretsPage(slurpee, w, r, "", "", plaintext)
+	renderSecretsPage(slurpee, w, r, "", "", pgtypeUUIDToString(secretID), plaintext)
 }
 
 func secretDeleteHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
