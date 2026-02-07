@@ -15,7 +15,7 @@
         "All existing code compiles without errors (`go build ./...`)"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -32,7 +32,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -48,7 +48,7 @@
         "Tests are table-driven where appropriate"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "matchesFilter and calculateBackoff are unexported — test from within app package (package app, not app_test)"
     },
     {

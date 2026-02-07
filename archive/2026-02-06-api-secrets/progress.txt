@@ -1,0 +1,21 @@
+# Ralph Progress Log
+Started: Fri Feb  6 20:48:00 MST 2026
+---
+
+## Codebase Patterns
+- Migrations use `-- +migrate Up/Down` markers and timestamp-prefixed filenames (e.g., `20260206140000-description.sql`)
+- Always use `IF NOT EXISTS` for CREATE TABLE/INDEX in migrations
+- sqlc queries go in `queries/<table_name>.sql` with `-- name: FunctionName :one/:many/:exec` annotations
+- Cast COALESCE/string_agg results to `::text` so sqlc generates `string` type instead of `interface{}`
+- sqlc config uses pgx/v5 with emit_prepared_queries and various type overrides for timestamps/text
+- Use `ON CONFLICT DO NOTHING` for idempotent join table inserts
+- Foreign keys use `ON DELETE CASCADE` for join tables
+- Session auth middleware exempts /login, /static/*, /version, /api/* routes
+- Use `middleware.GetSessionFromContext(ctx)` to get session info in handlers
+- templ templates regenerated via `templ generate` — produces *_templ.go files
+- templ templates have implicit `ctx` variable — use Go helper functions in same package to access context (e.g., session scope checks)
+- Scope helpers in views/scope_helpers.go: isSubscriberEditable, isSubjectInScope, isSessionAdmin
+- API handlers use signature: `func(slurpee *app.Application, w http.ResponseWriter, r *http.Request)`
+- Route registration via init() + registerRoute pattern in api/ and views/ packages
+- Application.DB is the database interface (db.Querier after US-001 refactor)
+- API auth: X-Slurpee-Secret-ID + X-Slurpee-Secret headers for event endpoints, X-Slurpee-Admin-Secret for subscriber endpoints
