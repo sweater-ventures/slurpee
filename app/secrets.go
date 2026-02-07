@@ -58,8 +58,8 @@ func CheckSendScope(subjectPattern, subject string) bool {
 	return MatchLikePattern(subjectPattern, subject)
 }
 
-// MatchLikePattern implements SQL LIKE semantics in Go.
-// % matches any sequence of characters (including empty).
+// MatchLikePattern implements glob-style matching in Go.
+// * matches any sequence of characters (including empty).
 // _ matches exactly one character.
 func MatchLikePattern(pattern, value string) bool {
 	return matchLike(pattern, 0, value, 0)
@@ -68,9 +68,9 @@ func MatchLikePattern(pattern, value string) bool {
 func matchLike(pattern string, pi int, value string, vi int) bool {
 	for pi < len(pattern) {
 		switch pattern[pi] {
-		case '%':
-			// Skip consecutive % characters
-			for pi < len(pattern) && pattern[pi] == '%' {
+		case '*':
+			// Skip consecutive * characters
+			for pi < len(pattern) && pattern[pi] == '*' {
 				pi++
 			}
 			if pi == len(pattern) {

@@ -89,7 +89,7 @@ func NewApiSecret(opts ...ApiSecretOpt) db.ApiSecret {
 		ID:             NewUUID(),
 		Name:           "test-secret",
 		SecretHash:     "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012", // placeholder hash
-		SubjectPattern: "%",
+		SubjectPattern: "*",
 		CreatedAt:      NewTimestamp(),
 	}
 	for _, opt := range opts {

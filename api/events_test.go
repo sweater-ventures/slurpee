@@ -74,7 +74,7 @@ func TestCreateEvent_WrongSecretValue(t *testing.T) {
 	secretID := uuid.Must(uuid.NewV7())
 	secret := testutil.NewApiSecretWithHash("correct-secret", func(s *db.ApiSecret) {
 		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
-		s.SubjectPattern = "%"
+		s.SubjectPattern = "*"
 	})
 
 	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
@@ -97,7 +97,7 @@ func TestCreateEvent_SubjectOutOfScope(t *testing.T) {
 	secretID := uuid.Must(uuid.NewV7())
 	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
 		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
-		s.SubjectPattern = "orders.%"
+		s.SubjectPattern = "orders.*"
 	})
 
 	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
@@ -120,7 +120,7 @@ func TestCreateEvent_MissingSubject(t *testing.T) {
 	secretID := uuid.Must(uuid.NewV7())
 	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
 		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
-		s.SubjectPattern = "%"
+		s.SubjectPattern = "*"
 	})
 
 	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
@@ -142,7 +142,7 @@ func TestCreateEvent_MissingData(t *testing.T) {
 	secretID := uuid.Must(uuid.NewV7())
 	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
 		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
-		s.SubjectPattern = "%"
+		s.SubjectPattern = "*"
 	})
 
 	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
@@ -164,7 +164,7 @@ func TestCreateEvent_InvalidJSONBody(t *testing.T) {
 	secretID := uuid.Must(uuid.NewV7())
 	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
 		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
-		s.SubjectPattern = "%"
+		s.SubjectPattern = "*"
 	})
 
 	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
@@ -185,7 +185,7 @@ func TestCreateEvent_Success(t *testing.T) {
 	secretID := uuid.Must(uuid.NewV7())
 	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
 		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
-		s.SubjectPattern = "%"
+		s.SubjectPattern = "*"
 	})
 
 	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
@@ -263,7 +263,7 @@ func TestGetEvent_WrongSecretValue(t *testing.T) {
 	secretID := uuid.Must(uuid.NewV7())
 	secret := testutil.NewApiSecretWithHash("correct-secret", func(s *db.ApiSecret) {
 		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
-		s.SubjectPattern = "%"
+		s.SubjectPattern = "*"
 	})
 
 	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
@@ -285,7 +285,7 @@ func TestGetEvent_NonexistentEvent(t *testing.T) {
 	secretID := uuid.Must(uuid.NewV7())
 	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
 		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
-		s.SubjectPattern = "%"
+		s.SubjectPattern = "*"
 	})
 
 	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
@@ -311,7 +311,7 @@ func TestGetEvent_Success(t *testing.T) {
 	secretID := uuid.Must(uuid.NewV7())
 	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
 		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
-		s.SubjectPattern = "%"
+		s.SubjectPattern = "*"
 	})
 
 	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
@@ -353,7 +353,7 @@ func TestGetEvent_SuccessResponseFormat(t *testing.T) {
 	secretID := uuid.Must(uuid.NewV7())
 	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
 		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
-		s.SubjectPattern = "%"
+		s.SubjectPattern = "*"
 	})
 
 	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
@@ -402,7 +402,7 @@ func TestCreateEvent_SuccessResponseFormat(t *testing.T) {
 	secretID := uuid.Must(uuid.NewV7())
 	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
 		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
-		s.SubjectPattern = "%"
+		s.SubjectPattern = "*"
 	})
 
 	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
