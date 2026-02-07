@@ -27,4 +27,13 @@
 | #527 | " | 🔵 | Sqlc-Generated Subscriber and Subscription Query Functions | ~605 |
 | #511 | 4:27 PM | 🔵 | Generated sqlc model structs for all database tables | ~409 |
 | #510 | " | 🔵 | Generated sqlc code for subscriber and subscription queries | ~486 |
+
+### Feb 6, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #1053 | 9:21 PM | 🔵 | sqlc-generated row types for complex query results | ~409 |
+| #1051 | " | 🔵 | sqlc-generated database query wrapper structure | ~402 |
+| #1035 | 9:18 PM | 🔵 | sqlc-generated database model types | ~426 |
+| #1033 | " | 🔵 | sqlc-generated Querier interface structure | ~407 |
 </claude-mem-context>

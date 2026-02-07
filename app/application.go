@@ -10,7 +10,7 @@ import (
 
 type Application struct {
 	Config       config.AppConfig
-	DB           *db.Queries
+	DB           db.Querier
 	DeliveryChan chan db.Event
 	EventBus     *EventBus
 	Sessions     *SessionStore

@@ -18,4 +18,14 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #625 | 7:20 PM | 🔵 | Application Structure with Buffered Delivery Channel | ~407 |
+
+### Feb 6, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #1047 | 9:21 PM | 🔵 | In-memory session storage for web UI authentication | ~425 |
+| #1046 | 9:20 PM | 🔵 | Helper function for UUID conversion | ~230 |
+| #1045 | " | 🔵 | In-memory EventBus for real-time SSE updates | ~474 |
+| #1043 | " | 🔵 | API secret generation, validation, and SQL LIKE pattern matching | ~530 |
+| #1037 | 9:19 PM | 🔵 | Application struct architecture for dependency injection | ~412 |
 </claude-mem-context>
