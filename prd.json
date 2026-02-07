@@ -84,7 +84,7 @@
         "All tests pass (`go test ./api/...`)"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "GET endpoint validates secret but does not check scope (read-only, any valid secret works)."
     },
     {

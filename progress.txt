@@ -10,6 +10,7 @@ Started: Fri Feb  6 21:16:06 MST 2026
 - Unexported functions (`matchesFilter`, `calculateBackoff`) require `package app` test files, not `package app_test`
 - API handler tests: use `callHandler(t, slurpee, handler, req)` helper wrapping `routeHandler` — no full server needed
 - Happy-path POST /events tests must mock `GetLogConfigBySubject` (called by `LogEvent`) — return error to skip
+- GET handler tests need `req.SetPathValue("id", ...)` since `callHandler` bypasses the mux router
 
 ---
 
@@ -70,4 +71,20 @@ Started: Fri Feb  6 21:16:06 MST 2026
   - `PublishCreatedEvent` publishes to EventBus which is safe with no subscribers in test
   - `NewApiSecretWithHash("plaintext")` creates real bcrypt hash — pair with exact plaintext in `WithSecretHeaders`
   - `mock.AnythingOfType("db.InsertEventParams")` matches the InsertEvent call without requiring exact param match
+---
+
+## 2026-02-07 8:50 AM - US-005
+- Created 6 tests for GET /api/events/{id} endpoint in `api/events_test.go`
+- `TestGetEvent_MissingSecretHeaders` — 401 when no X-Slurpee-Secret-ID header
+- `TestGetEvent_InvalidSecretIDFormat` — 400 when secret ID is not a valid UUID
+- `TestGetEvent_WrongSecretValue` — 401 when bcrypt comparison fails
+- `TestGetEvent_NonexistentEvent` — 404 when `GetEventByID` returns `pgx.ErrNoRows`
+- `TestGetEvent_Success` — 200 with correct event fields (ID, subject, status, retry count, data)
+- `TestGetEvent_SuccessResponseFormat` — verifies full EventResponse structure including TraceID and StatusUpdatedAt
+- Files changed: `api/events_test.go`
+- **Learnings for future iterations:**
+  - GET handler uses `r.PathValue("id")` which requires `req.SetPathValue("id", ...)` in tests since `callHandler` bypasses the mux
+  - GET endpoint does NOT check scope — any valid secret can read any event (read-only access)
+  - Added `pgx/v5` import for `pgx.ErrNoRows` in test file
+  - `eventToResponse` correctly handles optional TraceID and StatusUpdatedAt fields — test both present and absent cases
 ---
