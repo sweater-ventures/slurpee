@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sweater-ventures/slurpee/app"
 	"github.com/sweater-ventures/slurpee/db"
-	"github.com/sweater-ventures/slurpee/middleware"
 )
 
 func init() {
@@ -19,15 +18,6 @@ func init() {
 		router.Handle("GET /secrets/{id}/edit", routeHandler(slurpee, secretEditHandler))
 		router.Handle("POST /secrets/{id}/edit", routeHandler(slurpee, secretUpdateHandler))
 	})
-}
-
-func requireAdmin(w http.ResponseWriter, r *http.Request) bool {
-	session := middleware.GetSessionFromContext(r.Context())
-	if session == nil || !session.IsAdmin {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return false
-	}
-	return true
 }
 
 func loadSubscriberOptions(slurpee *app.Application, r *http.Request) ([]SubscriberOption, error) {
@@ -79,17 +69,10 @@ func renderSecretsPage(slurpee *app.Application, w http.ResponseWriter, r *http.
 }
 
 func secretsListHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
-	if !requireAdmin(w, r) {
-		return
-	}
 	renderSecretsPage(slurpee, w, r, "", "", "")
 }
 
 func secretCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
-	if !requireAdmin(w, r) {
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		renderSecretsPage(slurpee, w, r, "", "Invalid form data", "")
 		return
@@ -177,10 +160,6 @@ func secretCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 }
 
 func secretDeleteHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
-	if !requireAdmin(w, r) {
-		return
-	}
-
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {
@@ -199,10 +178,6 @@ func secretDeleteHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 }
 
 func secretEditHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
-	if !requireAdmin(w, r) {
-		return
-	}
-
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {
@@ -222,10 +197,6 @@ func secretEditHandler(slurpee *app.Application, w http.ResponseWriter, r *http.
 }
 
 func secretUpdateHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
-	if !requireAdmin(w, r) {
-		return
-	}
-
 	idStr := r.PathValue("id")
 	parsed, err := uuid.Parse(idStr)
 	if err != nil {

@@ -1,10 +1,8 @@
 package views
 
 import (
-	"log/slog"
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sweater-ventures/slurpee/app"
 )
 
@@ -31,61 +29,17 @@ func loginSubmitHandler(slurpee *app.Application, w http.ResponseWriter, r *http
 		return
 	}
 
-	// Check against admin secret first
-	if slurpee.Config.AdminSecret != "" && secret == slurpee.Config.AdminSecret {
-		session := app.SessionInfo{
-			IsAdmin: true,
-		}
-		token, err := slurpee.Sessions.CreateSession(session)
-		if err != nil {
-			log(r.Context()).Error("Failed to create admin session", "err", err)
-			LoginPage("Internal error").Render(r.Context(), w)
-			return
-		}
-		http.SetCookie(w, &http.Cookie{
-			Name:     "slurpee_session",
-			Value:    token,
-			Path:     "/",
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-		})
-		http.Redirect(w, r, "/events", http.StatusSeeOther)
-		return
-	}
-
-	// Validate against stored API secrets
-	matched, err := app.ValidateSecretForLogin(r.Context(), slurpee.DB, secret)
-	if err != nil {
-		slog.Warn("Failed login attempt", "remote_addr", r.RemoteAddr)
+	if slurpee.Config.AdminSecret == "" || secret != slurpee.Config.AdminSecret {
 		LoginPage("Invalid secret").Render(r.Context(), w)
 		return
 	}
 
-	// Get subscriber IDs for this secret
-	subscribers, err := slurpee.DB.ListSubscribersForApiSecret(r.Context(), matched.ID)
+	token, err := slurpee.Sessions.CreateSession(app.SessionInfo{})
 	if err != nil {
-		log(r.Context()).Error("Failed to list subscribers for secret", "err", err)
+		log(r.Context()).Error("Failed to create admin session", "err", err)
 		LoginPage("Internal error").Render(r.Context(), w)
 		return
 	}
-
-	var subscriberIDs []pgtype.UUID
-	for _, sub := range subscribers {
-		subscriberIDs = append(subscriberIDs, sub.ID)
-	}
-
-	session := app.SessionInfo{
-		SecretID:       matched.ID,
-		SubjectPattern: matched.SubjectPattern,
-		SubscriberIDs:  subscriberIDs,
-	}
-	token, err := slurpee.Sessions.CreateSession(session)
-	if err != nil {
-		log(r.Context()).Error("Failed to create session", "err", err)
-		LoginPage("Internal error").Render(r.Context(), w)
-		return
-	}
-
 	http.SetCookie(w, &http.Cookie{
 		Name:     "slurpee_session",
 		Value:    token,

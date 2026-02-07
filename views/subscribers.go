@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sweater-ventures/slurpee/app"
 	"github.com/sweater-ventures/slurpee/db"
-	"github.com/sweater-ventures/slurpee/middleware"
 )
 
 func init() {
@@ -31,10 +30,6 @@ func subscribersListHandler(slurpee *app.Application, w http.ResponseWriter, r *
 }
 
 func subscriberCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
-	if !requireAdmin(w, r) {
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
 		return
@@ -140,11 +135,6 @@ func subscriberUpdateHandler(slurpee *app.Application, w http.ResponseWriter, r 
 	}
 	pgID := pgtype.UUID{Bytes: parsed, Valid: true}
 
-	if !checkSubscriberAccess(r, pgID) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
 		return
@@ -196,11 +186,6 @@ func subscriptionCreateHandler(slurpee *app.Application, w http.ResponseWriter, 
 		return
 	}
 	pgID := pgtype.UUID{Bytes: parsed, Valid: true}
-
-	if !checkSubscriberAccess(r, pgID) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
 
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
@@ -268,11 +253,6 @@ func subscriptionDeleteHandler(slurpee *app.Application, w http.ResponseWriter, 
 		return
 	}
 	pgID := pgtype.UUID{Bytes: parsed, Valid: true}
-
-	if !checkSubscriberAccess(r, pgID) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
 
 	subIdStr := r.PathValue("subId")
 	subParsed, err := uuid.Parse(subIdStr)
@@ -358,20 +338,3 @@ func renderSubscriberDetailWithError(slurpee *app.Application, w http.ResponseWr
 	}
 }
 
-// checkSubscriberAccess returns true if the session is admin or has the subscriber
-// in its SubscriberIDs list.
-func checkSubscriberAccess(r *http.Request, subscriberID pgtype.UUID) bool {
-	session := middleware.GetSessionFromContext(r.Context())
-	if session == nil {
-		return false
-	}
-	if session.IsAdmin {
-		return true
-	}
-	for _, sid := range session.SubscriberIDs {
-		if sid == subscriberID {
-			return true
-		}
-	}
-	return false
-}

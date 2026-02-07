@@ -15,7 +15,6 @@ import (
 	"github.com/sweater-ventures/slurpee/api"
 	"github.com/sweater-ventures/slurpee/app"
 	"github.com/sweater-ventures/slurpee/db"
-	"github.com/sweater-ventures/slurpee/middleware"
 )
 
 func init() {
@@ -205,12 +204,6 @@ func eventReplayAllHandler(slurpee *app.Application, w http.ResponseWriter, r *h
 		return
 	}
 
-	// Check scope: session must match event subject or be admin
-	if !checkEventSubjectAccess(r, event.Subject) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
-
 	// Reset event status to pending and send to delivery channel
 	slurpee.DeliveryChan <- event
 
@@ -250,12 +243,6 @@ func eventReplaySubscriberHandler(slurpee *app.Application, w http.ResponseWrite
 		}
 		log(r.Context()).Error("Error fetching event for replay", "err", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// Check scope: session must match event subject or be admin
-	if !checkEventSubjectAccess(r, event.Subject) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -361,14 +348,6 @@ func eventCreateSubmitHandler(slurpee *app.Application, w http.ResponseWriter, r
 		Data:    data,
 		TraceID: traceID,
 		Errors:  map[string]string{},
-	}
-
-	// Check subject scope
-	session := middleware.GetSessionFromContext(r.Context())
-	if session != nil && !session.IsAdmin && subject != "" {
-		if !app.CheckSendScope(session.SubjectPattern, subject) {
-			form.Errors["subject"] = "Subject not permitted by your API secret scope"
-		}
 	}
 
 	// Validate required fields
@@ -605,19 +584,6 @@ func prettyJSON(data []byte) string {
 		}
 	}
 	return string(data)
-}
-
-// checkEventSubjectAccess returns true if the session is admin or the session's
-// SubjectPattern matches the event subject.
-func checkEventSubjectAccess(r *http.Request, subject string) bool {
-	session := middleware.GetSessionFromContext(r.Context())
-	if session == nil {
-		return false
-	}
-	if session.IsAdmin {
-		return true
-	}
-	return app.CheckSendScope(session.SubjectPattern, subject)
 }
 
 func pgtypeUUIDToString(u pgtype.UUID) string {

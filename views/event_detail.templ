@@ -143,11 +143,9 @@ templ deliveryAttemptsSection(event EventDetail, attempts []DeliveryAttemptRow) 
 			Delivery Attempts
 			<span class="badge badge-ghost ml-2">{ fmt.Sprintf("%d", len(attempts)) }</span>
 		</h3>
-		if isSubjectInScope(ctx, event.Subject) {
-			<button class="btn btn-primary btn-sm" onclick="document.getElementById('replay-all-modal').showModal()">
-				Replay All
-			</button>
-		}
+		<button class="btn btn-primary btn-sm" onclick="document.getElementById('replay-all-modal').showModal()">
+			Replay All
+		</button>
 	</div>
 	if len(attempts) == 0 {
 		<div class="text-base-content/60 text-center py-8">No delivery attempts recorded</div>
@@ -196,7 +194,7 @@ templ deliveryAttemptCard(event EventDetail, attempt DeliveryAttemptRow) {
 				if attempt.RequestHeaders == "" && attempt.ResponseHeaders == "" && attempt.ResponseBody == "" {
 					<p class="text-base-content/40 text-sm">No request/response details available</p>
 				}
-				if attempt.SubscriberID != "" && isSubjectInScope(ctx, event.Subject) {
+				if attempt.SubscriberID != "" {
 					<div class="flex justify-end pt-2">
 						<button
 							class="btn btn-outline btn-sm"

@@ -5,16 +5,10 @@ import (
 	"encoding/hex"
 	"sync"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type SessionInfo struct {
-	SecretID       pgtype.UUID
-	SubjectPattern string
-	SubscriberIDs  []pgtype.UUID
-	IsAdmin        bool
-	ExpiresAt      time.Time
+	ExpiresAt time.Time
 }
 
 type SessionStore struct {

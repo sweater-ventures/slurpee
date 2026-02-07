@@ -43,22 +43,6 @@ func ValidateSecretByID(ctx context.Context, queries *db.Queries, secretID uuid.
 	return secret, nil
 }
 
-// ValidateSecretForLogin iterates all stored secret hashes and returns the matching
-// secret record, or an error if none match. Used by the login flow where the
-// caller doesn't know the secret ID.
-func ValidateSecretForLogin(ctx context.Context, queries *db.Queries, plaintext string) (db.ListAllApiSecretHashesRow, error) {
-	secrets, err := queries.ListAllApiSecretHashes(ctx)
-	if err != nil {
-		return db.ListAllApiSecretHashesRow{}, fmt.Errorf("listing secrets: %w", err)
-	}
-	for _, s := range secrets {
-		if bcrypt.CompareHashAndPassword([]byte(s.SecretHash), []byte(plaintext)) == nil {
-			return s, nil
-		}
-	}
-	return db.ListAllApiSecretHashesRow{}, fmt.Errorf("no matching secret found")
-}
-
 // CheckSubscriberScope checks if the given secret is associated with the subscriber
 // via the join table.
 func CheckSubscriberScope(ctx context.Context, queries *db.Queries, secretID pgtype.UUID, subscriberID pgtype.UUID) (bool, error) {
