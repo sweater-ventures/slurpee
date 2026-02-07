@@ -4,6 +4,56 @@
 
 package db
 
-type Querier interface{}
+import (
+	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type Querier interface {
+	AddApiSecretSubscriber(ctx context.Context, arg AddApiSecretSubscriberParams) error
+	CountEventsAfterTimestamp(ctx context.Context, arg CountEventsAfterTimestampParams) (int64, error)
+	CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error)
+	DeleteApiSecret(ctx context.Context, id pgtype.UUID) error
+	DeleteLogConfigForSubject(ctx context.Context, subject string) error
+	DeleteSubscriber(ctx context.Context, id pgtype.UUID) error
+	DeleteSubscription(ctx context.Context, id pgtype.UUID) error
+	DeleteSubscriptionsForSubscriber(ctx context.Context, subscriberID pgtype.UUID) error
+	GetApiSecretByID(ctx context.Context, id pgtype.UUID) (ApiSecret, error)
+	GetApiSecretSubscriberExists(ctx context.Context, arg GetApiSecretSubscriberExistsParams) (bool, error)
+	GetEventByID(ctx context.Context, id pgtype.UUID) (Event, error)
+	GetLogConfigBySubject(ctx context.Context, subject string) (LogConfig, error)
+	GetSubscriberByEndpointURL(ctx context.Context, endpointUrl string) (Subscriber, error)
+	GetSubscriberByID(ctx context.Context, id pgtype.UUID) (Subscriber, error)
+	GetSubscriptionsMatchingSubject(ctx context.Context, subjectPattern string) ([]Subscription, error)
+	InsertApiSecret(ctx context.Context, arg InsertApiSecretParams) (ApiSecret, error)
+	InsertDeliveryAttempt(ctx context.Context, arg InsertDeliveryAttemptParams) (DeliveryAttempt, error)
+	InsertEvent(ctx context.Context, arg InsertEventParams) (Event, error)
+	ListAllApiSecretHashes(ctx context.Context) ([]ListAllApiSecretHashesRow, error)
+	ListApiSecrets(ctx context.Context) ([]ListApiSecretsRow, error)
+	ListApiSecretsForSubscriber(ctx context.Context, subscriberID pgtype.UUID) ([]ApiSecret, error)
+	ListDeliveryAttemptsForEvent(ctx context.Context, eventID pgtype.UUID) ([]DeliveryAttempt, error)
+	ListDeliveryAttemptsForSubscriber(ctx context.Context, subscriberID pgtype.UUID) ([]DeliveryAttempt, error)
+	ListEvents(ctx context.Context, arg ListEventsParams) ([]Event, error)
+	ListEventsAfterTimestamp(ctx context.Context, arg ListEventsAfterTimestampParams) ([]Event, error)
+	ListLogConfigs(ctx context.Context) ([]LogConfig, error)
+	ListSubscribers(ctx context.Context) ([]Subscriber, error)
+	ListSubscribersForApiSecret(ctx context.Context, apiSecretID pgtype.UUID) ([]Subscriber, error)
+	ListSubscribersWithCounts(ctx context.Context) ([]ListSubscribersWithCountsRow, error)
+	ListSubscriptionsForSubscriber(ctx context.Context, subscriberID pgtype.UUID) ([]Subscription, error)
+	RemoveAllApiSecretSubscribers(ctx context.Context, apiSecretID pgtype.UUID) error
+	RemoveApiSecretSubscriber(ctx context.Context, arg RemoveApiSecretSubscriberParams) error
+	SearchEventsByDataContent(ctx context.Context, arg SearchEventsByDataContentParams) ([]Event, error)
+	SearchEventsByDateRange(ctx context.Context, arg SearchEventsByDateRangeParams) ([]Event, error)
+	SearchEventsByDeliveryStatus(ctx context.Context, arg SearchEventsByDeliveryStatusParams) ([]Event, error)
+	SearchEventsBySubject(ctx context.Context, arg SearchEventsBySubjectParams) ([]Event, error)
+	SearchEventsFiltered(ctx context.Context, arg SearchEventsFilteredParams) ([]Event, error)
+	UpdateApiSecret(ctx context.Context, arg UpdateApiSecretParams) (ApiSecret, error)
+	UpdateDeliveryAttemptStatus(ctx context.Context, arg UpdateDeliveryAttemptStatusParams) (DeliveryAttempt, error)
+	UpdateEventDeliveryStatus(ctx context.Context, arg UpdateEventDeliveryStatusParams) (Event, error)
+	UpdateSubscriber(ctx context.Context, arg UpdateSubscriberParams) (Subscriber, error)
+	UpsertLogConfig(ctx context.Context, arg UpsertLogConfigParams) (LogConfig, error)
+	UpsertSubscriber(ctx context.Context, arg UpsertSubscriberParams) (Subscriber, error)
+}
 
 var _ Querier = (*Queries)(nil)

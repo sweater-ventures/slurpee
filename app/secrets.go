@@ -32,7 +32,7 @@ func HashSecret(plaintext string) (string, error) {
 
 // ValidateSecretByID fetches a single secret by UUID and validates the plaintext
 // against its stored hash. Returns the full ApiSecret record or an error.
-func ValidateSecretByID(ctx context.Context, queries *db.Queries, secretID uuid.UUID, plaintext string) (db.ApiSecret, error) {
+func ValidateSecretByID(ctx context.Context, queries db.Querier, secretID uuid.UUID, plaintext string) (db.ApiSecret, error) {
 	secret, err := queries.GetApiSecretByID(ctx, pgtype.UUID{Bytes: secretID, Valid: true})
 	if err != nil {
 		return db.ApiSecret{}, fmt.Errorf("secret not found")
@@ -45,7 +45,7 @@ func ValidateSecretByID(ctx context.Context, queries *db.Queries, secretID uuid.
 
 // CheckSubscriberScope checks if the given secret is associated with the subscriber
 // via the join table.
-func CheckSubscriberScope(ctx context.Context, queries *db.Queries, secretID pgtype.UUID, subscriberID pgtype.UUID) (bool, error) {
+func CheckSubscriberScope(ctx context.Context, queries db.Querier, secretID pgtype.UUID, subscriberID pgtype.UUID) (bool, error) {
 	return queries.GetApiSecretSubscriberExists(ctx, db.GetApiSecretSubscriberExistsParams{
 		ApiSecretID:  secretID,
 		SubscriberID: subscriberID,
