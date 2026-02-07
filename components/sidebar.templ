@@ -10,7 +10,7 @@ templ Sidebar(currentPath string) {
 				<a
 					href="/events"
 					if isActive(currentPath, "/events") {
-						class="active"
+						class="menu-active"
 					}
 				>
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -23,7 +23,7 @@ templ Sidebar(currentPath string) {
 				<a
 					href="/subscribers"
 					if isActive(currentPath, "/subscribers") {
-						class="active"
+						class="menu-active"
 					}
 				>
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -36,7 +36,7 @@ templ Sidebar(currentPath string) {
 				<a
 					href="/logging"
 					if isActive(currentPath, "/logging") {
-						class="active"
+						class="menu-active"
 					}
 				>
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -50,7 +50,7 @@ templ Sidebar(currentPath string) {
 				<a
 					href="/secrets"
 					if isActive(currentPath, "/secrets") {
-						class="active"
+						class="menu-active"
 					}
 				>
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,5 +77,6 @@ func isActive(currentPath, linkPath string) bool {
 	if linkPath == "/" {
 		return currentPath == "/"
 	}
+	// starts with linkPath
 	return len(currentPath) >= len(linkPath) && currentPath[:len(linkPath)] == linkPath
 }

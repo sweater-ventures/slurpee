@@ -34,7 +34,7 @@ func Sidebar(currentPath string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if isActive(currentPath, "/events") {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " class=\"active\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " class=\"menu-active\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -44,7 +44,7 @@ func Sidebar(currentPath string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if isActive(currentPath, "/subscribers") {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " class=\"active\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " class=\"menu-active\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -54,7 +54,7 @@ func Sidebar(currentPath string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if isActive(currentPath, "/logging") {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " class=\"active\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " class=\"menu-active\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -64,7 +64,7 @@ func Sidebar(currentPath string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if isActive(currentPath, "/secrets") {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, " class=\"active\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, " class=\"menu-active\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -81,6 +81,7 @@ func isActive(currentPath, linkPath string) bool {
 	if linkPath == "/" {
 		return currentPath == "/"
 	}
+	// starts with linkPath
 	return len(currentPath) >= len(linkPath) && currentPath[:len(linkPath)] == linkPath
 }
 
