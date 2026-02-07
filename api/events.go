@@ -71,6 +71,7 @@ func createEventHandler(slurpee *app.Application, w http.ResponseWriter, r *http
 	}
 	secretID, err := uuid.Parse(secretIDHeader)
 	if err != nil {
+		slog.Warn("Invalid API secret ID format on POST /api/events", "remote_addr", r.RemoteAddr, "secret_id", secretIDHeader)
 		writeJsonResponse(w, http.StatusBadRequest, map[string]string{"error": "X-Slurpee-Secret-ID must be a valid UUID"})
 		return
 	}
