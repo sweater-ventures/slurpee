@@ -25,6 +25,9 @@ type AppConfig struct {
 	MaxParallel       int    `arg:"--max-parallel,env:MAX_PARALLEL" default:"1" help:"Default max parallel deliveries per subscriber."`
 	MaxRetries        int    `arg:"--max-retries,env:MAX_RETRIES" default:"5" help:"Maximum number of delivery retry attempts per subscription."`
 	MaxBackoffSeconds int    `arg:"--max-backoff-seconds,env:MAX_BACKOFF_SECONDS" default:"300" help:"Maximum backoff delay in seconds between retries (cap for exponential backoff)."`
+	DeliveryQueueSize int    `arg:"--delivery-queue-size,env:DELIVERY_QUEUE_SIZE" default:"5000" help:"Capacity of the internal delivery task queue."`
+	DeliveryWorkers   int    `arg:"--delivery-workers,env:DELIVERY_WORKERS" default:"10" help:"Number of concurrent delivery worker goroutines."`
+	DeliveryChanSize  int    `arg:"--delivery-chan-size,env:DELIVERY_CHAN_SIZE" default:"1000" help:"Buffer size of the inbound event delivery channel."`
 }
 
 func LoadConfig() (*AppConfig, error) {

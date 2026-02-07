@@ -16,7 +16,7 @@
         "go build ./... passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -34,7 +34,7 @@
         "go build ./... and go vet ./... pass"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -50,7 +50,7 @@
         "go build ./... and go vet ./... pass"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -67,7 +67,7 @@
         "go build ./... and go vet ./... pass"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -85,7 +85,7 @@
         "go build ./... and go vet ./... pass"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -103,7 +103,7 @@
         "go build ./... and go vet ./... pass"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -121,7 +121,7 @@
         "go build ./... and go vet ./... pass"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -137,7 +137,7 @@
         "go build ./... and go vet ./... pass"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -153,7 +153,7 @@
         "go build ./... and go vet ./... pass"
       ],
       "priority": 9,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
@@ -170,7 +170,7 @@
         "go build ./... and go vet ./... pass"
       ],
       "priority": 10,
-      "passes": true,
+      "passes": false,
       "notes": ""
     }
   ]

@@ -61,7 +61,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", appConfig.Port),
-		Handler: middleware.AllStandardMiddleware(router),
+		Handler: middleware.AllStandardMiddleware(middleware.SessionAuthMiddleware(slurpee)(router)),
 	}
 
 	// Listen for shutdown signals

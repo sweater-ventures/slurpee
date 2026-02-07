@@ -17,6 +17,7 @@ import (
 func init() {
 	registerRoute(func(slurpee *app.Application, router *http.ServeMux) {
 		router.Handle("GET /subscribers", routeHandler(slurpee, subscribersListHandler))
+		router.Handle("POST /subscribers", routeHandler(slurpee, subscriberCreateHandler))
 		router.Handle("PUT /subscribers/{id}", routeHandler(slurpee, subscriberUpdateHandler))
 		router.Handle("POST /subscribers/{id}/subscriptions", routeHandler(slurpee, subscriptionCreateHandler))
 		router.Handle("DELETE /subscribers/{id}/subscriptions/{subId}", routeHandler(slurpee, subscriptionDeleteHandler))
@@ -25,6 +26,53 @@ func init() {
 }
 
 func subscribersListHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
+	renderSubscribersPage(slurpee, w, r, "", "")
+}
+
+func subscriberCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	name := r.FormValue("name")
+	endpointURL := r.FormValue("endpoint_url")
+	authSecret := r.FormValue("auth_secret")
+	maxParallelStr := r.FormValue("max_parallel")
+
+	if name == "" || endpointURL == "" || authSecret == "" {
+		renderSubscribersPage(slurpee, w, r, "", "Name, endpoint URL, and auth secret are required")
+		return
+	}
+
+	maxParallel := int32(1)
+	if maxParallelStr != "" {
+		val, err := strconv.ParseInt(maxParallelStr, 10, 32)
+		if err != nil || val < 1 {
+			renderSubscribersPage(slurpee, w, r, "", "Max parallel must be a positive integer")
+			return
+		}
+		maxParallel = int32(val)
+	}
+
+	newID := pgtype.UUID{Bytes: uuid.Must(uuid.NewV7()), Valid: true}
+	sub, err := slurpee.DB.UpsertSubscriber(r.Context(), db.UpsertSubscriberParams{
+		ID:          newID,
+		Name:        name,
+		EndpointUrl: endpointURL,
+		AuthSecret:  authSecret,
+		MaxParallel: maxParallel,
+	})
+	if err != nil {
+		log(r.Context()).Error("Error creating subscriber", "err", err)
+		renderSubscribersPage(slurpee, w, r, "", "Failed to create subscriber")
+		return
+	}
+
+	http.Redirect(w, r, "/subscribers/"+pgtypeUUIDToString(sub.ID), http.StatusSeeOther)
+}
+
+func renderSubscribersPage(slurpee *app.Application, w http.ResponseWriter, r *http.Request, successMsg, errorMsg string) {
 	subscribers, err := slurpee.DB.ListSubscribersWithCounts(r.Context())
 	if err != nil {
 		log(r.Context()).Error("Error listing subscribers", "err", err)
@@ -44,7 +92,10 @@ func subscribersListHandler(slurpee *app.Application, w http.ResponseWriter, r *
 		}
 	}
 
-	if err := SubscribersListTemplate(rows).Render(r.Context(), w); err != nil {
+	if errorMsg != "" {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	if err := SubscribersListTemplate(rows, successMsg, errorMsg).Render(r.Context(), w); err != nil {
 		log(r.Context()).Error("Error rendering subscribers list view", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
@@ -286,3 +337,4 @@ func renderSubscriberDetailWithError(slurpee *app.Application, w http.ResponseWr
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
+
