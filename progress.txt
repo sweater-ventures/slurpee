@@ -12,6 +12,7 @@ Started: Fri Feb  6 21:16:06 MST 2026
 - Happy-path POST /events tests must mock `GetLogConfigBySubject` (called by `LogEvent`) — return error to skip
 - GET handler tests need `req.SetPathValue("id", ...)` since `callHandler` bypasses the mux router
 - Subscriber endpoint auth uses simple string comparison (`config.AdminSecret`), not bcrypt — use `WithAdminSecret(req, "test-admin-secret")`
+- `package app` test files CANNOT import `testutil` (import cycle: testutil → app) — duplicate mock/factory locally in test file
 
 ---
 
@@ -118,4 +119,39 @@ Started: Fri Feb  6 21:16:06 MST 2026
   - `mock.AnythingOfType("db.UpsertSubscriberParams")` and `db.CreateSubscriptionParams` match the mock calls without exact params
   - Handler doesn't validate URL format — only checks for empty string
   - `subscriptionToResponse` handles nil filter and invalid max_retries gracefully — test these edge cases in response format tests
+---
+
+## 2026-02-07 10:28 AM - US-007
+- Created `app/delivery_test.go` with 20 tests covering event dispatch and delivery pipeline
+- `deliverToSubscriber` tests (6):
+  - `TestDeliverToSubscriber_CorrectHeadersAndBody` — verifies Content-Type, X-Slurpee-Secret, X-Event-ID, X-Event-Subject headers and event data body
+  - `TestDeliverToSubscriber_Returns_True_For_2xx` — 5 status codes (200, 201, 202, 204, 299)
+  - `TestDeliverToSubscriber_Returns_False_For_Non2xx` — 7 status codes (400, 401, 403, 404, 500, 502, 503)
+  - `TestDeliverToSubscriber_RecordsDeliveryAttempt` — captures InsertDeliveryAttempt params, verifies event/subscriber IDs, status, response details
+  - `TestDeliverToSubscriber_RecordsFailedAttempt` — verifies failed status and status code on non-2xx
+  - `TestDeliverToSubscriber_SendsEventDataAsBody` — verifies complex nested JSON is sent as request body
+- `dispatchEvent` tests (6):
+  - `TestDispatchEvent_FindsMatchingSubscriptionsAndEnqueuesTasks` — verifies task created with correct event, subscription, subscriber, attempt number
+  - `TestDispatchEvent_SkipsSubscriptionsWhoseFiltersDontMatch` — only matching filter produces a task
+  - `TestDispatchEvent_NoMatchingSubscriptions_MarksDelivered` — empty subscriptions => delivered status
+  - `TestDispatchEvent_SubscriptionDbError_MarksFailed` — DB error => failed status
+  - `TestDispatchEvent_UsesSubscriptionMaxRetries` — subscription-level override (10) used instead of global default (3)
+  - `TestDispatchEvent_MultipleSubscribers` — two subscribers each get their own task
+- `processDeliveryTask` tests (3):
+  - `TestProcessDeliveryTask_RetriesOnFailure` — failed delivery enqueues retry task with incremented attempt number
+  - `TestProcessDeliveryTask_MaxRetriesExhausted` — no retry enqueued, tracker records exhausted=true
+  - `TestProcessDeliveryTask_SuccessRecordsResult` — tracker records succeeded=true, no retry
+- `finalizeEvent` tests (3):
+  - `TestFinalizeEvent_AllSucceeded_MarksDelivered` — all succeeded => "delivered"
+  - `TestFinalizeEvent_AnyFailed_MarksFailed` — mixed results => "failed"
+  - `TestFinalizeEvent_AllFailed_MarksFailed` — all exhausted => "failed"
+- `eventTracker` tests (1):
+  - `TestEventTracker_RecordReturnsTrueWhenAllResultsCollected` — returns false until expected count reached
+- Files changed: `app/delivery_test.go`
+- **Learnings for future iterations:**
+  - Cannot import `testutil` from `package app` test files — creates import cycle (`testutil` imports `app`). Must duplicate mock querier and factory functions locally in test file.
+  - `deliverToSubscriber` uses a real `http.Client` — use `httptest.NewServer` to capture and control HTTP responses
+  - `processDeliveryTask` uses `time.AfterFunc` for retry scheduling — tests need `time.Sleep` to wait for timer to fire
+  - Set `MaxBackoffSeconds = 1` in retry tests to keep test duration short (backoff for attempt 0 = 1s)
+  - `deliverToSubscriber` publishes to `EventBus` — safe with no subscribers; no need to mock
 ---

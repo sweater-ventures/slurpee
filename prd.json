@@ -125,7 +125,7 @@
         "All tests pass (`go test ./app/...`)"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "deliverToSubscriber and dispatchEvent are unexported — test from within app package. Use httptest.Server as the webhook endpoint. The delivery pipeline uses goroutines and channels — tests may need short timeouts or synchronization helpers."
     }
   ]
