@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -224,6 +225,173 @@ func TestCreateEvent_Success(t *testing.T) {
 		t.Fatal("expected event on DeliveryChan but channel was empty")
 	}
 
+	mockDB.AssertExpectations(t)
+}
+
+// --- GET /api/events/{id} tests ---
+
+func TestGetEvent_MissingSecretHeaders(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	eventID := uuid.Must(uuid.NewV7())
+	req := httptest.NewRequest(http.MethodGet, "/events/"+eventID.String(), nil)
+	req.SetPathValue("id", eventID.String())
+
+	rec := callHandler(t, slurpee, getEventHandler, req)
+	testutil.AssertJSONError(t, rec, http.StatusUnauthorized, "Missing X-Slurpee-Secret-ID")
+}
+
+func TestGetEvent_InvalidSecretIDFormat(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	eventID := uuid.Must(uuid.NewV7())
+	req := httptest.NewRequest(http.MethodGet, "/events/"+eventID.String(), nil)
+	req.SetPathValue("id", eventID.String())
+	req.Header.Set("X-Slurpee-Secret-ID", "not-a-uuid")
+	req.Header.Set("X-Slurpee-Secret", "some-secret")
+
+	rec := callHandler(t, slurpee, getEventHandler, req)
+	testutil.AssertJSONError(t, rec, http.StatusBadRequest, "X-Slurpee-Secret-ID must be a valid UUID")
+}
+
+func TestGetEvent_WrongSecretValue(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	secretID := uuid.Must(uuid.NewV7())
+	secret := testutil.NewApiSecretWithHash("correct-secret", func(s *db.ApiSecret) {
+		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
+		s.SubjectPattern = "%"
+	})
+
+	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
+		Return(secret, nil)
+
+	eventID := uuid.Must(uuid.NewV7())
+	req := httptest.NewRequest(http.MethodGet, "/events/"+eventID.String(), nil)
+	req.SetPathValue("id", eventID.String())
+	testutil.WithSecretHeaders(req, secretID.String(), "wrong-secret")
+
+	rec := callHandler(t, slurpee, getEventHandler, req)
+	testutil.AssertJSONError(t, rec, http.StatusUnauthorized, "Missing or invalid API secret")
+}
+
+func TestGetEvent_NonexistentEvent(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	secretID := uuid.Must(uuid.NewV7())
+	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
+		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
+		s.SubjectPattern = "%"
+	})
+
+	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
+		Return(secret, nil)
+
+	eventID := uuid.Must(uuid.NewV7())
+	mockDB.On("GetEventByID", mock.Anything, pgtype.UUID{Bytes: eventID, Valid: true}).
+		Return(db.Event{}, pgx.ErrNoRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/events/"+eventID.String(), nil)
+	req.SetPathValue("id", eventID.String())
+	testutil.WithSecretHeaders(req, secretID.String(), "test-secret")
+
+	rec := callHandler(t, slurpee, getEventHandler, req)
+	testutil.AssertJSONError(t, rec, http.StatusNotFound, "event not found")
+	mockDB.AssertExpectations(t)
+}
+
+func TestGetEvent_Success(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	secretID := uuid.Must(uuid.NewV7())
+	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
+		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
+		s.SubjectPattern = "%"
+	})
+
+	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
+		Return(secret, nil)
+
+	eventID := uuid.Must(uuid.NewV7())
+	event := testutil.NewEvent(func(e *db.Event) {
+		e.ID = pgtype.UUID{Bytes: eventID, Valid: true}
+		e.Subject = "order.created"
+		e.Data = json.RawMessage(`{"order_id":"123"}`)
+		e.DeliveryStatus = "delivered"
+		e.RetryCount = 2
+	})
+
+	mockDB.On("GetEventByID", mock.Anything, pgtype.UUID{Bytes: eventID, Valid: true}).
+		Return(event, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/events/"+eventID.String(), nil)
+	req.SetPathValue("id", eventID.String())
+	testutil.WithSecretHeaders(req, secretID.String(), "test-secret")
+
+	rec := callHandler(t, slurpee, getEventHandler, req)
+
+	var resp EventResponse
+	testutil.AssertJSONResponse(t, rec, http.StatusOK, &resp)
+	assert.Equal(t, eventID.String(), resp.ID)
+	assert.Equal(t, "order.created", resp.Subject)
+	assert.Equal(t, "delivered", resp.DeliveryStatus)
+	assert.Equal(t, int32(2), resp.RetryCount)
+	assert.JSONEq(t, `{"order_id":"123"}`, string(resp.Data))
+	assert.NotZero(t, resp.Timestamp)
+	mockDB.AssertExpectations(t)
+}
+
+func TestGetEvent_SuccessResponseFormat(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	secretID := uuid.Must(uuid.NewV7())
+	secret := testutil.NewApiSecretWithHash("test-secret", func(s *db.ApiSecret) {
+		s.ID = pgtype.UUID{Bytes: secretID, Valid: true}
+		s.SubjectPattern = "%"
+	})
+
+	mockDB.On("GetApiSecretByID", mock.Anything, pgtype.UUID{Bytes: secretID, Valid: true}).
+		Return(secret, nil)
+
+	traceUUID := uuid.Must(uuid.NewV7())
+	eventID := uuid.Must(uuid.NewV7())
+	event := testutil.NewEvent(func(e *db.Event) {
+		e.ID = pgtype.UUID{Bytes: eventID, Valid: true}
+		e.Subject = "user.updated"
+		e.Data = json.RawMessage(`{"user_id":"456"}`)
+		e.TraceID = pgtype.UUID{Bytes: traceUUID, Valid: true}
+		e.DeliveryStatus = "pending"
+		e.RetryCount = 0
+	})
+
+	mockDB.On("GetEventByID", mock.Anything, pgtype.UUID{Bytes: eventID, Valid: true}).
+		Return(event, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/events/"+eventID.String(), nil)
+	req.SetPathValue("id", eventID.String())
+	testutil.WithSecretHeaders(req, secretID.String(), "test-secret")
+
+	rec := callHandler(t, slurpee, getEventHandler, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp EventResponse
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, eventID.String(), resp.ID)
+	assert.Equal(t, "user.updated", resp.Subject)
+	assert.NotZero(t, resp.Timestamp)
+	assert.JSONEq(t, `{"user_id":"456"}`, string(resp.Data))
+	assert.Equal(t, int32(0), resp.RetryCount)
+	assert.Equal(t, "pending", resp.DeliveryStatus)
+	assert.NotNil(t, resp.TraceID)
+	assert.Equal(t, traceUUID.String(), *resp.TraceID)
+	assert.NotNil(t, resp.StatusUpdatedAt)
 	mockDB.AssertExpectations(t)
 }
 
