@@ -180,7 +180,9 @@ func dispatchEvent(slurpee *Application, event db.Event, inflightWg *sync.WaitGr
 		subscribers[subID] = subscriber
 	}
 
-	// Build initial delivery tasks
+	// Build initial delivery tasks, deduplicated to one per subscriber.
+	// When multiple subscriptions match for the same subscriber, we pick the
+	// one with the highest effective max retries.
 	var tasks []deliveryTask
 	for subID, subs := range subscriberSubs {
 		subscriber, ok := subscribers[subID]
@@ -188,31 +190,48 @@ func dispatchEvent(slurpee *Application, event db.Event, inflightWg *sync.WaitGr
 			continue
 		}
 
-		for _, sub := range subs {
-			// Check subscription filter against event data
+		var bestSub *db.Subscription
+		bestMaxRetries := -1
+		for i, sub := range subs {
 			if !matchesFilter(sub.Filter, event.Data) {
 				logger.Debug("Subscription filter did not match event data",
 					"subscriber_id", UuidToString(subscriber.ID),
 					"subscription_id", UuidToString(sub.ID),
 					"subject_pattern", sub.SubjectPattern,
 				)
-				continue // Skip this subscription - filter doesn't match
+				continue
 			}
 
-			// Determine effective max retries: per-subscription override or global default
 			maxRetries := slurpee.Config.MaxRetries
 			if sub.MaxRetries.Valid {
 				maxRetries = int(sub.MaxRetries.Int32)
 			}
 
-			tasks = append(tasks, deliveryTask{
-				event:        event,
-				subscription: sub,
-				subscriber:   subscriber,
-				attemptNum:   0,
-				maxRetries:   maxRetries,
-			})
+			if maxRetries > bestMaxRetries {
+				bestSub = &subs[i]
+				bestMaxRetries = maxRetries
+			}
 		}
+
+		if bestSub == nil {
+			continue
+		}
+
+		if len(subs) > 1 {
+			logger.Debug("Deduplicated overlapping subscriptions for subscriber",
+				"subscriber_id", UuidToString(subscriber.ID),
+				"matching_subscriptions", len(subs),
+				"selected_subscription_id", UuidToString(bestSub.ID),
+			)
+		}
+
+		tasks = append(tasks, deliveryTask{
+			event:        event,
+			subscription: *bestSub,
+			subscriber:   subscriber,
+			attemptNum:   0,
+			maxRetries:   bestMaxRetries,
+		})
 	}
 
 	if len(tasks) == 0 {
