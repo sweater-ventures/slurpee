@@ -264,17 +264,37 @@ func secretUpdateHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Replace subscriber associations: delete all, re-add selected
-	slurpee.DB.RemoveAllApiSecretSubscribers(r.Context(), pgID)
+	// Sync subscriber associations: only add new and remove old
+	currentSubs, _ := slurpee.DB.ListSubscribersForApiSecret(r.Context(), pgID)
+	currentSet := make(map[string]struct{}, len(currentSubs))
+	for _, sub := range currentSubs {
+		currentSet[pgtypeUUIDToString(sub.ID)] = struct{}{}
+	}
+	desiredSet := make(map[string]struct{}, len(subscriberIDs))
 	for _, sid := range subscriberIDs {
-		subParsed, err := uuid.Parse(sid)
-		if err != nil {
-			continue
+		if _, err := uuid.Parse(sid); err == nil {
+			desiredSet[sid] = struct{}{}
 		}
-		slurpee.DB.AddApiSecretSubscriber(r.Context(), db.AddApiSecretSubscriberParams{
-			ApiSecretID:  pgID,
-			SubscriberID: pgtype.UUID{Bytes: subParsed, Valid: true},
-		})
+	}
+	// Add new associations
+	for sid := range desiredSet {
+		if _, exists := currentSet[sid]; !exists {
+			parsed, _ := uuid.Parse(sid)
+			slurpee.DB.AddApiSecretSubscriber(r.Context(), db.AddApiSecretSubscriberParams{
+				ApiSecretID:  pgID,
+				SubscriberID: pgtype.UUID{Bytes: parsed, Valid: true},
+			})
+		}
+	}
+	// Remove old associations
+	for sid := range currentSet {
+		if _, exists := desiredSet[sid]; !exists {
+			parsed, _ := uuid.Parse(sid)
+			slurpee.DB.RemoveApiSecretSubscriber(r.Context(), db.RemoveApiSecretSubscriberParams{
+				ApiSecretID:  pgID,
+				SubscriberID: pgtype.UUID{Bytes: parsed, Valid: true},
+			})
+		}
 	}
 
 	http.Redirect(w, r, "/secrets", http.StatusSeeOther)
