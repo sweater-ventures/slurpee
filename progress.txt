@@ -19,3 +19,15 @@ Started: Mon Feb  9 11:58:30 MST 2026
   - The `::bigint` cast trick works well — sqlc maps it to Go `int64`
   - `COUNT(*) FILTER (WHERE status = 'x')` avoids subqueries for per-group conditional counts
 ---
+
+## 2026-02-09 12:05pm - US-002
+- Added `ResumeUnfinishedDeliveries` function in `app/delivery.go`
+- Queries `GetResumableEvents`, feeds pending events into `DeliveryChan` in a goroutine (avoids blocking if channel buffer is full)
+- Logs at INFO level with counts when events need resuming, DEBUG when nothing to resume
+- Called from `main.go` after `StartDispatcher` but before HTTP server starts
+- Files changed: app/delivery.go, main.go
+- **Learnings for future iterations:**
+  - Pending events go through normal `dispatchEvent` path via `DeliveryChan` — no special handling needed
+  - Use goroutine for channel sends to avoid blocking startup if buffer is smaller than event count
+  - Partial events (US-003) will need direct task creation — cannot reuse `dispatchEvent` which starts at attemptNum=0
+---

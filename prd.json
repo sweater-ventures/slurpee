@@ -31,7 +31,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Pending events have zero delivery_attempts so they can safely go through the normal dispatchEvent path. Feed them into DeliveryChan in a goroutine if the count exceeds channel buffer size to avoid blocking startup. ResumeUnfinishedDeliveries needs access to *Application (for DB and DeliveryChan)."
     },
     {
