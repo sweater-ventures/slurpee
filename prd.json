@@ -68,7 +68,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "The JavaScript in events.templ builds table rows as HTML strings. Add a Properties td with badge spans generated from the message.properties object. Use Object.entries() to iterate the properties map."
     },
     {

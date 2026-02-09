@@ -47,3 +47,14 @@ Started: Mon Feb  9 16:34:04 MST 2026
   - PublishCreatedEvent is called from api/events.go and views/events.go — both need updating when signature changes
   - Properties use `omitempty` JSON tag so null/empty properties don't appear in SSE JSON
 ---
+
+## 2026-02-09 4:55 PM MST - US-004
+- Updated JavaScript `createEventRow` function to read `data.properties` and render badge elements
+- Properties badges are sorted by key and use `badge-outline badge-sm mr-1` classes matching static row styling
+- Added `tdProps` element between timestamp and status in the DOM construction
+- Events with null/undefined properties render an empty Properties cell
+- Files changed: views/events.templ, views/events_templ.go
+- **Learnings for future iterations:**
+  - JavaScript `Object.keys().sort()` ensures consistent property order matching the Go `sortedKeys` helper
+  - Live mode rows must mirror exact column order of static templ rows
+---
