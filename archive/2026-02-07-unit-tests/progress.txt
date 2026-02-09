@@ -1,0 +1,157 @@
+# Ralph Progress Log
+Started: Fri Feb  6 21:16:06 MST 2026
+---
+
+## Codebase Patterns
+- `emit_interface: true` in sqlc.yaml generates a populated `Querier` interface with all query methods
+- `Application.DB` is typed as `db.Querier` (interface), not `*db.Queries` (concrete) — enables mock injection for testing
+- Functions that accept a DB parameter should use `db.Querier` interface type, not `*db.Queries`
+- `go build ./...` is the primary quality check; `go vet ./...` for additional static analysis
+- Unexported functions (`matchesFilter`, `calculateBackoff`) require `package app` test files, not `package app_test`
+- API handler tests: use `callHandler(t, slurpee, handler, req)` helper wrapping `routeHandler` — no full server needed
+- Happy-path POST /events tests must mock `GetLogConfigBySubject` (called by `LogEvent`) — return error to skip
+- GET handler tests need `req.SetPathValue("id", ...)` since `callHandler` bypasses the mux router
+- Subscriber endpoint auth uses simple string comparison (`config.AdminSecret`), not bcrypt — use `WithAdminSecret(req, "test-admin-secret")`
+- `package app` test files CANNOT import `testutil` (import cycle: testutil → app) — duplicate mock/factory locally in test file
+
+---
+
+## 2026-02-06 9:17 PM - US-001
+- Added `emit_interface: true` to `sqlc.yaml` and regenerated sqlc code
+- Changed `Application.DB` field type from `*db.Queries` to `db.Querier`
+- Updated `ValidateSecretByID` and `CheckSubscriberScope` in `app/secrets.go` to accept `db.Querier` instead of `*db.Queries`
+- Files changed: `sqlc.yaml`, `db/querier.go`, `app/application.go`, `app/secrets.go`
+- **Learnings for future iterations:**
+  - The only compile errors from the type change were in `app/secrets.go` where `ValidateSecretByID` and `CheckSubscriberScope` explicitly took `*db.Queries` — the `slurpee.DB.Method()` calls throughout the codebase work fine because the interface has all the same methods
+  - LSP diagnostics may show stale errors after regenerating sqlc — trust `go build` over IDE diagnostics
+  - `db.New()` still returns `*db.Queries` which satisfies `db.Querier`, so `NewApp()` needed no changes
+---
+
+## 2026-02-06 9:25 PM - US-002
+- Added `github.com/stretchr/testify` as test dependency
+- Created `testutil/mock_querier.go` — testify mock implementing all 38 methods of `db.Querier`
+- Created `testutil/factories.go` — factory functions with functional options: `NewEvent`, `NewSubscriber`, `NewSubscription`, `NewApiSecret`, `NewApiSecretWithHash`, `NewTestApp`
+- Created `testutil/helpers.go` — HTTP helpers: `NewJSONRequest`, `WithSecretHeaders`, `WithAdminSecret`, `AssertJSONResponse`, `AssertJSONError`
+- Files changed: `go.mod`, `go.sum`, `testutil/mock_querier.go`, `testutil/factories.go`, `testutil/helpers.go`
+- **Learnings for future iterations:**
+  - `testutil` package is not a `_test` package — it's importable from any test file in the project
+  - `NewApiSecretWithHash` creates secrets with real bcrypt hashes for testing `ValidateSecretByID`
+  - `NewTestApp` sets `AdminSecret: "test-admin-secret"` and `DeliveryChan` buffer size 100 by default
+  - Factory functions use functional option pattern (`type EventOpt func(*db.Event)`) for clean overrides
+  - `go mod tidy` must be run after adding testify to resolve transitive deps (`objx`, `difflib`, etc.)
+---
+
+## 2026-02-06 9:30 PM - US-003
+- Created `app/business_logic_test.go` with 59 table-driven tests covering all pure business logic
+- `TestCheckSendScope` — 12 cases: exact match, wildcard patterns, empty patterns, edge cases
+- `TestMatchLikePattern` — 22 cases: % at start/end/middle, _ wildcard, combined wildcards, empty strings
+- `TestMatchesFilter` — 16 cases: nil/empty filters, matching/non-matching keys, nested JSON, numeric/boolean values, invalid JSON
+- `TestCalculateBackoff` — 9 cases: exponential growth, max cap respected, small cap
+- Files changed: `app/business_logic_test.go`
+- **Learnings for future iterations:**
+  - `matchesFilter` and `calculateBackoff` are unexported — tests must use `package app` (not `package app_test`) to access them
+  - `matchesFilter` uses JSON marshal/unmarshal for type-safe comparison, so nested objects match correctly
+  - `calculateBackoff` uses `math.Pow(2, attemptNum)` — attempt 0 = 1s, attempt 1 = 2s, etc.
+---
+
+## 2026-02-07 8:47 AM - US-004
+- Created `api/events_test.go` with 10 tests for POST /api/events endpoint
+- `TestCreateEvent_MissingSecretHeaders` — 401 when no X-Slurpee-Secret-ID header
+- `TestCreateEvent_MissingSecretValue` — 401 when X-Slurpee-Secret-ID present but no X-Slurpee-Secret
+- `TestCreateEvent_InvalidSecretIDFormat` — 400 when secret ID is not a valid UUID
+- `TestCreateEvent_WrongSecretValue` — 401 when bcrypt comparison fails (uses NewApiSecretWithHash)
+- `TestCreateEvent_SubjectOutOfScope` — 403 when subject doesn't match secret's subject_pattern
+- `TestCreateEvent_MissingSubject` — 400 when subject field is empty
+- `TestCreateEvent_MissingData` — 400 when data field is missing
+- `TestCreateEvent_InvalidJSONBody` — 400 when request body is nil/empty
+- `TestCreateEvent_Success` — 201 with correct response fields, event on DeliveryChan
+- `TestCreateEvent_SuccessResponseFormat` — verifies full EventResponse structure including timestamp, retry_count, data
+- Files changed: `api/events_test.go`
+- **Learnings for future iterations:**
+  - API handler tests use `callHandler` helper that wraps `routeHandler(slurpee, handler)` — avoids needing full HTTP server setup
+  - `LogEvent` calls `GetLogConfigBySubject` — must mock this in happy-path tests (return error to skip logging)
+  - `PublishCreatedEvent` publishes to EventBus which is safe with no subscribers in test
+  - `NewApiSecretWithHash("plaintext")` creates real bcrypt hash — pair with exact plaintext in `WithSecretHeaders`
+  - `mock.AnythingOfType("db.InsertEventParams")` matches the InsertEvent call without requiring exact param match
+---
+
+## 2026-02-07 8:50 AM - US-005
+- Created 6 tests for GET /api/events/{id} endpoint in `api/events_test.go`
+- `TestGetEvent_MissingSecretHeaders` — 401 when no X-Slurpee-Secret-ID header
+- `TestGetEvent_InvalidSecretIDFormat` — 400 when secret ID is not a valid UUID
+- `TestGetEvent_WrongSecretValue` — 401 when bcrypt comparison fails
+- `TestGetEvent_NonexistentEvent` — 404 when `GetEventByID` returns `pgx.ErrNoRows`
+- `TestGetEvent_Success` — 200 with correct event fields (ID, subject, status, retry count, data)
+- `TestGetEvent_SuccessResponseFormat` — verifies full EventResponse structure including TraceID and StatusUpdatedAt
+- Files changed: `api/events_test.go`
+- **Learnings for future iterations:**
+  - GET handler uses `r.PathValue("id")` which requires `req.SetPathValue("id", ...)` in tests since `callHandler` bypasses the mux
+  - GET endpoint does NOT check scope — any valid secret can read any event (read-only access)
+  - Added `pgx/v5` import for `pgx.ErrNoRows` in test file
+  - `eventToResponse` correctly handles optional TraceID and StatusUpdatedAt fields — test both present and absent cases
+---
+
+## 2026-02-07 10:22 AM - US-006
+- Created `api/subscribers_test.go` with 15 tests for /api/subscribers endpoints
+- POST tests (10):
+  - `TestCreateSubscriber_MissingAdminSecret` — 401 when no X-Slurpee-Admin-Secret header
+  - `TestCreateSubscriber_WrongAdminSecret` — 401 when admin secret doesn't match
+  - `TestCreateSubscriber_MissingName` — 400 when name field is empty
+  - `TestCreateSubscriber_MissingEndpointURL` — 400 when endpoint_url field is empty
+  - `TestCreateSubscriber_MissingAuthSecret` — 400 when auth_secret field is empty
+  - `TestCreateSubscriber_MissingSubscriptions` — 400 when subscriptions field is nil
+  - `TestCreateSubscriber_SubscriptionMissingSubjectPattern` — 400 when subscription has no subject_pattern
+  - `TestCreateSubscriber_InvalidJSONBody` — 400 when request body is nil
+  - `TestCreateSubscriber_Success` — 200 with correct response fields and mock expectations
+  - `TestCreateSubscriber_WithMultipleSubscriptions` — 200 with two subscriptions created
+- GET tests (5):
+  - `TestListSubscribers_MissingAdminSecret` — 401 when no admin secret
+  - `TestListSubscribers_WrongAdminSecret` — 401 when wrong admin secret
+  - `TestListSubscribers_EmptyList` — 200 with empty array
+  - `TestListSubscribers_Success` — 200 with two subscribers and their subscriptions
+  - `TestListSubscribers_SuccessResponseFormat` — verifies full response structure including filter, max_retries, timestamps
+- Files changed: `api/subscribers_test.go`
+- **Learnings for future iterations:**
+  - Subscriber endpoints use `X-Slurpee-Admin-Secret` header — simple string comparison against `config.AdminSecret`, no bcrypt
+  - `WithAdminSecret` helper adds the admin secret header — default admin secret in `NewTestApp` is "test-admin-secret"
+  - POST /subscribers returns 200 (not 201) on success — handler uses `http.StatusOK`
+  - `UpsertSubscriber` + `DeleteSubscriptionsForSubscriber` + `CreateSubscription` is the idempotent replace pattern
+  - `mock.AnythingOfType("db.UpsertSubscriberParams")` and `db.CreateSubscriptionParams` match the mock calls without exact params
+  - Handler doesn't validate URL format — only checks for empty string
+  - `subscriptionToResponse` handles nil filter and invalid max_retries gracefully — test these edge cases in response format tests
+---
+
+## 2026-02-07 10:28 AM - US-007
+- Created `app/delivery_test.go` with 20 tests covering event dispatch and delivery pipeline
+- `deliverToSubscriber` tests (6):
+  - `TestDeliverToSubscriber_CorrectHeadersAndBody` — verifies Content-Type, X-Slurpee-Secret, X-Event-ID, X-Event-Subject headers and event data body
+  - `TestDeliverToSubscriber_Returns_True_For_2xx` — 5 status codes (200, 201, 202, 204, 299)
+  - `TestDeliverToSubscriber_Returns_False_For_Non2xx` — 7 status codes (400, 401, 403, 404, 500, 502, 503)
+  - `TestDeliverToSubscriber_RecordsDeliveryAttempt` — captures InsertDeliveryAttempt params, verifies event/subscriber IDs, status, response details
+  - `TestDeliverToSubscriber_RecordsFailedAttempt` — verifies failed status and status code on non-2xx
+  - `TestDeliverToSubscriber_SendsEventDataAsBody` — verifies complex nested JSON is sent as request body
+- `dispatchEvent` tests (6):
+  - `TestDispatchEvent_FindsMatchingSubscriptionsAndEnqueuesTasks` — verifies task created with correct event, subscription, subscriber, attempt number
+  - `TestDispatchEvent_SkipsSubscriptionsWhoseFiltersDontMatch` — only matching filter produces a task
+  - `TestDispatchEvent_NoMatchingSubscriptions_MarksDelivered` — empty subscriptions => delivered status
+  - `TestDispatchEvent_SubscriptionDbError_MarksFailed` — DB error => failed status
+  - `TestDispatchEvent_UsesSubscriptionMaxRetries` — subscription-level override (10) used instead of global default (3)
+  - `TestDispatchEvent_MultipleSubscribers` — two subscribers each get their own task
+- `processDeliveryTask` tests (3):
+  - `TestProcessDeliveryTask_RetriesOnFailure` — failed delivery enqueues retry task with incremented attempt number
+  - `TestProcessDeliveryTask_MaxRetriesExhausted` — no retry enqueued, tracker records exhausted=true
+  - `TestProcessDeliveryTask_SuccessRecordsResult` — tracker records succeeded=true, no retry
+- `finalizeEvent` tests (3):
+  - `TestFinalizeEvent_AllSucceeded_MarksDelivered` — all succeeded => "delivered"
+  - `TestFinalizeEvent_AnyFailed_MarksFailed` — mixed results => "failed"
+  - `TestFinalizeEvent_AllFailed_MarksFailed` — all exhausted => "failed"
+- `eventTracker` tests (1):
+  - `TestEventTracker_RecordReturnsTrueWhenAllResultsCollected` — returns false until expected count reached
+- Files changed: `app/delivery_test.go`
+- **Learnings for future iterations:**
+  - Cannot import `testutil` from `package app` test files — creates import cycle (`testutil` imports `app`). Must duplicate mock querier and factory functions locally in test file.
+  - `deliverToSubscriber` uses a real `http.Client` — use `httptest.NewServer` to capture and control HTTP responses
+  - `processDeliveryTask` uses `time.AfterFunc` for retry scheduling — tests need `time.Sleep` to wait for timer to fire
+  - Set `MaxBackoffSeconds = 1` in retry tests to keep test duration short (backoff for attempt 0 = 1s)
+  - `deliverToSubscriber` publishes to `EventBus` — safe with no subscribers; no need to mock
+---

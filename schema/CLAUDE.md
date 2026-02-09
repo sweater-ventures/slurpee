@@ -12,4 +12,14 @@
 | #225 | 4:31 PM | 🔵 | Reviewed delivery_attempts table schema for query implementation | ~328 |
 | #144 | 3:49 PM | 🟣 | Implemented events table migration with all required columns and indexes | ~374 |
 | #143 | " | 🔵 | Migration file template contains Up and Down sections for bidirectional migrations | ~239 |
+
+### Feb 7, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #1191 | 8:42 PM | 🟣 | PRD created for E2E regression tests with embedded-postgres | ~557 |
+| #1189 | 8:13 PM | 🔵 | API secret to subscriber access control table | ~294 |
+| #1187 | " | 🔵 | Subscriptions table schema with filtering and retry configuration | ~358 |
+| #1185 | " | 🔵 | Delivery attempts audit trail with full HTTP request/response capture | ~405 |
+| #1183 | " | 🔵 | Events table schema with indexed query patterns | ~362 |
 </claude-mem-context>

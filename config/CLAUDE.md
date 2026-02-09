@@ -19,4 +19,10 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #1039 | 9:19 PM | 🔵 | Application configuration structure and defaults | ~432 |
+
+### Feb 7, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #1190 | 8:14 PM | 🔵 | Configuration management via environment variables and CLI arguments | ~472 |
 </claude-mem-context>
