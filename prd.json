@@ -50,7 +50,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "This is the most complex story. The resume function must re-run subscription matching (GetSubscriptionsMatchingSubject), apply filter logic (matchesFilter), deduplicate per subscriber, then cross-reference with delivery history. The dispatchEvent function handles all this for fresh events — consider extracting shared logic into helpers. The inflightWg/taskQueue/registry are currently local to StartDispatcher; refactoring to expose them (e.g., via a dispatcherState struct) keeps the code clean."
     },
     {

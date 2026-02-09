@@ -7,6 +7,8 @@ Started: Mon Feb  9 11:58:30 MST 2026
 - `COUNT(*) FILTER (WHERE ...)` is valid PostgreSQL syntax for conditional aggregation
 - Two mock querier implementations exist: `testutil/mock_querier.go` and `app/delivery_test.go` (import cycle prevention). Both must be updated when adding new queries.
 - sqlc generates prepared query constants, param structs, and row structs — run `sqlc generate` then `go build` to verify
+- `StartDispatcher` returns `*DispatcherState` with `inflightWg`, `taskQueue`, `registry` — needed for direct task enqueuing (e.g., partial event resumption)
+- `ResumeUnfinishedDeliveries(slurpee, ds)` handles both pending (via DeliveryChan) and partial (via direct taskQueue) events
 
 ## 2026-02-09 12:00pm - US-001
 - Added `GetResumableEvents` query to `queries/events.sql`: selects events with delivery_status IN ('pending', 'partial') ordered by timestamp ASC
@@ -30,4 +32,17 @@ Started: Mon Feb  9 11:58:30 MST 2026
   - Pending events go through normal `dispatchEvent` path via `DeliveryChan` — no special handling needed
   - Use goroutine for channel sends to avoid blocking startup if buffer is smaller than event count
   - Partial events (US-003) will need direct task creation — cannot reuse `dispatchEvent` which starts at attemptNum=0
+---
+
+## 2026-02-09 12:10pm - US-003
+- Refactored `StartDispatcher` to return `*DispatcherState` struct exposing `inflightWg`, `taskQueue`, and `registry`
+- Extended `ResumeUnfinishedDeliveries` to accept `*DispatcherState` and handle partial events
+- Added `resumePartialEvent` function that: queries delivery summary, re-runs subscription matching with filter/dedup logic, skips already-succeeded subscribers, sets `attemptNum` to count of prior failed attempts
+- Partial event tasks go directly into `taskQueue` (not `DeliveryChan`) with their own `eventTracker`
+- Updated `main.go` to capture `DispatcherState` return value and pass it to resume function
+- Files changed: app/delivery.go, main.go
+- **Learnings for future iterations:**
+  - `StartDispatcher` now returns `*DispatcherState` — callers that don't need it can ignore the return value
+  - The partial event resume logic mirrors `dispatchEvent` but with delivery history cross-referencing
+  - `summaryMap` keyed by `[16]byte` (UUID bytes) is the fastest lookup pattern for UUID maps
 ---
