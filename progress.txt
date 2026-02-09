@@ -1,176 +1,78 @@
 # Ralph Progress Log
-Started: Mon Feb  9 09:09:47 MST 2026
+Started: Mon Feb  9 11:58:30 MST 2026
 ---
 
 ## Codebase Patterns
-- E2E tests use embedded-postgres on port 15432, database `slurpee_test`
-- `TestMain` must call `flag.Parse()` before `testing.Short()` in Go 1.25+
-- Migration parser extracts lines between `-- +migrate Up` and `-- +migrate Down` markers
-- `truncateAll` uses single TRUNCATE with CASCADE for all tables (faster than individual truncates)
-- Seed helpers use `bcrypt.MinCost` for fast test execution (not default cost 10)
-- For delivery pipeline tests: use `httptest.NewServer` (not `httptest.ResponseRecorder`) since the dispatcher makes real HTTP calls
-- Poll DB for `delivery_status` changes via `waitForEventStatus` helper — never use `time.Sleep` for delivery assertions
-- `app.StartDispatcher(slurpee)` starts delivery goroutines; dispatcher goroutines leak in tests but are acceptable since each test creates its own app
-- `stopDelivery` is unexported — for tests, don't try to call it; just poll DB state and let goroutines leak
-- `newTestApp` wires real `db.Queries` to embedded postgres, not mocks
-- `seedApiSecret` returns both the db record and the plaintext for use in auth headers
-- POST /events sends to `DeliveryChan` — call `drainDeliveryChan(slurpee)` after each create test to avoid blocking
-- API routes are prefixed with `/api/` — use `/api/events`, `/api/subscribers`, etc. in test requests
-- When all subscriptions match by subject but none pass filter, `dispatchEvent` marks event as `failed` (not `delivered`) — "No valid subscribers found" path
-- Filter matching is AND logic on top-level JSON keys — `matchesFilter` in `app/delivery.go` compares JSON-marshaled values for type-safe equality
+- Use `::bigint` cast on `COUNT(*)` in sqlc queries so generated Go type is `int64` (not `interface{}`)
+- `COUNT(*) FILTER (WHERE ...)` is valid PostgreSQL syntax for conditional aggregation
+- Two mock querier implementations exist: `testutil/mock_querier.go` and `app/delivery_test.go` (import cycle prevention). Both must be updated when adding new queries.
+- sqlc generates prepared query constants, param structs, and row structs — run `sqlc generate` then `go build` to verify
+- `StartDispatcher` returns `*DispatcherState` with `inflightWg`, `taskQueue`, `registry` — needed for direct task enqueuing (e.g., partial event resumption)
+- `ResumeUnfinishedDeliveries(slurpee, ds)` handles both pending (via DeliveryChan) and partial (via direct taskQueue) events
 
-## 2026-02-09 09:15 AM - US-001
-- Implemented: E2E test infrastructure with embedded-postgres
-- Files changed:
-  - `tests/e2e/main_test.go` — TestMain, migration runner, truncateAll, newTestApp, newTestRouter, seed helpers, placeholder test
-  - `go.mod` / `go.sum` — added embedded-postgres dependency
+## 2026-02-09 12:00pm - US-001
+- Added `GetResumableEvents` query to `queries/events.sql`: selects events with delivery_status IN ('pending', 'partial') ordered by timestamp ASC
+- Added `GetDeliverySummaryForEvent` query to `queries/delivery_attempts.sql`: groups delivery attempts by subscriber_id with COUNT FILTER for failed/succeeded counts
+- Ran `sqlc generate` — produced `GetDeliverySummaryForEventRow` struct with `SubscriberID pgtype.UUID`, `FailedCount int64`, `SucceededCount int64`
+- Updated both mock querier implementations (testutil + app/delivery_test.go) with new interface methods
+- Files changed: queries/events.sql, queries/delivery_attempts.sql, db/events.sql.go, db/delivery_attempts.sql.go, db/querier.go, testutil/mock_querier.go, app/delivery_test.go
 - **Learnings for future iterations:**
-  - `flag.Parse()` must be called before `testing.Short()` in TestMain (Go 1.25 panics otherwise)
-  - embedded-postgres default user/password is `postgres/postgres`
-  - Using `bcrypt.MinCost` in seed helpers keeps tests fast vs default cost 10
-  - `TRUNCATE ... CASCADE` handles FK dependencies without needing specific ordering
-  - pgxpool.Pool satisfies db.DBTX interface, so `db.New(pool)` works directly
+  - Two mock querier files must stay in sync with db.Querier interface
+  - The `::bigint` cast trick works well — sqlc maps it to Go `int64`
+  - `COUNT(*) FILTER (WHERE status = 'x')` avoids subqueries for per-group conditional counts
 ---
 
-## 2026-02-09 09:17 AM - US-002
-- Implemented: E2E tests for POST /events endpoint (11 tests)
-- Files changed:
-  - `tests/e2e/events_create_test.go` — all POST /events E2E tests
-- Tests cover:
-  - Happy path: create event, verify 201 + response fields + DB persistence
-  - Client-provided UUID: verify exact ID used
-  - Client-provided timestamp: verify custom timestamp stored
-  - Optional trace_id: verify persistence
-  - Missing X-Slurpee-Secret-ID → 401
-  - Invalid/wrong API secret → 401
-  - Subject outside secret scope → 403
-  - Missing subject → 400
-  - Missing data → 400
-  - Invalid JSON data (string instead of object) → 400
-  - Invalid JSON body → 400
+## 2026-02-09 12:05pm - US-002
+- Added `ResumeUnfinishedDeliveries` function in `app/delivery.go`
+- Queries `GetResumableEvents`, feeds pending events into `DeliveryChan` in a goroutine (avoids blocking if channel buffer is full)
+- Logs at INFO level with counts when events need resuming, DEBUG when nothing to resume
+- Called from `main.go` after `StartDispatcher` but before HTTP server starts
+- Files changed: app/delivery.go, main.go
 - **Learnings for future iterations:**
-  - POST /events sends event to `DeliveryChan` after insert — tests must drain the channel via `drainDeliveryChan` helper to prevent blocking
-  - `api.EventResponse` is exported and can be used directly for response deserialization in tests
-  - `app.UuidToString` converts pgtype.UUID to string for use in headers
-  - Route is `/api/events` (with `/api/` prefix handled by `http.StripPrefix` in `AddApis`)
+  - Pending events go through normal `dispatchEvent` path via `DeliveryChan` — no special handling needed
+  - Use goroutine for channel sends to avoid blocking startup if buffer is smaller than event count
+  - Partial events (US-003) will need direct task creation — cannot reuse `dispatchEvent` which starts at attemptNum=0
 ---
 
-## 2026-02-09 09:18 AM - US-003
-- Implemented: E2E tests for GET /events/{id} endpoint (5 tests)
-- Files changed:
-  - `tests/e2e/events_get_test.go` — all GET /events/{id} E2E tests
-- Tests cover:
-  - Happy path: create event via POST, then GET by ID, verify all fields match
-  - Event not found → 404
-  - Invalid UUID format → 400
-  - Missing API secret → 401
-  - Invalid/wrong API secret → 401
+## 2026-02-09 12:10pm - US-003
+- Refactored `StartDispatcher` to return `*DispatcherState` struct exposing `inflightWg`, `taskQueue`, and `registry`
+- Extended `ResumeUnfinishedDeliveries` to accept `*DispatcherState` and handle partial events
+- Added `resumePartialEvent` function that: queries delivery summary, re-runs subscription matching with filter/dedup logic, skips already-succeeded subscribers, sets `attemptNum` to count of prior failed attempts
+- Partial event tasks go directly into `taskQueue` (not `DeliveryChan`) with their own `eventTracker`
+- Updated `main.go` to capture `DispatcherState` return value and pass it to resume function
+- Files changed: app/delivery.go, main.go
 - **Learnings for future iterations:**
-  - GET /events/{id} does NOT check subject scope — any valid API secret can read any event
-  - Use `r.PathValue("id")` for Go 1.22+ path params in ServeMux
-  - Create event via POST first, then GET it back — this tests the full round-trip
+  - `StartDispatcher` now returns `*DispatcherState` — callers that don't need it can ignore the return value
+  - The partial event resume logic mirrors `dispatchEvent` but with delivery history cross-referencing
+  - `summaryMap` keyed by `[16]byte` (UUID bytes) is the fastest lookup pattern for UUID maps
 ---
 
-## 2026-02-09 10:54 AM - US-004
-- Implemented: E2E tests for POST /subscribers endpoint (11 tests)
-- Files changed:
-  - `tests/e2e/subscribers_create_test.go` — all POST /subscribers E2E tests
-- Tests cover:
-  - Happy path: create subscriber with subscriptions, verify 200 + response fields + DB persistence
-  - Upsert: POST same endpoint_url again with different subscriptions, verify old replaced and same subscriber ID retained
-  - Subscription with filter JSON: verify filter persisted in response and DB
-  - Subscription with max_retries override: verify persisted in response and DB
-  - Missing admin secret → 401
-  - Wrong admin secret → 401
-  - Missing name → 400
-  - Missing endpoint_url → 400
-  - Missing auth_secret → 400
-  - Missing subscriptions → 400
-  - Missing subject_pattern in subscription → 400
+## 2026-02-09 12:15pm - US-004
+- Created `tests/e2e/startup_resume_test.go` with `TestStartupResume_PendingEvent`
+- Test inserts event directly with `delivery_status='pending'`, seeds subscriber+subscription, then calls `ResumeUnfinishedDeliveries`
+- Verifies: mock endpoint received exactly 1 request, event status transitions to 'delivered', delivery_attempts has 'succeeded' row
+- Uses `atomic.Int32` for request counting (thread-safe)
+- Files changed: tests/e2e/startup_resume_test.go
 - **Learnings for future iterations:**
-  - POST /subscribers uses `X-Slurpee-Admin-Secret` header (simple string comparison, not bcrypt)
-  - POST /subscribers returns 200 (not 201) — this is an upsert operation
-  - Upsert is keyed on `endpoint_url` (unique constraint) — same endpoint = same subscriber
-  - Upsert deletes all existing subscriptions then recreates — idempotent replace pattern
-  - Use `GetSubscriberByEndpointURL` to verify DB persistence since endpoint_url is the unique key
-  - Use `ListSubscriptionsForSubscriber` to verify subscriptions were persisted correctly
-  - `api.SubscriberResponse` and `api.SubscriptionResponse` are exported for test deserialization
+  - E2E tests don't call `Close()` or `StopDelivery` — goroutines leak after test, matching existing test patterns
+  - `StartDispatcher` must be called before `ResumeUnfinishedDeliveries` for workers to process tasks
+  - Direct DB insert with `InsertEvent` simulates a pre-shutdown event that was never dispatched
 ---
 
-## 2026-02-09 10:57 AM - US-005
-- Implemented: E2E tests for GET /subscribers endpoint (3 tests)
-- Files changed:
-  - `tests/e2e/subscribers_list_test.go` — all GET /subscribers E2E tests
-- Tests cover:
-  - Happy path: seed two subscribers via POST, GET all, verify both returned with correct subscription details
-  - Empty list: no subscribers returns empty JSON array `[]`
-  - Missing admin secret → 401
+## 2026-02-09 12:20pm - US-005
+- Added `TestStartupResume_PartialEvent` to `tests/e2e/startup_resume_test.go`
+- Sets up two subscribers (A with succeeded history, B with 2 failed attempts)
+- Inserts event with `delivery_status='partial'` and 3 delivery_attempts rows directly in DB
+- Calls `ResumeUnfinishedDeliveries` and verifies:
+  - Subscriber A receives 0 requests (already succeeded)
+  - Subscriber B receives exactly 1 new request
+  - Total delivery_attempts for B = 3 (2 prior + 1 new)
+  - Newest attempt for B has status='succeeded'
+  - Event reaches 'delivered' status
+- Logs confirm attempt=3 for subscriber B (continuing from 2 prior failures)
+- Files changed: tests/e2e/startup_resume_test.go
 - **Learnings for future iterations:**
-  - `httptest.ResponseRecorder.Body` is a `*bytes.Buffer` — calling `json.NewDecoder(rr.Body).Decode()` consumes the buffer, so `rr.Body.String()` returns empty after decode. Use `rr.Body.String()` first if you need both raw and decoded output.
-  - GET /subscribers returns `[]` (empty array) not `null` when no subscribers exist — the handler explicitly initializes to `[]SubscriberResponse{}`
-  - `createSubscriberViaAPI` helper pattern is useful for tests that need to seed data via the API rather than direct DB inserts
----
-
-## 2026-02-09 11:12 AM - US-006
-- Implemented: E2E tests for delivery pipeline (2 tests)
-- Files changed:
-  - `tests/e2e/delivery_pipeline_test.go` — delivery pipeline E2E tests + helpers
-- Tests cover:
-  - Happy path: create subscriber with httptest.Server endpoint, POST event, verify mock received exactly 1 HTTP POST with correct headers (X-Event-ID, X-Event-Subject, X-Slurpee-Secret, Content-Type) and event data body, verify delivery_attempts row with status "succeeded" and response_status_code 200, verify event delivery_status is "delivered"
-  - No matching subscriptions: POST event with no subscribers, verify event status becomes "delivered" with 0 delivery attempts
-- Helpers added:
-  - `waitForEventStatus(t, queries, eventID, expected, timeout)` — polls DB for delivery_status change
-  - `parseUUID(t, s)` — converts string UUID to pgtype.UUID
-- **Learnings for future iterations:**
-  - Delivery pipeline uses real HTTP clients — `httptest.NewServer` provides an actual HTTP endpoint the dispatcher can POST to, unlike `httptest.ResponseRecorder` which only works with direct handler calls
-  - `stopDelivery` field on Application is unexported — from the test package you can't call it directly. The `Close()` method calls it but also closes `dbconn` (which is nil in tests). Best approach: don't stop the dispatcher, just poll DB for expected state
-  - Dispatcher goroutines leak when not stopped, but this is acceptable for tests — each test creates isolated app instances with separate channels
-  - `sync.Mutex` is needed to safely access mock endpoint's received requests from test assertions (requests arrive on dispatcher goroutines)
-  - No need for `drainDeliveryChan` when using `StartDispatcher` — the dispatcher reads from the channel automatically
----
-
-## 2026-02-09 11:16 AM - US-007
-- Implemented: E2E tests for subscription pattern matching and filters (6 tests)
-- Files changed:
-  - `tests/e2e/pattern_matching_test.go` — all pattern matching and filter E2E tests
-- Tests cover:
-  - Exact subject match: `order.created` pattern matches `order.created` event
-  - Glob wildcard: `order.*` pattern matches `order.created` event
-  - Wildcard non-match: `order.*` does NOT match `user.created` event (0 deliveries, 0 attempts)
-  - Filter match: subscription with `{"type":"premium"}` filter receives event with `{"type":"premium","amount":99.99}` data
-  - Filter mismatch: subscription with `{"type":"premium"}` filter does NOT receive event with `{"type":"basic"}` data — event marked as `failed`
-  - Only matched subscriptions delivered: two subscribers (order.* and user.*), only order.* receives order.created event
-- **Learnings for future iterations:**
-  - When subject pattern matches but filter doesn't match for ANY subscription, `dispatchEvent` marks event as `failed` (not `delivered`) because the "No valid subscribers found" code path is hit
-  - `GetSubscriptionsMatchingSubject` converts `*` to SQL `%` and `?` to `_` at the database level — true SQL LIKE matching, not Go-side
-  - `matchesFilter` uses JSON marshal/unmarshal for type-safe comparison of filter values against event data top-level keys
-  - Multiple subscribers with different patterns work correctly — each gets its own delivery task based on independent pattern matching
----
-
-## 2026-02-09 11:18 AM - US-008
-- Implemented: E2E tests for subscriber deduplication (2 tests)
-- Files changed:
-  - `tests/e2e/deduplication_test.go` — subscriber deduplication E2E tests
-- Tests cover:
-  - Two overlapping subscriptions: one subscriber with `order.*` (max_retries=3) and `order.created` (max_retries=5), verify exactly 1 delivery request and 1 delivery_attempts row
-  - Three overlapping subscriptions: one subscriber with `*` (max_retries=1), `order.*` (max_retries=3), and `order.created` (max_retries=5), verify exactly 1 delivery request and 1 delivery_attempts row
-- **Learnings for future iterations:**
-  - Deduplication groups by subscriber_id in `dispatchEvent`, then picks the subscription with the highest effective `max_retries` — the `seedSubscription` helper with `maxRetries *int32` parameter makes it easy to test this
-  - Both tests use `seedSubscriber` + `seedSubscription` (direct DB seeding) rather than the API — this is simpler for multi-subscription setups and avoids the upsert behavior of POST /subscribers which replaces all subscriptions
-  - The `*` glob pattern matches all subjects in the database — confirmed via E2E tests that SQL LIKE `%` works correctly for catch-all patterns
----
-
-## 2026-02-09 11:20 AM - US-009
-- Implemented: E2E tests for delivery retries (2 tests)
-- Files changed:
-  - `tests/e2e/delivery_retries_test.go` — delivery retry E2E tests
-- Tests cover:
-  - Success after failures: mock endpoint returns 500 for first 2 requests then 200, verify 3 delivery attempts recorded (2 failed + 1 succeeded), event status becomes "delivered"
-  - Max retries exhausted: mock endpoint always returns 500, verify exactly max_retries+1=3 delivery attempts recorded (all failed), event status becomes "failed"
-- **Learnings for future iterations:**
-  - `MaxRetries=2` in config means total attempts = 3 (initial + 2 retries) — `attemptNum >= maxRetries` is the exhaustion check
-  - `MaxBackoffSeconds=1` caps exponential backoff at 1 second, keeping retry tests fast (~2s each)
-  - `time.AfterFunc` is used for non-blocking retry scheduling — the inflight WaitGroup is incremented before the timer starts
-  - `atomic.Int32` is cleaner than `sync.Mutex` + `int` for simple request counting in mock endpoints
-  - Event transitions through "partial" status during retries before settling on "delivered" or "failed"
+  - Set subscription `maxRetries` high enough to allow continued attempts (default MaxRetries=2 would exhaust immediately with attemptNum=2)
+  - `InsertDeliveryAttempt` can be used to seed prior delivery history for testing
+  - `atomic.Int32` works well for thread-safe mock endpoint request counting
 ---

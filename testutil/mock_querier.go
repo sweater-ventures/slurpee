@@ -65,9 +65,19 @@ func (m *MockQuerier) GetApiSecretSubscriberExists(ctx context.Context, arg db.G
 	return args.Get(0).(bool), args.Error(1)
 }
 
+func (m *MockQuerier) GetDeliverySummaryForEvent(ctx context.Context, eventID pgtype.UUID) ([]db.GetDeliverySummaryForEventRow, error) {
+	args := m.Called(ctx, eventID)
+	return args.Get(0).([]db.GetDeliverySummaryForEventRow), args.Error(1)
+}
+
 func (m *MockQuerier) GetEventByID(ctx context.Context, id pgtype.UUID) (db.Event, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(db.Event), args.Error(1)
+}
+
+func (m *MockQuerier) GetResumableEvents(ctx context.Context) ([]db.Event, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]db.Event), args.Error(1)
 }
 
 func (m *MockQuerier) GetLogConfigBySubject(ctx context.Context, subject string) (db.LogConfig, error) {

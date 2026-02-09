@@ -58,6 +58,39 @@ func (q *Queries) GetEventByID(ctx context.Context, id pgtype.UUID) (Event, erro
 	return i, err
 }
 
+const getResumableEvents = `-- name: GetResumableEvents :many
+SELECT id, subject, timestamp, trace_id, data, retry_count, delivery_status, status_updated_at FROM events WHERE delivery_status IN ('pending', 'partial') ORDER BY timestamp ASC
+`
+
+func (q *Queries) GetResumableEvents(ctx context.Context) ([]Event, error) {
+	rows, err := q.db.Query(ctx, getResumableEvents)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Event
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.ID,
+			&i.Subject,
+			&i.Timestamp,
+			&i.TraceID,
+			&i.Data,
+			&i.RetryCount,
+			&i.DeliveryStatus,
+			&i.StatusUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertEvent = `-- name: InsertEvent :one
 INSERT INTO events (id, subject, timestamp, trace_id, data, retry_count, delivery_status, status_updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

@@ -75,10 +75,19 @@ func (r *eventRegistry) remove(id [16]byte) {
 	delete(r.trackers, id)
 }
 
+// DispatcherState holds references to the internal dispatcher state needed by
+// ResumeUnfinishedDeliveries to enqueue partial-event delivery tasks directly.
+type DispatcherState struct {
+	inflightWg *sync.WaitGroup
+	taskQueue  chan<- deliveryTask
+	registry   *eventRegistry
+}
+
 // StartDispatcher launches the centralized event delivery dispatcher.
 // It reads events from app.DeliveryChan and delivers them to matching subscribers
 // using a fixed-size worker pool with non-blocking retries.
-func StartDispatcher(slurpee *Application) {
+// Returns a DispatcherState for use by ResumeUnfinishedDeliveries.
+func StartDispatcher(slurpee *Application) *DispatcherState {
 	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 
 	// Persistent per-subscriber semaphores keyed by UUID bytes
@@ -142,6 +151,12 @@ func StartDispatcher(slurpee *Application) {
 		close(slurpee.DeliveryChan)
 		<-done
 	})
+
+	return &DispatcherState{
+		inflightWg: &inflightWg,
+		taskQueue:  taskQueue,
+		registry:   registry,
+	}
 }
 
 // dispatchEvent finds matching subscriptions for an event and enqueues delivery tasks.
@@ -571,6 +586,186 @@ func recordFailedAttempt(ctx context.Context, slurpee *Application, attemptID pg
 		AttemptStatus:      "failed",
 		ResponseStatusCode: 0,
 	})
+}
+
+// ResumeUnfinishedDeliveries queries for events with 'pending' or 'partial' status
+// and feeds them back through the delivery pipeline. Pending events are sent to
+// DeliveryChan for normal dispatchEvent processing. Partial events are enqueued
+// directly into the dispatcher's task queue, skipping already-succeeded subscribers
+// and continuing retry counts. Call this after StartDispatcher.
+func ResumeUnfinishedDeliveries(slurpee *Application, ds *DispatcherState) {
+	ctx := context.Background()
+	events, err := slurpee.DB.GetResumableEvents(ctx)
+	if err != nil {
+		slog.Error("Failed to query resumable events", "error", err)
+		return
+	}
+
+	if len(events) == 0 {
+		slog.Debug("No events to resume on startup")
+		return
+	}
+
+	var pendingCount, partialCount int
+	for _, event := range events {
+		switch event.DeliveryStatus {
+		case "pending":
+			pendingCount++
+		case "partial":
+			partialCount++
+		}
+	}
+
+	slog.Info("Resuming unfinished deliveries on startup",
+		"pending", pendingCount, "partial", partialCount, "total", len(events))
+
+	// Feed pending events into DeliveryChan in a goroutine to avoid blocking
+	// if the channel buffer is smaller than the number of events.
+	go func() {
+		for _, event := range events {
+			if event.DeliveryStatus == "pending" {
+				slurpee.DeliveryChan <- event
+			}
+		}
+	}()
+
+	// Resume partial events directly via the dispatcher's task queue
+	for _, event := range events {
+		if event.DeliveryStatus == "partial" {
+			resumePartialEvent(ctx, slurpee, event, ds)
+		}
+	}
+}
+
+// resumePartialEvent handles resumption of a single partial event by checking
+// delivery history, re-running subscription matching, and enqueuing tasks for
+// subscribers that still need delivery.
+func resumePartialEvent(ctx context.Context, slurpee *Application, event db.Event, ds *DispatcherState) {
+	logger := slog.Default().With("event_id", UuidToString(event.ID), "subject", event.Subject, "resume", true)
+
+	// Get per-subscriber delivery summary
+	summary, err := slurpee.DB.GetDeliverySummaryForEvent(ctx, event.ID)
+	if err != nil {
+		logger.Error("Failed to get delivery summary for partial event", "error", err)
+		return
+	}
+
+	// Build lookup: subscriber_id -> {failed_count, succeeded_count}
+	type subSummary struct {
+		failedCount    int64
+		succeededCount int64
+	}
+	summaryMap := make(map[[16]byte]subSummary)
+	for _, s := range summary {
+		summaryMap[s.SubscriberID.Bytes] = subSummary{
+			failedCount:    s.FailedCount,
+			succeededCount: s.SucceededCount,
+		}
+	}
+
+	// Re-run subscription matching (same logic as dispatchEvent)
+	subscriptions, err := slurpee.DB.GetSubscriptionsMatchingSubject(ctx, event.Subject)
+	if err != nil {
+		logger.Error("Failed to find matching subscriptions for partial event", "error", err)
+		return
+	}
+
+	if len(subscriptions) == 0 {
+		logger.Warn("No matching subscriptions for partial event, marking as delivered")
+		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "delivered")
+		return
+	}
+
+	// Group subscriptions by subscriber
+	subscriberSubs := make(map[pgtype.UUID][]db.Subscription)
+	for _, sub := range subscriptions {
+		subscriberSubs[sub.SubscriberID] = append(subscriberSubs[sub.SubscriberID], sub)
+	}
+
+	// Load subscriber details
+	subscribers := make(map[pgtype.UUID]db.Subscriber)
+	for subID := range subscriberSubs {
+		subscriber, err := slurpee.DB.GetSubscriberByID(ctx, subID)
+		if err != nil {
+			logger.Error("Failed to get subscriber", "error", err, "subscriber_id", UuidToString(subID))
+			continue
+		}
+		subscribers[subID] = subscriber
+	}
+
+	// Build delivery tasks, deduplicated per subscriber, skipping already-succeeded
+	var tasks []deliveryTask
+	for subID, subs := range subscriberSubs {
+		subscriber, ok := subscribers[subID]
+		if !ok {
+			continue
+		}
+
+		// Check if this subscriber already succeeded
+		if ss, found := summaryMap[subID.Bytes]; found && ss.succeededCount > 0 {
+			logger.Debug("Skipping already-succeeded subscriber",
+				"subscriber_id", UuidToString(subID))
+			continue
+		}
+
+		// Pick best subscription (same deduplication logic as dispatchEvent)
+		var bestSub *db.Subscription
+		bestMaxRetries := -1
+		for i, sub := range subs {
+			if !matchesFilter(sub.Filter, event.Data) {
+				continue
+			}
+			maxRetries := slurpee.Config.MaxRetries
+			if sub.MaxRetries.Valid {
+				maxRetries = int(sub.MaxRetries.Int32)
+			}
+			if maxRetries > bestMaxRetries {
+				bestSub = &subs[i]
+				bestMaxRetries = maxRetries
+			}
+		}
+
+		if bestSub == nil {
+			continue
+		}
+
+		// Continue retry count from prior failed attempts
+		attemptNum := 0
+		if ss, found := summaryMap[subID.Bytes]; found {
+			attemptNum = int(ss.failedCount)
+		}
+
+		tasks = append(tasks, deliveryTask{
+			event:        event,
+			subscription: *bestSub,
+			subscriber:   subscriber,
+			attemptNum:   attemptNum,
+			maxRetries:   bestMaxRetries,
+		})
+	}
+
+	if len(tasks) == 0 {
+		logger.Info("No subscribers need delivery for partial event, marking as delivered")
+		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "delivered")
+		return
+	}
+
+	logger.Info("Resuming partial event", "subscribers_remaining", len(tasks))
+
+	// Create tracker and enqueue tasks directly into the dispatcher
+	tracker := &eventTracker{
+		event:    event,
+		expected: len(tasks),
+		results:  make(map[[16]byte]deliveryResult),
+		logger:   logger,
+	}
+	ds.registry.register(event.ID.Bytes, tracker)
+
+	for i := range tasks {
+		tasks[i].tracker = tracker
+		ds.inflightWg.Add(1)
+		ds.taskQueue <- tasks[i]
+	}
 }
 
 // PublishCreatedEvent publishes a 'created' bus message for SSE clients.

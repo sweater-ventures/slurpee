@@ -11,6 +11,42 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getDeliverySummaryForEvent = `-- name: GetDeliverySummaryForEvent :many
+SELECT
+  subscriber_id,
+  COUNT(*) FILTER (WHERE status = 'failed')::bigint AS failed_count,
+  COUNT(*) FILTER (WHERE status = 'succeeded')::bigint AS succeeded_count
+FROM delivery_attempts
+WHERE event_id = $1
+GROUP BY subscriber_id
+`
+
+type GetDeliverySummaryForEventRow struct {
+	SubscriberID   pgtype.UUID
+	FailedCount    int64
+	SucceededCount int64
+}
+
+func (q *Queries) GetDeliverySummaryForEvent(ctx context.Context, eventID pgtype.UUID) ([]GetDeliverySummaryForEventRow, error) {
+	rows, err := q.db.Query(ctx, getDeliverySummaryForEvent, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetDeliverySummaryForEventRow
+	for rows.Next() {
+		var i GetDeliverySummaryForEventRow
+		if err := rows.Scan(&i.SubscriberID, &i.FailedCount, &i.SucceededCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertDeliveryAttempt = `-- name: InsertDeliveryAttempt :one
 INSERT INTO delivery_attempts (id, event_id, subscriber_id, endpoint_url, attempted_at, request_headers, response_status_code, response_headers, response_body, status)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)

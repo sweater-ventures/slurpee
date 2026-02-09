@@ -14,7 +14,7 @@
         "Go build passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "Use COUNT(*) FILTER (WHERE ...) for the summary query — PostgreSQL supports this syntax. Cast counts to ::bigint so sqlc generates int64. The summary query is only needed for partial events (pending events have zero delivery_attempts)."
     },
     {
@@ -31,7 +31,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "Pending events have zero delivery_attempts so they can safely go through the normal dispatchEvent path. Feed them into DeliveryChan in a goroutine if the count exceeds channel buffer size to avoid blocking startup. ResumeUnfinishedDeliveries needs access to *Application (for DB and DeliveryChan)."
     },
     {
@@ -50,7 +50,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "This is the most complex story. The resume function must re-run subscription matching (GetSubscriptionsMatchingSubject), apply filter logic (matchesFilter), deduplicate per subscriber, then cross-reference with delivery history. The dispatchEvent function handles all this for fresh events — consider extracting shared logic into helpers. The inflightWg/taskQueue/registry are currently local to StartDispatcher; refactoring to expose them (e.g., via a dispatcherState struct) keeps the code clean."
     },
     {
@@ -69,7 +69,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "Use the same E2E infrastructure from tests/e2e/main_test.go (newTestApp, truncateAll, waitForEventStatus, etc.). Insert event via DB.InsertEvent with delivery_status='pending'. StartDispatcher must be running for delivery to work. The resume function must be exported or testable from the e2e package."
     },
     {
@@ -89,7 +89,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "This test requires inserting delivery_attempts rows directly via InsertDeliveryAttempt to simulate prior history. Use two separate httptest.NewServer instances for the two subscribers. The already-succeeded subscriber should have zero requests to its mock endpoint after resume. Use atomic counters on mock endpoints to verify request counts."
     }
   ]
