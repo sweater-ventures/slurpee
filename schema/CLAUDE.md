@@ -22,4 +22,10 @@
 | #1187 | " | 🔵 | Subscriptions table schema with filtering and retry configuration | ~358 |
 | #1185 | " | 🔵 | Delivery attempts audit trail with full HTTP request/response capture | ~405 |
 | #1183 | " | 🔵 | Events table schema with indexed query patterns | ~362 |
+
+### Feb 9, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #1431 | 4:11 PM | 🔵 | Complete events list architecture with SSE live streaming and reconnection recovery | ~877 |
 </claude-mem-context>
