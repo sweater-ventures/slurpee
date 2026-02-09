@@ -79,7 +79,7 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "POST /subscribers uses X-Slurpee-Admin-Secret header (simple string comparison against config.AdminSecret). Upsert is keyed on endpoint_url (unique constraint). POST returns 200 (not 201)."
     },
     {
@@ -94,8 +94,8 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": "GET /subscribers also requires X-Slurpee-Admin-Secret. Response includes nested subscriptions for each subscriber."
+      "passes": true,
+      "notes": "GET /subscribers also requires X-Slurpee-Admin-Secret. Response includes nested subscriptions for each subscriber. Tests seed data via POST /api/subscribers then verify GET returns correct list with nested subscriptions."
     },
     {
       "id": "US-006",

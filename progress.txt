@@ -64,3 +64,43 @@ Started: Mon Feb  9 09:09:47 MST 2026
   - Use `r.PathValue("id")` for Go 1.22+ path params in ServeMux
   - Create event via POST first, then GET it back — this tests the full round-trip
 ---
+
+## 2026-02-09 10:54 AM - US-004
+- Implemented: E2E tests for POST /subscribers endpoint (11 tests)
+- Files changed:
+  - `tests/e2e/subscribers_create_test.go` — all POST /subscribers E2E tests
+- Tests cover:
+  - Happy path: create subscriber with subscriptions, verify 200 + response fields + DB persistence
+  - Upsert: POST same endpoint_url again with different subscriptions, verify old replaced and same subscriber ID retained
+  - Subscription with filter JSON: verify filter persisted in response and DB
+  - Subscription with max_retries override: verify persisted in response and DB
+  - Missing admin secret → 401
+  - Wrong admin secret → 401
+  - Missing name → 400
+  - Missing endpoint_url → 400
+  - Missing auth_secret → 400
+  - Missing subscriptions → 400
+  - Missing subject_pattern in subscription → 400
+- **Learnings for future iterations:**
+  - POST /subscribers uses `X-Slurpee-Admin-Secret` header (simple string comparison, not bcrypt)
+  - POST /subscribers returns 200 (not 201) — this is an upsert operation
+  - Upsert is keyed on `endpoint_url` (unique constraint) — same endpoint = same subscriber
+  - Upsert deletes all existing subscriptions then recreates — idempotent replace pattern
+  - Use `GetSubscriberByEndpointURL` to verify DB persistence since endpoint_url is the unique key
+  - Use `ListSubscriptionsForSubscriber` to verify subscriptions were persisted correctly
+  - `api.SubscriberResponse` and `api.SubscriptionResponse` are exported for test deserialization
+---
+
+## 2026-02-09 10:57 AM - US-005
+- Implemented: E2E tests for GET /subscribers endpoint (3 tests)
+- Files changed:
+  - `tests/e2e/subscribers_list_test.go` — all GET /subscribers E2E tests
+- Tests cover:
+  - Happy path: seed two subscribers via POST, GET all, verify both returned with correct subscription details
+  - Empty list: no subscribers returns empty JSON array `[]`
+  - Missing admin secret → 401
+- **Learnings for future iterations:**
+  - `httptest.ResponseRecorder.Body` is a `*bytes.Buffer` — calling `json.NewDecoder(rr.Body).Decode()` consumes the buffer, so `rr.Body.String()` returns empty after decode. Use `rr.Body.String()` first if you need both raw and decoded output.
+  - GET /subscribers returns `[]` (empty array) not `null` when no subscribers exist — the handler explicitly initializes to `[]SubscriberResponse{}`
+  - `createSubscriberViaAPI` helper pattern is useful for tests that need to seed data via the API rather than direct DB inserts
+---
