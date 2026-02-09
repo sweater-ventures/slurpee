@@ -113,8 +113,8 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": "Must call app.StartDispatcher(slurpee) before posting events, and slurpee.stopDelivery() after (via the SetStopDelivery callback). Use polling/retry loop to wait for delivery_status to change in the database — do not use fixed sleeps. The dispatcher reads from DeliveryChan, so the event must go through the channel (which POST /events already does)."
+      "passes": true,
+      "notes": "Tests use httptest.NewServer as mock subscriber endpoint. app.StartDispatcher(slurpee) starts the delivery pipeline. waitForEventStatus polls the DB for delivery_status changes (no fixed sleeps). Dispatcher goroutines leak in tests but that's acceptable — each test creates its own app instance. parseUUID helper converts string UUIDs to pgtype.UUID for DB queries."
     },
     {
       "id": "US-007",
@@ -131,8 +131,8 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": "GetSubscriptionsMatchingSubject uses database-side pattern matching — this is a key thing E2E tests validate that mocks cannot. Glob wildcards use * (not %). Filter matching is AND logic on top-level JSON keys, evaluated in Go code (matchesFilter), not SQL."
+      "passes": true,
+      "notes": "GetSubscriptionsMatchingSubject uses database-side pattern matching — this is a key thing E2E tests validate that mocks cannot. Glob wildcards use * (not %). Filter matching is AND logic on top-level JSON keys, evaluated in Go code (matchesFilter), not SQL. When all subscriptions match subject but none pass filter, dispatchEvent marks event as 'failed' (not 'delivered')."
     },
     {
       "id": "US-008",
@@ -148,8 +148,8 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": "Deduplication logic is in dispatchEvent — groups subscriptions by subscriber_id and picks the one with highest effective max_retries. This was recently implemented; E2E tests confirm it works with real DB data."
+      "passes": true,
+      "notes": "Deduplication logic is in dispatchEvent — groups subscriptions by subscriber_id and picks the one with highest effective max_retries. This was recently implemented; E2E tests confirm it works with real DB data. Tests validate both two and three overlapping subscriptions result in exactly one delivery per subscriber."
     },
     {
       "id": "US-009",
@@ -166,7 +166,7 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "Use MaxBackoffSeconds=1 and MaxRetries=2 in test config to keep retry tests fast. processDeliveryTask uses time.AfterFunc for retry scheduling. Poll the database for delivery_attempts count and event status rather than using fixed sleeps."
     }
   ]
