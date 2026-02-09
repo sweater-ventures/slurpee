@@ -8,6 +8,10 @@ Started: Mon Feb  9 09:09:47 MST 2026
 - Migration parser extracts lines between `-- +migrate Up` and `-- +migrate Down` markers
 - `truncateAll` uses single TRUNCATE with CASCADE for all tables (faster than individual truncates)
 - Seed helpers use `bcrypt.MinCost` for fast test execution (not default cost 10)
+- For delivery pipeline tests: use `httptest.NewServer` (not `httptest.ResponseRecorder`) since the dispatcher makes real HTTP calls
+- Poll DB for `delivery_status` changes via `waitForEventStatus` helper — never use `time.Sleep` for delivery assertions
+- `app.StartDispatcher(slurpee)` starts delivery goroutines; dispatcher goroutines leak in tests but are acceptable since each test creates its own app
+- `stopDelivery` is unexported — for tests, don't try to call it; just poll DB state and let goroutines leak
 - `newTestApp` wires real `db.Queries` to embedded postgres, not mocks
 - `seedApiSecret` returns both the db record and the plaintext for use in auth headers
 - POST /events sends to `DeliveryChan` — call `drainDeliveryChan(slurpee)` after each create test to avoid blocking
@@ -103,4 +107,22 @@ Started: Mon Feb  9 09:09:47 MST 2026
   - `httptest.ResponseRecorder.Body` is a `*bytes.Buffer` — calling `json.NewDecoder(rr.Body).Decode()` consumes the buffer, so `rr.Body.String()` returns empty after decode. Use `rr.Body.String()` first if you need both raw and decoded output.
   - GET /subscribers returns `[]` (empty array) not `null` when no subscribers exist — the handler explicitly initializes to `[]SubscriberResponse{}`
   - `createSubscriberViaAPI` helper pattern is useful for tests that need to seed data via the API rather than direct DB inserts
+---
+
+## 2026-02-09 11:12 AM - US-006
+- Implemented: E2E tests for delivery pipeline (2 tests)
+- Files changed:
+  - `tests/e2e/delivery_pipeline_test.go` — delivery pipeline E2E tests + helpers
+- Tests cover:
+  - Happy path: create subscriber with httptest.Server endpoint, POST event, verify mock received exactly 1 HTTP POST with correct headers (X-Event-ID, X-Event-Subject, X-Slurpee-Secret, Content-Type) and event data body, verify delivery_attempts row with status "succeeded" and response_status_code 200, verify event delivery_status is "delivered"
+  - No matching subscriptions: POST event with no subscribers, verify event status becomes "delivered" with 0 delivery attempts
+- Helpers added:
+  - `waitForEventStatus(t, queries, eventID, expected, timeout)` — polls DB for delivery_status change
+  - `parseUUID(t, s)` — converts string UUID to pgtype.UUID
+- **Learnings for future iterations:**
+  - Delivery pipeline uses real HTTP clients — `httptest.NewServer` provides an actual HTTP endpoint the dispatcher can POST to, unlike `httptest.ResponseRecorder` which only works with direct handler calls
+  - `stopDelivery` field on Application is unexported — from the test package you can't call it directly. The `Close()` method calls it but also closes `dbconn` (which is nil in tests). Best approach: don't stop the dispatcher, just poll DB for expected state
+  - Dispatcher goroutines leak when not stopped, but this is acceptable for tests — each test creates isolated app instances with separate channels
+  - `sync.Mutex` is needed to safely access mock endpoint's received requests from test assertions (requests arrive on dispatcher goroutines)
+  - No need for `drainDeliveryChan` when using `StartDispatcher` — the dispatcher reads from the channel automatically
 ---
