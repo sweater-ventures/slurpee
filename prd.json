@@ -69,7 +69,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Use the same E2E infrastructure from tests/e2e/main_test.go (newTestApp, truncateAll, waitForEventStatus, etc.). Insert event via DB.InsertEvent with delivery_status='pending'. StartDispatcher must be running for delivery to work. The resume function must be exported or testable from the e2e package."
     },
     {

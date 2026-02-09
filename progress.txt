@@ -46,3 +46,15 @@ Started: Mon Feb  9 11:58:30 MST 2026
   - The partial event resume logic mirrors `dispatchEvent` but with delivery history cross-referencing
   - `summaryMap` keyed by `[16]byte` (UUID bytes) is the fastest lookup pattern for UUID maps
 ---
+
+## 2026-02-09 12:15pm - US-004
+- Created `tests/e2e/startup_resume_test.go` with `TestStartupResume_PendingEvent`
+- Test inserts event directly with `delivery_status='pending'`, seeds subscriber+subscription, then calls `ResumeUnfinishedDeliveries`
+- Verifies: mock endpoint received exactly 1 request, event status transitions to 'delivered', delivery_attempts has 'succeeded' row
+- Uses `atomic.Int32` for request counting (thread-safe)
+- Files changed: tests/e2e/startup_resume_test.go
+- **Learnings for future iterations:**
+  - E2E tests don't call `Close()` or `StopDelivery` — goroutines leak after test, matching existing test patterns
+  - `StartDispatcher` must be called before `ResumeUnfinishedDeliveries` for workers to process tasks
+  - Direct DB insert with `InsertEvent` simulates a pre-shutdown event that was never dispatched
+---
