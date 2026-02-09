@@ -292,6 +292,36 @@ func (q *Queries) UpdateSubscriber(ctx context.Context, arg UpdateSubscriberPara
 	return i, err
 }
 
+const updateSubscription = `-- name: UpdateSubscription :one
+UPDATE subscriptions SET
+    filter = $2,
+    max_retries = $3,
+    updated_at = now()
+WHERE id = $1
+RETURNING id, subscriber_id, subject_pattern, filter, max_retries, created_at, updated_at
+`
+
+type UpdateSubscriptionParams struct {
+	ID         pgtype.UUID
+	Filter     []byte
+	MaxRetries pgtype.Int4
+}
+
+func (q *Queries) UpdateSubscription(ctx context.Context, arg UpdateSubscriptionParams) (Subscription, error) {
+	row := q.db.QueryRow(ctx, updateSubscription, arg.ID, arg.Filter, arg.MaxRetries)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.SubscriberID,
+		&i.SubjectPattern,
+		&i.Filter,
+		&i.MaxRetries,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const upsertSubscriber = `-- name: UpsertSubscriber :one
 INSERT INTO subscribers (id, name, endpoint_url, auth_secret, max_parallel, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, now(), now())

@@ -54,6 +54,7 @@ type Querier interface {
 	UpdateDeliveryAttemptStatus(ctx context.Context, arg UpdateDeliveryAttemptStatusParams) (DeliveryAttempt, error)
 	UpdateEventDeliveryStatus(ctx context.Context, arg UpdateEventDeliveryStatusParams) (Event, error)
 	UpdateSubscriber(ctx context.Context, arg UpdateSubscriberParams) (Subscriber, error)
+	UpdateSubscription(ctx context.Context, arg UpdateSubscriptionParams) (Subscription, error)
 	UpsertLogConfig(ctx context.Context, arg UpsertLogConfigParams) (LogConfig, error)
 	UpsertSubscriber(ctx context.Context, arg UpsertSubscriberParams) (Subscriber, error)
 }
