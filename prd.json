@@ -79,7 +79,7 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "POST /subscribers uses X-Slurpee-Admin-Secret header (simple string comparison against config.AdminSecret). Upsert is keyed on endpoint_url (unique constraint). POST returns 200 (not 201)."
     },
     {
