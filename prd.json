@@ -1,132 +1,173 @@
 {
   "project": "Slurpee Event Broker",
-  "branchName": "ralph/unit-tests",
-  "description": "Add unit tests for core functionality: /api/events and /api/subscribers endpoints, and the event dispatch/delivery pipeline. Tests focus on behavior over implementation, using mocked database dependencies and httptest servers.",
+  "branchName": "ralph/e2e-tests",
+  "description": "End-to-end regression tests using embedded-postgres that exercise the full API stack against a real PostgreSQL database. Validates the complete request-to-database-to-response cycle, delivery pipeline, deduplication, retries, and pattern matching — catching issues that mock-based unit tests cannot.",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Enable sqlc Querier interface and refactor Application",
-      "description": "As a developer, I need a mockable interface for database operations so that handlers and business logic can be tested without a real database.",
+      "title": "Set up embedded-postgres test infrastructure",
+      "description": "As a developer, I need reusable test infrastructure that starts an embedded PostgreSQL instance, runs migrations, and provides helpers for creating test fixtures against the real database, so that all E2E tests can share this foundation.",
       "acceptanceCriteria": [
-        "Add `emit_interface: true` to `sqlc.yaml` under `gen.go`",
-        "Regenerate sqlc code (`go tool sqlc generate`) — the `Querier` interface in `db/querier.go` is now populated with all query methods",
-        "Change `Application.DB` field type from `*db.Queries` to `db.Querier`",
-        "Update `NewApp()` and any code that assigns to `Application.DB` to work with the interface",
-        "All existing code compiles without errors (`go build ./...`)"
+        "Add `github.com/fergusstrange/embedded-postgres` dependency",
+        "Create `tests/e2e/` package with `TestMain` that starts embedded-postgres once for the package",
+        "TestMain checks `testing.Short()` and skips all E2E tests when `-short` flag is passed",
+        "TestMain runs all `schema/*.sql` migration files (sorted by filename) against the embedded database on startup, parsing only the `-- +migrate Up` section",
+        "Provide a `truncateAll(t *testing.T)` helper that truncates all tables between tests (respecting FK order: delivery_attempts, api_secret_subscribers, subscriptions, subscribers, api_secrets, events, log_config)",
+        "Provide a `newTestApp(t *testing.T)` helper that returns an `*app.Application` wired to the real database (real `db.Queries`, not mock) with sensible config defaults (AdminSecret, MaxRetries=2, MaxBackoffSeconds=1, DeliveryWorkers=2, DeliveryQueueSize=100, DeliveryChanSize=100)",
+        "Provide a `newTestRouter(t *testing.T, slurpee *app.Application)` helper that returns an `*http.ServeMux` with API routes registered via `api.AddApis`",
+        "Provide seed helpers: `seedSubscriber`, `seedSubscription`, `seedApiSecret` that insert test data directly via the real `db.Queries` interface",
+        "`go build ./...` passes",
+        "`go test ./tests/e2e/...` passes with a placeholder test"
       ],
       "priority": 1,
       "passes": true,
-      "notes": ""
+      "notes": "The db.New(conn) function returns *db.Queries satisfying db.Querier. Migration files use `-- +migrate Up` / `-- +migrate Down` format. API secret seed helpers must create secrets with real bcrypt hashes. The Application struct needs DB, Config, DeliveryChan, EventBus, and Sessions fields populated."
     },
     {
       "id": "US-002",
-      "title": "Set up test infrastructure",
-      "description": "As a developer, I need test dependencies, mock implementations, and helper functions so that writing tests is straightforward and consistent.",
+      "title": "E2E tests for POST /events endpoint",
+      "description": "As a developer, I want E2E tests for event creation that verify the full request-to-database-to-response cycle including authentication, authorization, validation, and persistence.",
       "acceptanceCriteria": [
-        "Add `github.com/stretchr/testify` as a test dependency",
-        "Create `testutil/mock_querier.go` with a testify mock implementation of `db.Querier`",
-        "Create `testutil/factories.go` with factory functions that build test instances of `db.Event`, `db.Subscriber`, `db.Subscription`, `db.ApiSecret`, and `app.Application` (with mock DB, config, channels, etc.)",
-        "Factory functions use sensible defaults but allow overrides",
-        "Create `testutil/helpers.go` with HTTP test helpers: functions to build `*http.Request` with headers (secret ID, secret value, admin secret, JSON body) and to assert JSON response bodies",
-        "All test utilities compile (`go test ./testutil/...`)",
-        "Typecheck passes"
+        "Test happy path: create event with valid API secret, verify 201 response with correct fields, verify event persisted in database via GetEventByID",
+        "Test with client-provided UUID: verify the event is created with the exact ID provided",
+        "Test with client-provided timestamp: verify the event stores the provided timestamp",
+        "Test with optional trace_id: verify trace_id is persisted and returned",
+        "Test missing X-Slurpee-Secret-ID header returns 401",
+        "Test invalid/wrong API secret returns 401",
+        "Test subject outside secret's scope returns 403",
+        "Test missing subject returns 400",
+        "Test missing data returns 400",
+        "Test invalid JSON data returns 400",
+        "All tests call truncateAll before running (clean state)",
+        "`go test ./tests/e2e/...` passes"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": ""
+      "passes": false,
+      "notes": "POST /events requires X-Slurpee-Secret-ID and X-Slurpee-Secret headers. ValidateSecretByID uses bcrypt to compare secrets. CheckSendScope validates subject against the secret's subject_pattern. Event is sent to DeliveryChan after creation — use a buffered channel and drain it in tests to avoid blocking."
     },
     {
       "id": "US-003",
-      "title": "Unit tests for pure business logic",
-      "description": "As a developer, I want tests for the pure functions that don't require database mocks, so that core logic is verified in isolation.",
+      "title": "E2E tests for GET /events/{id} endpoint",
+      "description": "As a developer, I want E2E tests for event retrieval that verify reading events back from the real database with proper authentication.",
       "acceptanceCriteria": [
-        "Tests for `app.CheckSendScope` — verifies SQL LIKE-style pattern matching: exact match, `%` wildcard, `_` single-char wildcard, no match, edge cases (empty pattern, empty subject)",
-        "Tests for `app.MatchLikePattern` — covers `%` at start/end/middle, `_` matching, escaped characters, multiple wildcards",
-        "Tests for `matchesFilter` in `app/delivery.go` — matching filter, non-matching filter, empty/nil filter matches all, partial key match, nested JSON values",
-        "Tests for `calculateBackoff` in `app/delivery.go` — verifies exponential growth, respects max backoff cap, first attempt backoff",
-        "All tests pass (`go test ./app/...`)",
-        "Tests are table-driven where appropriate"
+        "Test happy path: create event via POST, then GET it by ID, verify all fields match",
+        "Test event not found returns 404",
+        "Test invalid UUID format returns 400",
+        "Test missing API secret returns 401",
+        "Test invalid API secret returns 401",
+        "All tests call truncateAll before running",
+        "`go test ./tests/e2e/...` passes"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "matchesFilter and calculateBackoff are unexported — test from within app package (package app, not app_test)"
+      "passes": false,
+      "notes": "GET /events/{id} validates API secret but does NOT check subject scope — any valid secret can read any event."
     },
     {
       "id": "US-004",
-      "title": "Unit tests for POST /api/events",
-      "description": "As a developer, I want tests that verify the behavior of creating events through the API, covering authentication, authorization, validation, and the happy path.",
+      "title": "E2E tests for POST /subscribers endpoint",
+      "description": "As a developer, I want E2E tests for subscriber creation/upsert that verify the full cycle including subscription creation and idempotent upsert behavior against the real database.",
       "acceptanceCriteria": [
-        "Test: request without secret headers returns 401",
-        "Test: request with invalid secret ID (not a UUID) returns 400",
-        "Test: request with valid secret ID but wrong secret value returns 401",
-        "Test: request with valid credentials but subject outside secret's scope returns 403",
-        "Test: request with missing required fields (subject, data) returns 400",
-        "Test: request with invalid JSON body returns 400",
-        "Test: successful event creation returns 201 with event ID, subject, timestamp, and data in response",
-        "Test: successful event creation sends event to delivery channel",
-        "Tests use mock Querier, `httptest.NewRecorder`, and `httptest.NewRequest`",
-        "All tests pass (`go test ./api/...`)"
+        "Test happy path: create subscriber with subscriptions, verify 200 response, verify subscriber and subscriptions persisted in database",
+        "Test upsert: create subscriber, then POST again with same name/endpoint but different subscriptions, verify old subscriptions replaced",
+        "Test subscription with filter: verify filter JSON persisted correctly",
+        "Test subscription with max_retries override: verify persisted",
+        "Test missing admin secret returns 401",
+        "Test wrong admin secret returns 401",
+        "Test missing required fields (name, endpoint_url, auth_secret, subscriptions) each return 400",
+        "Test missing subject_pattern in subscription returns 400",
+        "All tests call truncateAll before running",
+        "`go test ./tests/e2e/...` passes"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "API handlers take (slurpee *app.Application, w, r). Construct Application with mock DB. ValidateSecretByID is called on the Querier. DeliveryChan is a buffered channel on Application — read from it to verify event dispatch."
+      "passes": false,
+      "notes": "POST /subscribers uses X-Slurpee-Admin-Secret header (simple string comparison against config.AdminSecret). Upsert is keyed on endpoint_url (unique constraint). POST returns 200 (not 201)."
     },
     {
       "id": "US-005",
-      "title": "Unit tests for GET /api/events/{id}",
-      "description": "As a developer, I want tests that verify the behavior of retrieving events by ID through the API.",
+      "title": "E2E tests for GET /subscribers endpoint",
+      "description": "As a developer, I want E2E tests for listing subscribers that verify the real database query returns correct data with subscriptions included.",
       "acceptanceCriteria": [
-        "Test: request without secret headers returns 401",
-        "Test: request with valid credentials for nonexistent event returns 404",
-        "Test: request with valid credentials for existing event returns 200 with correct event data",
-        "Test: response JSON structure matches the documented `EventResponse` format",
-        "Tests use mock Querier",
-        "All tests pass (`go test ./api/...`)"
+        "Test happy path: seed multiple subscribers with subscriptions via POST, verify all returned with correct subscription details",
+        "Test empty list: no subscribers returns empty array []",
+        "Test missing admin secret returns 401",
+        "All tests call truncateAll before running",
+        "`go test ./tests/e2e/...` passes"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "GET endpoint validates secret but does not check scope (read-only, any valid secret works)."
+      "passes": false,
+      "notes": "GET /subscribers also requires X-Slurpee-Admin-Secret. Response includes nested subscriptions for each subscriber."
     },
     {
       "id": "US-006",
-      "title": "Unit tests for /api/subscribers endpoints",
-      "description": "As a developer, I want tests that verify the behavior of subscriber management API endpoints: creating/updating subscribers and listing them.",
+      "title": "E2E tests for delivery pipeline",
+      "description": "As a developer, I want E2E tests that verify the complete delivery pipeline: posting an event causes it to be delivered to matching subscribers' HTTP endpoints, with delivery attempts recorded in the database.",
       "acceptanceCriteria": [
-        "Test POST: request without admin secret returns 401",
-        "Test POST: request with wrong admin secret returns 401",
-        "Test POST: request with missing required fields (name, endpoint_url) returns 400",
-        "Test POST: request with invalid endpoint URL returns 400",
-        "Test POST: successful subscriber creation returns 201 with subscriber details and subscriptions",
-        "Test POST: subscriber creation with subscriptions creates both subscriber and subscription records",
-        "Test GET: request without admin secret returns 401",
-        "Test GET: successful request returns 200 with list of subscribers and their subscriptions",
-        "Test GET: empty subscriber list returns 200 with empty array",
-        "Tests use mock Querier",
-        "All tests pass (`go test ./api/...`)"
+        "Start an httptest.Server as a mock subscriber endpoint that records received requests",
+        "Seed a subscriber pointing at the test server with a subscription matching the event subject",
+        "POST an event via the API, wait for delivery to complete",
+        "Verify the mock endpoint received exactly one HTTP POST with correct headers (X-Event-ID, X-Event-Subject, X-Slurpee-Secret) and the event data as the body",
+        "Verify a delivery_attempts row was recorded in the database with status succeeded and correct response_status_code",
+        "Verify the event's delivery_status was updated to delivered in the database",
+        "Test with no matching subscriptions: event status becomes delivered (no subscribers to deliver to)",
+        "All tests call truncateAll before running",
+        "`go test ./tests/e2e/...` passes"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "Subscriber endpoints use X-Slurpee-Admin-Secret header, validated against config.AdminSecret (simple string comparison)."
+      "passes": false,
+      "notes": "Must call app.StartDispatcher(slurpee) before posting events, and slurpee.stopDelivery() after (via the SetStopDelivery callback). Use polling/retry loop to wait for delivery_status to change in the database — do not use fixed sleeps. The dispatcher reads from DeliveryChan, so the event must go through the channel (which POST /events already does)."
     },
     {
       "id": "US-007",
-      "title": "Unit tests for event dispatch and delivery",
-      "description": "As a developer, I want tests that verify the full delivery pipeline: matching events to subscribers, building and sending webhook requests, handling responses, and retry behavior.",
+      "title": "E2E tests for subscription pattern matching and filters",
+      "description": "As a developer, I want E2E tests that verify glob-style subject pattern matching and JSON filter logic work correctly with the real database query (GetSubscriptionsMatchingSubject).",
       "acceptanceCriteria": [
-        "Test: `deliverToSubscriber` sends POST to subscriber endpoint with correct headers (`Content-Type`, `X-Slurpee-Secret`, `X-Event-ID`, `X-Event-Subject`) and body (event data)",
-        "Test: `deliverToSubscriber` returns true for 2xx responses and false for non-2xx",
-        "Test: `deliverToSubscriber` records delivery attempt in database with request/response details",
-        "Test: `dispatchEvent` finds matching subscriptions and enqueues delivery tasks",
-        "Test: `dispatchEvent` skips subscriptions whose filters don't match the event data",
-        "Test: delivery retries on failure up to the configured max retries",
-        "Test: event status is updated to 'delivered' when all deliveries succeed",
-        "Test: event status is updated to 'failed' when all deliveries fail after retries",
-        "Tests use `httptest.Server` for webhook endpoints and mock Querier for database",
-        "All tests pass (`go test ./app/...`)"
+        "Test exact subject match: subscription with pattern order.created matches event with subject order.created",
+        "Test glob wildcard: subscription with pattern order.* matches event with subject order.created",
+        "Test wildcard does NOT match unrelated subjects: order.* does not match user.created",
+        "Test subscription filter: subscriber with filter {\"type\": \"premium\"} only receives events where data.type == premium",
+        "Test filter mismatch: event with {\"type\": \"basic\"} is NOT delivered to subscriber with filter {\"type\": \"premium\"}",
+        "Verify delivery attempts are only recorded for matched subscriptions",
+        "All tests call truncateAll before running",
+        "`go test ./tests/e2e/...` passes"
       ],
       "priority": 7,
-      "passes": true,
-      "notes": "deliverToSubscriber and dispatchEvent are unexported — test from within app package. Use httptest.Server as the webhook endpoint. The delivery pipeline uses goroutines and channels — tests may need short timeouts or synchronization helpers."
+      "passes": false,
+      "notes": "GetSubscriptionsMatchingSubject uses database-side pattern matching — this is a key thing E2E tests validate that mocks cannot. Glob wildcards use * (not %). Filter matching is AND logic on top-level JSON keys, evaluated in Go code (matchesFilter), not SQL."
+    },
+    {
+      "id": "US-008",
+      "title": "E2E tests for subscriber deduplication",
+      "description": "As a developer, I want E2E tests that verify when a subscriber has multiple overlapping subscriptions matching the same event, only one delivery is made (the one with the highest max_retries).",
+      "acceptanceCriteria": [
+        "Seed a subscriber with two subscriptions: order.* (max_retries=3) and order.created (max_retries=5)",
+        "POST an event with subject order.created",
+        "Verify the mock endpoint received exactly ONE request (not two)",
+        "Verify exactly one delivery_attempts row in the database for this event+subscriber pair",
+        "Test with three overlapping patterns: verify still only one delivery",
+        "All tests call truncateAll before running",
+        "`go test ./tests/e2e/...` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Deduplication logic is in dispatchEvent — groups subscriptions by subscriber_id and picks the one with highest effective max_retries. This was recently implemented; E2E tests confirm it works with real DB data."
+    },
+    {
+      "id": "US-009",
+      "title": "E2E tests for delivery retries",
+      "description": "As a developer, I want E2E tests that verify the retry mechanism works end-to-end: failed deliveries are retried up to max_retries, and delivery attempts are recorded for each attempt.",
+      "acceptanceCriteria": [
+        "Start a mock endpoint that returns 500 for the first N requests then 200",
+        "Seed subscriber and subscription with known max_retries",
+        "POST an event and wait for delivery to complete (MaxBackoffSeconds=1 for fast tests)",
+        "Verify multiple delivery_attempts rows recorded (one per attempt)",
+        "Verify the final event status is delivered after the successful retry",
+        "Test max retries exhausted: endpoint always returns 500, verify event status becomes failed, verify exactly max_retries+1 delivery attempts recorded",
+        "All tests call truncateAll before running",
+        "`go test ./tests/e2e/...` passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Use MaxBackoffSeconds=1 and MaxRetries=2 in test config to keep retry tests fast. processDeliveryTask uses time.AfterFunc for retry scheduling. Poll the database for delivery_attempts count and event status rather than using fixed sleeps."
     }
   ]
 }
