@@ -1,3 +1,21 @@
 # Ralph Progress Log
 Started: Mon Feb  9 11:58:30 MST 2026
 ---
+
+## Codebase Patterns
+- Use `::bigint` cast on `COUNT(*)` in sqlc queries so generated Go type is `int64` (not `interface{}`)
+- `COUNT(*) FILTER (WHERE ...)` is valid PostgreSQL syntax for conditional aggregation
+- Two mock querier implementations exist: `testutil/mock_querier.go` and `app/delivery_test.go` (import cycle prevention). Both must be updated when adding new queries.
+- sqlc generates prepared query constants, param structs, and row structs — run `sqlc generate` then `go build` to verify
+
+## 2026-02-09 12:00pm - US-001
+- Added `GetResumableEvents` query to `queries/events.sql`: selects events with delivery_status IN ('pending', 'partial') ordered by timestamp ASC
+- Added `GetDeliverySummaryForEvent` query to `queries/delivery_attempts.sql`: groups delivery attempts by subscriber_id with COUNT FILTER for failed/succeeded counts
+- Ran `sqlc generate` — produced `GetDeliverySummaryForEventRow` struct with `SubscriberID pgtype.UUID`, `FailedCount int64`, `SucceededCount int64`
+- Updated both mock querier implementations (testutil + app/delivery_test.go) with new interface methods
+- Files changed: queries/events.sql, queries/delivery_attempts.sql, db/events.sql.go, db/delivery_attempts.sql.go, db/querier.go, testutil/mock_querier.go, app/delivery_test.go
+- **Learnings for future iterations:**
+  - Two mock querier files must stay in sync with db.Querier interface
+  - The `::bigint` cast trick works well — sqlc maps it to Go `int64`
+  - `COUNT(*) FILTER (WHERE status = 'x')` avoids subqueries for per-group conditional counts
+---

@@ -14,7 +14,7 @@
         "Go build passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Use COUNT(*) FILTER (WHERE ...) for the summary query — PostgreSQL supports this syntax. Cast counts to ::bigint so sqlc generates int64. The summary query is only needed for partial events (pending events have zero delivery_attempts)."
     },
     {
