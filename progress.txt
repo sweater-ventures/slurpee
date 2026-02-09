@@ -90,3 +90,17 @@ Started: Mon Feb  9 09:09:47 MST 2026
   - Use `ListSubscriptionsForSubscriber` to verify subscriptions were persisted correctly
   - `api.SubscriberResponse` and `api.SubscriptionResponse` are exported for test deserialization
 ---
+
+## 2026-02-09 10:57 AM - US-005
+- Implemented: E2E tests for GET /subscribers endpoint (3 tests)
+- Files changed:
+  - `tests/e2e/subscribers_list_test.go` — all GET /subscribers E2E tests
+- Tests cover:
+  - Happy path: seed two subscribers via POST, GET all, verify both returned with correct subscription details
+  - Empty list: no subscribers returns empty JSON array `[]`
+  - Missing admin secret → 401
+- **Learnings for future iterations:**
+  - `httptest.ResponseRecorder.Body` is a `*bytes.Buffer` — calling `json.NewDecoder(rr.Body).Decode()` consumes the buffer, so `rr.Body.String()` returns empty after decode. Use `rr.Body.String()` first if you need both raw and decoded output.
+  - GET /subscribers returns `[]` (empty array) not `null` when no subscribers exist — the handler explicitly initializes to `[]SubscriberResponse{}`
+  - `createSubscriberViaAPI` helper pattern is useful for tests that need to seed data via the API rather than direct DB inserts
+---
