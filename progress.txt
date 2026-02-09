@@ -37,3 +37,13 @@ Started: Mon Feb  9 16:34:04 MST 2026
   - The missed-events banner and placeholder rows all use colspan — search for all occurrences
   - Property badges use `badge-outline badge-sm` for subtle look consistent with DaisyUI patterns
 ---
+
+## 2026-02-09 4:50 PM MST - US-003
+- Added `Properties map[string]string` field with `json:"properties,omitempty"` tag to BusMessage
+- Updated `PublishCreatedEvent` signature to accept `props map[string]string` parameter
+- Updated both call sites (api/events.go and views/events.go) to extract properties before publishing
+- Files changed: app/eventbus.go, app/delivery.go, api/events.go, views/events.go
+- **Learnings for future iterations:**
+  - PublishCreatedEvent is called from api/events.go and views/events.go — both need updating when signature changes
+  - Properties use `omitempty` JSON tag so null/empty properties don't appear in SSE JSON
+---

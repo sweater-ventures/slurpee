@@ -51,7 +51,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "BusMessage is published in two places: api/events.go (API event creation) and views/events.go (UI event creation). Both need to call the shared helper. The Properties field should use json tag 'properties,omitempty'."
     },
     {
