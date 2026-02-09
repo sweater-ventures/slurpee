@@ -83,7 +83,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "The eventsMissedHandler in views/events.go queries missed events and returns them as JSON. Add property extraction using the same shared helper from US-001."
     }
   ]

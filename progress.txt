@@ -58,3 +58,14 @@ Started: Mon Feb  9 16:34:04 MST 2026
   - JavaScript `Object.keys().sort()` ensures consistent property order matching the Go `sortedKeys` helper
   - Live mode rows must mirror exact column order of static templ rows
 ---
+
+## 2026-02-09 4:58 PM MST - US-005
+- Added `BatchExtractLogProperties` call to `eventsMissedHandler` for missed events
+- Populated EventRow.Properties for each missed event row
+- Missed events are rendered server-side by `MissedEventsRows` templ component which already includes Properties column from US-002
+- No JavaScript changes needed — `loadMissedEvents` inserts server-rendered HTML directly
+- Files changed: views/events.go
+- **Learnings for future iterations:**
+  - Missed events use server-side rendering (not client-side JSON), so property badges come from the templ template for free once EventRow.Properties is populated
+  - The loadMissedEvents JavaScript function works with HTML fragments, not JSON — different from live mode SSE
+---
