@@ -159,3 +159,18 @@ Started: Mon Feb  9 09:09:47 MST 2026
   - Both tests use `seedSubscriber` + `seedSubscription` (direct DB seeding) rather than the API — this is simpler for multi-subscription setups and avoids the upsert behavior of POST /subscribers which replaces all subscriptions
   - The `*` glob pattern matches all subjects in the database — confirmed via E2E tests that SQL LIKE `%` works correctly for catch-all patterns
 ---
+
+## 2026-02-09 11:20 AM - US-009
+- Implemented: E2E tests for delivery retries (2 tests)
+- Files changed:
+  - `tests/e2e/delivery_retries_test.go` — delivery retry E2E tests
+- Tests cover:
+  - Success after failures: mock endpoint returns 500 for first 2 requests then 200, verify 3 delivery attempts recorded (2 failed + 1 succeeded), event status becomes "delivered"
+  - Max retries exhausted: mock endpoint always returns 500, verify exactly max_retries+1=3 delivery attempts recorded (all failed), event status becomes "failed"
+- **Learnings for future iterations:**
+  - `MaxRetries=2` in config means total attempts = 3 (initial + 2 retries) — `attemptNum >= maxRetries` is the exhaustion check
+  - `MaxBackoffSeconds=1` caps exponential backoff at 1 second, keeping retry tests fast (~2s each)
+  - `time.AfterFunc` is used for non-blocking retry scheduling — the inflight WaitGroup is incremented before the timer starts
+  - `atomic.Int32` is cleaner than `sync.Mutex` + `int` for simple request counting in mock endpoints
+  - Event transitions through "partial" status during retries before settling on "delivered" or "failed"
+---

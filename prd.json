@@ -166,7 +166,7 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "Use MaxBackoffSeconds=1 and MaxRetries=2 in test config to keep retry tests fast. processDeliveryTask uses time.AfterFunc for retry scheduling. Poll the database for delivery_attempts count and event status rather than using fixed sleeps."
     }
   ]
