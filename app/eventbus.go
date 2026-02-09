@@ -17,12 +17,13 @@ const (
 
 // BusMessage is a message published to the EventBus.
 type BusMessage struct {
-	ID             uint64         `json:"id"`
-	Type           BusMessageType `json:"type"`
-	EventID        string         `json:"event_id"`
-	Subject        string         `json:"subject"`
-	DeliveryStatus string         `json:"delivery_status"`
-	Timestamp      time.Time      `json:"timestamp"`
+	ID             uint64            `json:"id"`
+	Type           BusMessageType    `json:"type"`
+	EventID        string            `json:"event_id"`
+	Subject        string            `json:"subject"`
+	DeliveryStatus string            `json:"delivery_status"`
+	Timestamp      time.Time         `json:"timestamp"`
+	Properties     map[string]string `json:"properties,omitempty"`
 
 	// DeliveryAttempt fields (only set for delivery_attempt messages)
 	SubscriberEndpoint string `json:"subscriber_endpoint,omitempty"`

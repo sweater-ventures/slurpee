@@ -414,7 +414,8 @@ func eventCreateSubmitHandler(slurpee *app.Application, w http.ResponseWriter, r
 	}
 	api.LogEvent(r.Context(), slurpee, event)
 	// Publish 'created' message to the event bus for SSE clients
-	app.PublishCreatedEvent(slurpee, event)
+	props := app.ExtractLogProperties(r.Context(), slurpee.DB, event.Subject, event.Data)
+	app.PublishCreatedEvent(slurpee, event, props)
 	// Trigger async delivery
 	slurpee.DeliveryChan <- event
 
