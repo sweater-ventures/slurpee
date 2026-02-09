@@ -47,5 +47,8 @@ WHERE timestamp > sqlc.arg(after_timestamp)::timestamptz
 ORDER BY timestamp DESC
 LIMIT 200;
 
+-- name: GetResumableEvents :many
+SELECT * FROM events WHERE delivery_status IN ('pending', 'partial') ORDER BY timestamp ASC;
+
 -- name: UpdateEventDeliveryStatus :one
 UPDATE events SET delivery_status = $1, retry_count = $2, status_updated_at = $3 WHERE id = $4 RETURNING *;

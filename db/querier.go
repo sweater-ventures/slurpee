@@ -21,8 +21,10 @@ type Querier interface {
 	DeleteSubscriptionsForSubscriber(ctx context.Context, subscriberID pgtype.UUID) error
 	GetApiSecretByID(ctx context.Context, id pgtype.UUID) (ApiSecret, error)
 	GetApiSecretSubscriberExists(ctx context.Context, arg GetApiSecretSubscriberExistsParams) (bool, error)
+	GetDeliverySummaryForEvent(ctx context.Context, eventID pgtype.UUID) ([]GetDeliverySummaryForEventRow, error)
 	GetEventByID(ctx context.Context, id pgtype.UUID) (Event, error)
 	GetLogConfigBySubject(ctx context.Context, subject string) (LogConfig, error)
+	GetResumableEvents(ctx context.Context) ([]Event, error)
 	GetSubscriberByEndpointURL(ctx context.Context, endpointUrl string) (Subscriber, error)
 	GetSubscriberByID(ctx context.Context, id pgtype.UUID) (Subscriber, error)
 	GetSubscriptionsMatchingSubject(ctx context.Context, subjectPattern string) ([]Subscription, error)
