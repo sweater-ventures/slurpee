@@ -191,6 +191,10 @@ func (m *deliveryMockQuerier) UpdateSubscriber(ctx context.Context, arg db.Updat
 	args := m.Called(ctx, arg)
 	return args.Get(0).(db.Subscriber), args.Error(1)
 }
+func (m *deliveryMockQuerier) UpdateSubscription(ctx context.Context, arg db.UpdateSubscriptionParams) (db.Subscription, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(db.Subscription), args.Error(1)
+}
 func (m *deliveryMockQuerier) UpsertLogConfig(ctx context.Context, arg db.UpsertLogConfigParams) (db.LogConfig, error) {
 	args := m.Called(ctx, arg)
 	return args.Get(0).(db.LogConfig), args.Error(1)

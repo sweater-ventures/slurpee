@@ -50,5 +50,13 @@ UPDATE subscribers SET
 WHERE id = sqlc.arg(id)
 RETURNING *;
 
+-- name: UpdateSubscription :one
+UPDATE subscriptions SET
+    filter = $2,
+    max_retries = $3,
+    updated_at = now()
+WHERE id = $1
+RETURNING *;
+
 -- name: DeleteSubscription :exec
 DELETE FROM subscriptions WHERE id = $1;

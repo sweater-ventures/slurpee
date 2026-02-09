@@ -110,16 +110,24 @@ func createSubscriberHandler(slurpee *app.Application, w http.ResponseWriter, r 
 		return
 	}
 
-	// Delete existing subscriptions and recreate (idempotent replace)
-	if err := slurpee.DB.DeleteSubscriptionsForSubscriber(r.Context(), subscriber.ID); err != nil {
-		log(r.Context()).Error("Failed to delete existing subscriptions", "error", err)
+	// Sync subscriptions: add new, update existing, delete removed
+	existing, err := slurpee.DB.ListSubscriptionsForSubscriber(r.Context(), subscriber.ID)
+	if err != nil {
+		log(r.Context()).Error("Failed to list existing subscriptions", "error", err)
 		writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update subscriptions"})
 		return
 	}
 
+	existingByPattern := make(map[string]db.Subscription, len(existing))
+	for _, s := range existing {
+		existingByPattern[s.SubjectPattern] = s
+	}
+
+	incomingPatterns := make(map[string]struct{}, len(req.Subscriptions))
+
 	var subscriptions []SubscriptionResponse
 	for _, sub := range req.Subscriptions {
-		subID := pgtype.UUID{Bytes: uuid.Must(uuid.NewV7()), Valid: true}
+		incomingPatterns[sub.SubjectPattern] = struct{}{}
 
 		var filter []byte
 		if len(sub.Filter) > 0 && string(sub.Filter) != "null" {
@@ -131,20 +139,47 @@ func createSubscriberHandler(slurpee *app.Application, w http.ResponseWriter, r 
 			maxRetries = pgtype.Int4{Int32: *sub.MaxRetries, Valid: true}
 		}
 
-		created, err := slurpee.DB.CreateSubscription(r.Context(), db.CreateSubscriptionParams{
-			ID:             subID,
-			SubscriberID:   subscriber.ID,
-			SubjectPattern: sub.SubjectPattern,
-			Filter:         filter,
-			MaxRetries:     maxRetries,
-		})
-		if err != nil {
-			log(r.Context()).Error("Failed to create subscription", "error", err, "subject_pattern", sub.SubjectPattern)
-			writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create subscription"})
-			return
+		if existingSub, ok := existingByPattern[sub.SubjectPattern]; ok {
+			// Update existing subscription in place
+			updated, err := slurpee.DB.UpdateSubscription(r.Context(), db.UpdateSubscriptionParams{
+				ID:         existingSub.ID,
+				Filter:     filter,
+				MaxRetries: maxRetries,
+			})
+			if err != nil {
+				log(r.Context()).Error("Failed to update subscription", "error", err, "subject_pattern", sub.SubjectPattern)
+				writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update subscription"})
+				return
+			}
+			subscriptions = append(subscriptions, subscriptionToResponse(updated))
+		} else {
+			// Create new subscription
+			subID := pgtype.UUID{Bytes: uuid.Must(uuid.NewV7()), Valid: true}
+			created, err := slurpee.DB.CreateSubscription(r.Context(), db.CreateSubscriptionParams{
+				ID:             subID,
+				SubscriberID:   subscriber.ID,
+				SubjectPattern: sub.SubjectPattern,
+				Filter:         filter,
+				MaxRetries:     maxRetries,
+			})
+			if err != nil {
+				log(r.Context()).Error("Failed to create subscription", "error", err, "subject_pattern", sub.SubjectPattern)
+				writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create subscription"})
+				return
+			}
+			subscriptions = append(subscriptions, subscriptionToResponse(created))
 		}
+	}
 
-		subscriptions = append(subscriptions, subscriptionToResponse(created))
+	// Delete subscriptions no longer in the incoming set
+	for _, s := range existing {
+		if _, ok := incomingPatterns[s.SubjectPattern]; !ok {
+			if err := slurpee.DB.DeleteSubscription(r.Context(), s.ID); err != nil {
+				log(r.Context()).Error("Failed to delete subscription", "error", err, "subject_pattern", s.SubjectPattern)
+				writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete subscription"})
+				return
+			}
+		}
 	}
 
 	log(r.Context()).Info("Subscriber registered",

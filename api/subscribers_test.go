@@ -160,8 +160,8 @@ func TestCreateSubscriber_Success(t *testing.T) {
 
 	mockDB.On("UpsertSubscriber", mock.Anything, mock.AnythingOfType("db.UpsertSubscriberParams")).
 		Return(subscriber, nil)
-	mockDB.On("DeleteSubscriptionsForSubscriber", mock.Anything, subscriber.ID).
-		Return(nil)
+	mockDB.On("ListSubscriptionsForSubscriber", mock.Anything, subscriber.ID).
+		Return([]db.Subscription{}, nil)
 
 	subscription := testutil.NewSubscription(func(s *db.Subscription) {
 		s.SubscriberID = subscriber.ID
@@ -209,8 +209,8 @@ func TestCreateSubscriber_WithMultipleSubscriptions(t *testing.T) {
 
 	mockDB.On("UpsertSubscriber", mock.Anything, mock.AnythingOfType("db.UpsertSubscriberParams")).
 		Return(subscriber, nil)
-	mockDB.On("DeleteSubscriptionsForSubscriber", mock.Anything, subscriber.ID).
-		Return(nil)
+	mockDB.On("ListSubscriptionsForSubscriber", mock.Anything, subscriber.ID).
+		Return([]db.Subscription{}, nil)
 
 	sub1 := testutil.NewSubscription(func(s *db.Subscription) {
 		s.SubscriberID = subscriber.ID
@@ -243,6 +243,121 @@ func TestCreateSubscriber_WithMultipleSubscriptions(t *testing.T) {
 	var resp SubscriberResponse
 	testutil.AssertJSONResponse(t, rec, http.StatusOK, &resp)
 	assert.Equal(t, "multi-service", resp.Name)
+	assert.Len(t, resp.Subscriptions, 2)
+	mockDB.AssertExpectations(t)
+}
+
+func TestCreateSubscriber_UpdateExistingSubscriptions(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	subscriber := testutil.NewSubscriber(func(s *db.Subscriber) {
+		s.Name = "order-service"
+		s.EndpointUrl = "https://orders.example.com/webhook"
+		s.AuthSecret = "webhook-secret"
+	})
+
+	existingSub := testutil.NewSubscription(func(s *db.Subscription) {
+		s.SubscriberID = subscriber.ID
+		s.SubjectPattern = "orders.*"
+		s.MaxRetries = pgtype.Int4{Int32: 3, Valid: true}
+	})
+
+	mockDB.On("UpsertSubscriber", mock.Anything, mock.AnythingOfType("db.UpsertSubscriberParams")).
+		Return(subscriber, nil)
+	mockDB.On("ListSubscriptionsForSubscriber", mock.Anything, subscriber.ID).
+		Return([]db.Subscription{existingSub}, nil)
+
+	updatedSub := existingSub
+	updatedSub.MaxRetries = pgtype.Int4{Int32: 5, Valid: true}
+	updatedSub.Filter = []byte(`{"type":"urgent"}`)
+	mockDB.On("UpdateSubscription", mock.Anything, db.UpdateSubscriptionParams{
+		ID:         existingSub.ID,
+		Filter:     []byte(`{"type":"urgent"}`),
+		MaxRetries: pgtype.Int4{Int32: 5, Valid: true},
+	}).Return(updatedSub, nil)
+
+	maxRetries := int32(5)
+	req := testutil.NewJSONRequest(t, http.MethodPost, "/subscribers", map[string]any{
+		"name":         "order-service",
+		"endpoint_url": "https://orders.example.com/webhook",
+		"auth_secret":  "webhook-secret",
+		"subscriptions": []map[string]any{
+			{"subject_pattern": "orders.*", "filter": map[string]any{"type": "urgent"}, "max_retries": maxRetries},
+		},
+	})
+	testutil.WithAdminSecret(req, "test-admin-secret")
+
+	rec := callHandler(t, slurpee, createSubscriberHandler, req)
+
+	var resp SubscriberResponse
+	testutil.AssertJSONResponse(t, rec, http.StatusOK, &resp)
+	assert.Len(t, resp.Subscriptions, 1)
+	assert.Equal(t, "orders.*", resp.Subscriptions[0].SubjectPattern)
+	require.NotNil(t, resp.Subscriptions[0].MaxRetries)
+	assert.Equal(t, int32(5), *resp.Subscriptions[0].MaxRetries)
+	assert.JSONEq(t, `{"type":"urgent"}`, string(resp.Subscriptions[0].Filter))
+	mockDB.AssertExpectations(t)
+}
+
+func TestCreateSubscriber_MixedAddUpdateDelete(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	subscriber := testutil.NewSubscriber(func(s *db.Subscriber) {
+		s.Name = "mixed-service"
+		s.EndpointUrl = "https://mixed.example.com/webhook"
+		s.AuthSecret = "webhook-secret"
+	})
+
+	// Existing: orders.* (will be updated), users.* (will be deleted)
+	existingOrders := testutil.NewSubscription(func(s *db.Subscription) {
+		s.SubscriberID = subscriber.ID
+		s.SubjectPattern = "orders.*"
+	})
+	existingUsers := testutil.NewSubscription(func(s *db.Subscription) {
+		s.SubscriberID = subscriber.ID
+		s.SubjectPattern = "users.*"
+	})
+
+	mockDB.On("UpsertSubscriber", mock.Anything, mock.AnythingOfType("db.UpsertSubscriberParams")).
+		Return(subscriber, nil)
+	mockDB.On("ListSubscriptionsForSubscriber", mock.Anything, subscriber.ID).
+		Return([]db.Subscription{existingOrders, existingUsers}, nil)
+
+	// orders.* is updated in place
+	updatedOrders := existingOrders
+	updatedOrders.Filter = []byte(`{"priority":"high"}`)
+	mockDB.On("UpdateSubscription", mock.Anything, mock.AnythingOfType("db.UpdateSubscriptionParams")).
+		Return(updatedOrders, nil)
+
+	// payments.* is new
+	newPayments := testutil.NewSubscription(func(s *db.Subscription) {
+		s.SubscriberID = subscriber.ID
+		s.SubjectPattern = "payments.*"
+	})
+	mockDB.On("CreateSubscription", mock.Anything, mock.AnythingOfType("db.CreateSubscriptionParams")).
+		Return(newPayments, nil)
+
+	// users.* is deleted (not in incoming)
+	mockDB.On("DeleteSubscription", mock.Anything, existingUsers.ID).
+		Return(nil)
+
+	req := testutil.NewJSONRequest(t, http.MethodPost, "/subscribers", map[string]any{
+		"name":         "mixed-service",
+		"endpoint_url": "https://mixed.example.com/webhook",
+		"auth_secret":  "webhook-secret",
+		"subscriptions": []map[string]any{
+			{"subject_pattern": "orders.*", "filter": map[string]any{"priority": "high"}},
+			{"subject_pattern": "payments.*"},
+		},
+	})
+	testutil.WithAdminSecret(req, "test-admin-secret")
+
+	rec := callHandler(t, slurpee, createSubscriberHandler, req)
+
+	var resp SubscriberResponse
+	testutil.AssertJSONResponse(t, rec, http.StatusOK, &resp)
 	assert.Len(t, resp.Subscriptions, 2)
 	mockDB.AssertExpectations(t)
 }
