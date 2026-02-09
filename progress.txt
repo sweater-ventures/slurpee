@@ -10,6 +10,8 @@ Started: Mon Feb  9 09:09:47 MST 2026
 - Seed helpers use `bcrypt.MinCost` for fast test execution (not default cost 10)
 - `newTestApp` wires real `db.Queries` to embedded postgres, not mocks
 - `seedApiSecret` returns both the db record and the plaintext for use in auth headers
+- POST /events sends to `DeliveryChan` — call `drainDeliveryChan(slurpee)` after each create test to avoid blocking
+- API routes are prefixed with `/api/` — use `/api/events`, `/api/subscribers`, etc. in test requests
 
 ## 2026-02-09 09:15 AM - US-001
 - Implemented: E2E test infrastructure with embedded-postgres
@@ -22,4 +24,43 @@ Started: Mon Feb  9 09:09:47 MST 2026
   - Using `bcrypt.MinCost` in seed helpers keeps tests fast vs default cost 10
   - `TRUNCATE ... CASCADE` handles FK dependencies without needing specific ordering
   - pgxpool.Pool satisfies db.DBTX interface, so `db.New(pool)` works directly
+---
+
+## 2026-02-09 09:17 AM - US-002
+- Implemented: E2E tests for POST /events endpoint (11 tests)
+- Files changed:
+  - `tests/e2e/events_create_test.go` — all POST /events E2E tests
+- Tests cover:
+  - Happy path: create event, verify 201 + response fields + DB persistence
+  - Client-provided UUID: verify exact ID used
+  - Client-provided timestamp: verify custom timestamp stored
+  - Optional trace_id: verify persistence
+  - Missing X-Slurpee-Secret-ID → 401
+  - Invalid/wrong API secret → 401
+  - Subject outside secret scope → 403
+  - Missing subject → 400
+  - Missing data → 400
+  - Invalid JSON data (string instead of object) → 400
+  - Invalid JSON body → 400
+- **Learnings for future iterations:**
+  - POST /events sends event to `DeliveryChan` after insert — tests must drain the channel via `drainDeliveryChan` helper to prevent blocking
+  - `api.EventResponse` is exported and can be used directly for response deserialization in tests
+  - `app.UuidToString` converts pgtype.UUID to string for use in headers
+  - Route is `/api/events` (with `/api/` prefix handled by `http.StripPrefix` in `AddApis`)
+---
+
+## 2026-02-09 09:18 AM - US-003
+- Implemented: E2E tests for GET /events/{id} endpoint (5 tests)
+- Files changed:
+  - `tests/e2e/events_get_test.go` — all GET /events/{id} E2E tests
+- Tests cover:
+  - Happy path: create event via POST, then GET by ID, verify all fields match
+  - Event not found → 404
+  - Invalid UUID format → 400
+  - Missing API secret → 401
+  - Invalid/wrong API secret → 401
+- **Learnings for future iterations:**
+  - GET /events/{id} does NOT check subject scope — any valid API secret can read any event
+  - Use `r.PathValue("id")` for Go 1.22+ path params in ServeMux
+  - Create event via POST first, then GET it back — this tests the full round-trip
 ---

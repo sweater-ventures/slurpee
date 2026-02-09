@@ -28,4 +28,14 @@
 | #1045 | " | 🔵 | In-memory EventBus for real-time SSE updates | ~474 |
 | #1043 | " | 🔵 | API secret generation, validation, and SQL LIKE pattern matching | ~530 |
 | #1037 | 9:19 PM | 🔵 | Application struct architecture for dependency injection | ~412 |
+
+### Feb 7, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #1191 | 8:42 PM | 🟣 | PRD created for E2E regression tests with embedded-postgres | ~557 |
+| #1186 | 8:13 PM | 🔵 | Application struct as dependency injection container | ~364 |
+| #1184 | " | 🔵 | Event delivery dispatcher with worker pool and exponential backoff | ~638 |
+| #1181 | 8:12 PM | 🔵 | Comprehensive codebase exploration reveals mock-first testing architecture | ~541 |
+| #1177 | 8:11 PM | 🔵 | Database connection pooling configuration | ~269 |
 </claude-mem-context>

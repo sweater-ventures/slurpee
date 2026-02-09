@@ -23,4 +23,10 @@
 | #446 | 3:15 PM | 🟣 | Added SearchEventsFiltered query with empty string handling for optional filters | ~361 |
 | #445 | 3:14 PM | ✅ | Removed SearchEventsFiltered query in favor of alternative approach | ~274 |
 | #443 | " | 🟣 | Added unified event search query with optional filter parameters | ~420 |
+
+### Feb 7, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #1180 | 8:12 PM | 🔵 | Event query patterns with advanced filtering | ~379 |
 </claude-mem-context>

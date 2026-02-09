@@ -20,7 +20,7 @@
         "`go test ./tests/e2e/...` passes with a placeholder test"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "The db.New(conn) function returns *db.Queries satisfying db.Querier. Migration files use `-- +migrate Up` / `-- +migrate Down` format. API secret seed helpers must create secrets with real bcrypt hashes. The Application struct needs DB, Config, DeliveryChan, EventBus, and Sessions fields populated."
     },
     {
@@ -42,7 +42,7 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "POST /events requires X-Slurpee-Secret-ID and X-Slurpee-Secret headers. ValidateSecretByID uses bcrypt to compare secrets. CheckSendScope validates subject against the secret's subject_pattern. Event is sent to DeliveryChan after creation — use a buffered channel and drain it in tests to avoid blocking."
     },
     {
@@ -59,7 +59,7 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "GET /events/{id} validates API secret but does NOT check subject scope — any valid secret can read any event."
     },
     {
