@@ -146,3 +146,16 @@ Started: Mon Feb  9 09:09:47 MST 2026
   - `matchesFilter` uses JSON marshal/unmarshal for type-safe comparison of filter values against event data top-level keys
   - Multiple subscribers with different patterns work correctly — each gets its own delivery task based on independent pattern matching
 ---
+
+## 2026-02-09 11:18 AM - US-008
+- Implemented: E2E tests for subscriber deduplication (2 tests)
+- Files changed:
+  - `tests/e2e/deduplication_test.go` — subscriber deduplication E2E tests
+- Tests cover:
+  - Two overlapping subscriptions: one subscriber with `order.*` (max_retries=3) and `order.created` (max_retries=5), verify exactly 1 delivery request and 1 delivery_attempts row
+  - Three overlapping subscriptions: one subscriber with `*` (max_retries=1), `order.*` (max_retries=3), and `order.created` (max_retries=5), verify exactly 1 delivery request and 1 delivery_attempts row
+- **Learnings for future iterations:**
+  - Deduplication groups by subscriber_id in `dispatchEvent`, then picks the subscription with the highest effective `max_retries` — the `seedSubscription` helper with `maxRetries *int32` parameter makes it easy to test this
+  - Both tests use `seedSubscriber` + `seedSubscription` (direct DB seeding) rather than the API — this is simpler for multi-subscription setups and avoids the upsert behavior of POST /subscribers which replaces all subscriptions
+  - The `*` glob pattern matches all subjects in the database — confirmed via E2E tests that SQL LIKE `%` works correctly for catch-all patterns
+---

@@ -148,8 +148,8 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": "Deduplication logic is in dispatchEvent — groups subscriptions by subscriber_id and picks the one with highest effective max_retries. This was recently implemented; E2E tests confirm it works with real DB data."
+      "passes": true,
+      "notes": "Deduplication logic is in dispatchEvent — groups subscriptions by subscriber_id and picks the one with highest effective max_retries. This was recently implemented; E2E tests confirm it works with real DB data. Tests validate both two and three overlapping subscriptions result in exactly one delivery per subscriber."
     },
     {
       "id": "US-009",
