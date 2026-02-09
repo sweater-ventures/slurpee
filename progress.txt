@@ -24,3 +24,16 @@ Started: Mon Feb  9 16:34:04 MST 2026
   - The EventRow struct lives in events.templ, so changes to it require templ generate to update events_templ.go
   - Using a batch function with caching avoids N+1 queries for log_config lookups on the events list page
 ---
+
+## 2026-02-09 4:45 PM MST - US-002
+- Added Properties column to events table between Timestamp and Status
+- Created `propertyBadges` templ component rendering sorted key=value badges with `badge-outline badge-sm` classes
+- Created `sortedKeys` helper for consistent property display order
+- Updated colspan from 4 to 5 in all empty/placeholder table rows (including JavaScript live mode placeholders)
+- Added Properties cell to MissedEventsRows template for column consistency
+- Files changed: views/events.templ, views/events_templ.go
+- **Learnings for future iterations:**
+  - When adding a column to the events table, must also update JavaScript colspan references in liveStreamScript
+  - The missed-events banner and placeholder rows all use colspan — search for all occurrences
+  - Property badges use `badge-outline badge-sm` for subtle look consistent with DaisyUI patterns
+---

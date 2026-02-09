@@ -35,7 +35,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Use DaisyUI badge-ghost or badge-outline classes for a subtle look. The EventRow struct from US-001 provides the property data. templ files use tabs for indentation."
     },
     {
