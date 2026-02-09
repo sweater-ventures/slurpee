@@ -1,0 +1,96 @@
+{
+  "project": "Slurpee Event Broker",
+  "branchName": "ralph/startup-resume",
+  "description": "Automatic resumption of unfinished event deliveries on startup. Queries for events in 'pending' or 'partial' status and feeds them back through the delivery pipeline, continuing retry counts from existing delivery_attempts history.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add SQL queries for event resumption",
+      "description": "As a developer, I need database queries to find resumable events and understand their per-subscriber delivery history so the resume logic can make informed decisions.",
+      "acceptanceCriteria": [
+        "Add GetResumableEvents query: SELECT * FROM events WHERE delivery_status IN ('pending', 'partial') ORDER BY timestamp ASC",
+        "Add GetDeliverySummaryForEvent query: for a given event_id, returns per-subscriber_id counts of failed and succeeded attempts grouped by subscriber_id using COUNT(*) FILTER (WHERE status = 'failed') and COUNT(*) FILTER (WHERE status = 'succeeded')",
+        "Run sqlc generate successfully",
+        "Go build passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Use COUNT(*) FILTER (WHERE ...) for the summary query — PostgreSQL supports this syntax. Cast counts to ::bigint so sqlc generates int64. The summary query is only needed for partial events (pending events have zero delivery_attempts)."
+    },
+    {
+      "id": "US-002",
+      "title": "Resume pending events on startup",
+      "description": "As an operator, I want events that were never dispatched (status 'pending') to be automatically delivered when the service restarts, so no events are lost.",
+      "acceptanceCriteria": [
+        "Add ResumeUnfinishedDeliveries function in app/delivery.go that queries GetResumableEvents",
+        "Pending events are fed into DeliveryChan for normal dispatchEvent processing",
+        "Function is called from main.go after StartDispatcher but before the HTTP server starts accepting traffic",
+        "Logs count of pending events being resumed at INFO level",
+        "If no events need resuming, logs at DEBUG level",
+        "Go build passes",
+        "Existing tests pass with go test ./... -short"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Pending events have zero delivery_attempts so they can safely go through the normal dispatchEvent path. Feed them into DeliveryChan in a goroutine if the count exceeds channel buffer size to avoid blocking startup. ResumeUnfinishedDeliveries needs access to *Application (for DB and DeliveryChan)."
+    },
+    {
+      "id": "US-003",
+      "title": "Resume partial events on startup",
+      "description": "As an operator, I want events that were mid-retry (status 'partial') to continue delivery only to subscribers that haven't succeeded yet, preserving retry counts from prior attempts.",
+      "acceptanceCriteria": [
+        "Extend ResumeUnfinishedDeliveries to handle partial events",
+        "For each partial event, query GetDeliverySummaryForEvent to check per-subscriber delivery history",
+        "Skip subscribers that already have at least one successful delivery attempt",
+        "Set attemptNum on delivery tasks to the count of prior failed attempts for that subscriber (continues counting, does not reset)",
+        "Create delivery tasks and event tracker directly — cannot reuse dispatchEvent since it starts fresh with attemptNum=0",
+        "Resume logic needs access to the same inflightWg, taskQueue, and registry used by StartDispatcher — refactor StartDispatcher to expose these or pass them to the resume function",
+        "Logs per-event detail at INFO level: event ID, number of subscribers still needing delivery",
+        "Go build passes",
+        "Existing tests pass with go test ./... -short"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "This is the most complex story. The resume function must re-run subscription matching (GetSubscriptionsMatchingSubject), apply filter logic (matchesFilter), deduplicate per subscriber, then cross-reference with delivery history. The dispatchEvent function handles all this for fresh events — consider extracting shared logic into helpers. The inflightWg/taskQueue/registry are currently local to StartDispatcher; refactoring to expose them (e.g., via a dispatcherState struct) keeps the code clean."
+    },
+    {
+      "id": "US-004",
+      "title": "E2E test for resuming pending events",
+      "description": "As a developer, I want an E2E test that verifies pending events are delivered after calling the resume function, simulating a restart scenario.",
+      "acceptanceCriteria": [
+        "Create tests/e2e/startup_resume_test.go",
+        "Test inserts an event directly into the database with delivery_status='pending' (bypassing DeliveryChan)",
+        "Test creates a subscriber with a mock httptest.Server endpoint and matching subscription",
+        "Test calls ResumeUnfinishedDeliveries (or the exported resume entry point)",
+        "Verify the mock endpoint receives the event with correct headers and body",
+        "Verify the event delivery_status transitions to 'delivered' in the database",
+        "Verify a delivery_attempts row is recorded with status 'succeeded'",
+        "Test passes with go test ./tests/e2e/ -v -count=1",
+        "Existing tests pass with go test ./... -short"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "Use the same E2E infrastructure from tests/e2e/main_test.go (newTestApp, truncateAll, waitForEventStatus, etc.). Insert event via DB.InsertEvent with delivery_status='pending'. StartDispatcher must be running for delivery to work. The resume function must be exported or testable from the e2e package."
+    },
+    {
+      "id": "US-005",
+      "title": "E2E test for resuming partial events",
+      "description": "As a developer, I want an E2E test that verifies partial events resume correctly — skipping already-succeeded subscribers and continuing retry counts for failing ones.",
+      "acceptanceCriteria": [
+        "Add test to tests/e2e/startup_resume_test.go",
+        "Test sets up two subscribers with mock endpoints and matching subscriptions",
+        "Test inserts an event with delivery_status='partial' and existing delivery_attempts rows: one succeeded attempt for subscriber A, two failed attempts for subscriber B",
+        "Test calls ResumeUnfinishedDeliveries",
+        "Verify subscriber A's mock endpoint does NOT receive another delivery (already succeeded)",
+        "Verify subscriber B's mock endpoint receives a new delivery attempt",
+        "Verify subscriber B's new delivery_attempts row shows the attempt is the 3rd (continuing from 2 prior failures)",
+        "Verify the event reaches a final status ('delivered' if B succeeds, 'failed' if B exhausts retries)",
+        "Test passes with go test ./tests/e2e/ -v -count=1",
+        "Existing tests pass with go test ./... -short"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "This test requires inserting delivery_attempts rows directly via InsertDeliveryAttempt to simulate prior history. Use two separate httptest.NewServer instances for the two subscribers. The already-succeeded subscriber should have zero requests to its mock endpoint after resume. Use atomic counters on mock endpoints to verify request counts."
+    }
+  ]
+}

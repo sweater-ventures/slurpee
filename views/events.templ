@@ -10,6 +10,7 @@ type EventRow struct {
 	Subject        string
 	Timestamp      string
 	DeliveryStatus string
+	Properties     map[string]string
 }
 
 func truncateID(id string) string {

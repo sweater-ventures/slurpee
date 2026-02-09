@@ -43,20 +43,10 @@ type EventResponse struct {
 }
 
 func LogEvent(ctx context.Context, slurpee *app.Application, event db.Event) {
-	// Log event with configured data properties
-	var dataObj map[string]any
-	if err := json.Unmarshal(event.Data, &dataObj); err != nil {
-		log(ctx).Error("Failed to unmarshal event data for logging", "error", err)
-		return
-	}
 	logAttrs := []any{"event_id", app.UuidToString(event.ID), "subject", event.Subject}
-	logConfig, err := slurpee.DB.GetLogConfigBySubject(ctx, event.Subject)
-	if err == nil {
-		for _, prop := range logConfig.LogProperties {
-			if val, ok := dataObj[prop]; ok {
-				logAttrs = append(logAttrs, prop, val)
-			}
-		}
+	props := app.ExtractLogProperties(ctx, slurpee.DB, event.Subject, event.Data)
+	for k, v := range props {
+		logAttrs = append(logAttrs, k, v)
 	}
 	log(ctx).Info("Event received", logAttrs...)
 }
