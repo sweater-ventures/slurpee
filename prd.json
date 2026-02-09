@@ -131,8 +131,8 @@
         "`go test ./tests/e2e/...` passes"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": "GetSubscriptionsMatchingSubject uses database-side pattern matching — this is a key thing E2E tests validate that mocks cannot. Glob wildcards use * (not %). Filter matching is AND logic on top-level JSON keys, evaluated in Go code (matchesFilter), not SQL."
+      "passes": true,
+      "notes": "GetSubscriptionsMatchingSubject uses database-side pattern matching — this is a key thing E2E tests validate that mocks cannot. Glob wildcards use * (not %). Filter matching is AND logic on top-level JSON keys, evaluated in Go code (matchesFilter), not SQL. When all subscriptions match subject but none pass filter, dispatchEvent marks event as 'failed' (not 'delivered')."
     },
     {
       "id": "US-008",
