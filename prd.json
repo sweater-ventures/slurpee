@@ -89,7 +89,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "This test requires inserting delivery_attempts rows directly via InsertDeliveryAttempt to simulate prior history. Use two separate httptest.NewServer instances for the two subscribers. The already-succeeded subscriber should have zero requests to its mock endpoint after resume. Use atomic counters on mock endpoints to verify request counts."
     }
   ]

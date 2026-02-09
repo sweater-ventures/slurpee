@@ -58,3 +58,21 @@ Started: Mon Feb  9 11:58:30 MST 2026
   - `StartDispatcher` must be called before `ResumeUnfinishedDeliveries` for workers to process tasks
   - Direct DB insert with `InsertEvent` simulates a pre-shutdown event that was never dispatched
 ---
+
+## 2026-02-09 12:20pm - US-005
+- Added `TestStartupResume_PartialEvent` to `tests/e2e/startup_resume_test.go`
+- Sets up two subscribers (A with succeeded history, B with 2 failed attempts)
+- Inserts event with `delivery_status='partial'` and 3 delivery_attempts rows directly in DB
+- Calls `ResumeUnfinishedDeliveries` and verifies:
+  - Subscriber A receives 0 requests (already succeeded)
+  - Subscriber B receives exactly 1 new request
+  - Total delivery_attempts for B = 3 (2 prior + 1 new)
+  - Newest attempt for B has status='succeeded'
+  - Event reaches 'delivered' status
+- Logs confirm attempt=3 for subscriber B (continuing from 2 prior failures)
+- Files changed: tests/e2e/startup_resume_test.go
+- **Learnings for future iterations:**
+  - Set subscription `maxRetries` high enough to allow continued attempts (default MaxRetries=2 would exhaust immediately with attemptNum=2)
+  - `InsertDeliveryAttempt` can be used to seed prior delivery history for testing
+  - `atomic.Int32` works well for thread-safe mock endpoint request counting
+---
