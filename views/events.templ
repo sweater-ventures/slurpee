@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"sort"
 	"github.com/sweater-ventures/slurpee/components"
 )
 
@@ -53,6 +54,21 @@ func filterQueryString(subject, status, dateFrom, dateTo, content string, page i
 		q += "&content=" + content
 	}
 	return q
+}
+
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+templ propertyBadges(props map[string]string) {
+	for _, k := range sortedKeys(props) {
+		<span class="badge badge-outline badge-sm mr-1">{ k }={ props[k] }</span>
+	}
 }
 
 templ EventsListTemplate(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content string) {
@@ -190,13 +206,14 @@ templ eventsTableAndPagination(events []EventRow, page int, hasNext bool, subjec
 					<th>Subject</th>
 					<th>Event ID</th>
 					<th>Timestamp</th>
+					<th>Properties</th>
 					<th>Status</th>
 				</tr>
 			</thead>
 			<tbody>
 				if len(events) == 0 {
 					<tr>
-						<td colspan="4" class="text-center text-base-content/60 py-8">No events found</td>
+						<td colspan="5" class="text-center text-base-content/60 py-8">No events found</td>
 					</tr>
 				}
 				for _, event := range events {
@@ -204,6 +221,11 @@ templ eventsTableAndPagination(events []EventRow, page int, hasNext bool, subjec
 						<td class="font-mono">{ event.Subject }</td>
 						<td class="font-mono text-sm">{ truncateID(event.ID) }</td>
 						<td>{ event.Timestamp }</td>
+						<td>
+							if len(event.Properties) > 0 {
+								@propertyBadges(event.Properties)
+							}
+						</td>
 						<td><span class={ statusBadgeClass(event.DeliveryStatus) }>{ event.DeliveryStatus }</span></td>
 					</tr>
 				}
@@ -239,6 +261,11 @@ templ MissedEventsRows(events []EventRow) {
 			<td class="font-mono">{ event.Subject }</td>
 			<td class="font-mono text-sm">{ truncateID(event.ID) }</td>
 			<td>{ event.Timestamp }</td>
+			<td>
+				if len(event.Properties) > 0 {
+					@propertyBadges(event.Properties)
+				}
+			</td>
 			<td><span class={ statusBadgeClass(event.DeliveryStatus) }>{ event.DeliveryStatus }</span></td>
 		</tr>
 	}
@@ -393,7 +420,7 @@ templ liveStreamScript() {
 				var tr = document.createElement("tr");
 				tr.id = "missed-banner";
 				var td = document.createElement("td");
-				td.setAttribute("colspan", "4");
+				td.setAttribute("colspan", "5");
 				td.className = "py-3 px-4 bg-warning/20 text-warning-content";
 				td.innerHTML =
 					'<div class="flex items-center justify-between">' +
@@ -440,7 +467,7 @@ templ liveStreamScript() {
 						var tbody = document.querySelector("#events-results tbody");
 						if (!tbody) return;
 						// Remove "Waiting for events..." placeholder if present
-						var placeholder = tbody.querySelector('td[colspan="4"]');
+						var placeholder = tbody.querySelector('td[colspan="5"]');
 						if (placeholder) {
 							placeholder.closest("tr").remove();
 						}
@@ -473,7 +500,7 @@ templ liveStreamScript() {
 				var tbody = document.querySelector("#events-results tbody");
 				if (tbody) {
 					tbody.innerHTML =
-						'<tr><td colspan="4" class="text-center text-base-content/60 py-8">Waiting for events...</td></tr>';
+						'<tr><td colspan="5" class="text-center text-base-content/60 py-8">Waiting for events...</td></tr>';
 				}
 
 				// Open new connection with current filter params
@@ -562,7 +589,7 @@ templ liveStreamScript() {
 				var tbody = document.querySelector("#events-results tbody");
 				if (tbody) {
 					tbody.innerHTML =
-						'<tr><td colspan="4" class="text-center text-base-content/60 py-8">Waiting for events...</td></tr>';
+						'<tr><td colspan="5" class="text-center text-base-content/60 py-8">Waiting for events...</td></tr>';
 				}
 
 				// Hide pagination
