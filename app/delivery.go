@@ -573,6 +573,42 @@ func recordFailedAttempt(ctx context.Context, slurpee *Application, attemptID pg
 	})
 }
 
+// ResumeUnfinishedDeliveries queries for events with 'pending' or 'partial' status
+// and feeds them back through the delivery pipeline. Pending events are sent to
+// DeliveryChan for normal dispatchEvent processing. Call this after StartDispatcher.
+func ResumeUnfinishedDeliveries(slurpee *Application) {
+	ctx := context.Background()
+	events, err := slurpee.DB.GetResumableEvents(ctx)
+	if err != nil {
+		slog.Error("Failed to query resumable events", "error", err)
+		return
+	}
+
+	if len(events) == 0 {
+		slog.Debug("No events to resume on startup")
+		return
+	}
+
+	var pendingCount int
+	for _, event := range events {
+		if event.DeliveryStatus == "pending" {
+			pendingCount++
+		}
+	}
+
+	slog.Info("Resuming unfinished deliveries on startup", "pending", pendingCount, "total", len(events))
+
+	// Feed pending events into DeliveryChan in a goroutine to avoid blocking
+	// if the channel buffer is smaller than the number of events.
+	go func() {
+		for _, event := range events {
+			if event.DeliveryStatus == "pending" {
+				slurpee.DeliveryChan <- event
+			}
+		}
+	}()
+}
+
 // PublishCreatedEvent publishes a 'created' bus message for SSE clients.
 func PublishCreatedEvent(slurpee *Application, event db.Event) {
 	slurpee.EventBus.Publish(BusMessage{

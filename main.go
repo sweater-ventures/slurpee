@@ -59,6 +59,9 @@ func main() {
 	// Start the centralized delivery dispatcher
 	app.StartDispatcher(slurpee)
 
+	// Resume any events left in pending/partial status from before shutdown
+	app.ResumeUnfinishedDeliveries(slurpee)
+
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", appConfig.Port),
 		Handler: middleware.AllStandardMiddleware(middleware.SessionAuthMiddleware(slurpee)(router)),
