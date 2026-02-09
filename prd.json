@@ -18,7 +18,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "The existing LogEvent() function in api/events.go already implements this pattern — extract the shared logic into a helper in the app package. The helper needs access to db.Querier for GetLogConfigBySubject. Consider accepting a context and querier as params."
     },
     {

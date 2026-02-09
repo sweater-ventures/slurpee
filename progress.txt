@@ -1,14 +1,26 @@
 # Ralph Progress Log
-Started: Sun Feb  9 16:15:00 MST 2026
----
+Started: Mon Feb  9 16:34:04 MST 2026
 
 ## Codebase Patterns
-- Use `::bigint` cast on `COUNT(*)` in sqlc queries so generated Go type is `int64` (not `interface{}`)
-- Two mock querier implementations exist: `testutil/mock_querier.go` and `app/delivery_test.go` (import cycle prevention). Both must be updated when adding new queries.
-- sqlc generates prepared query constants, param structs, and row structs — run `sqlc generate` then `go build` to verify
-- templ files use tabs for indentation — Edit tool shows them as spaces but must match tabs exactly
-- BusMessage is published in two places: `api/events.go` (API creation) and `views/events.go` (UI creation)
-- Existing `LogEvent()` in `api/events.go` shows the pattern for extracting log_config properties from event data
-- DaisyUI badge components: `badge badge-ghost`, `badge badge-outline`, `badge badge-sm`
-- EventBus SSE live mode: `eventsStreamHandler` in `views/events.go`, JS in `views/events.templ`
-- Missed events recovery: `eventsMissedHandler` in `views/events.go`
+- templ files use tabs for indentation
+- BusMessage is published in two places: api/events.go (API) and views/events.go (UI) — and also in app/delivery.go (PublishCreatedEvent, updateEventStatus)
+- LogEvent in api/events.go handles structured logging with log_config properties
+- EventRow struct is defined in views/events.templ, not a .go file — templ generate regenerates the _templ.go
+- BatchExtractLogProperties caches log_config lookups per subject for efficiency
+- events.templ JavaScript `createEventRow` builds DOM elements for live mode rows
+- MissedEventsRows templ component renders rows fetched from /events/stream/missed
+---
+
+## 2026-02-09 4:40 PM MST - US-001
+- Created shared `ExtractLogProperties` helper in `app/log_properties.go` that accepts ctx, querier, subject, data and returns map[string]string
+- Created `BatchExtractLogProperties` for efficient batch extraction with per-subject log_config caching
+- Created `formatPropertyValue` to convert arbitrary JSON values to display strings
+- Refactored `LogEvent()` in `api/events.go` to use the shared helper instead of inline logic
+- Added `Properties map[string]string` field to `EventRow` struct in `views/events.templ`
+- Updated `eventsListHandler` in `views/events.go` to call `BatchExtractLogProperties` and populate EventRow.Properties
+- Files changed: app/log_properties.go (new), api/events.go, views/events.go, views/events.templ, views/events_templ.go
+- **Learnings for future iterations:**
+  - templ generate detects changes incrementally — struct-only changes in .templ files regenerate automatically
+  - The EventRow struct lives in events.templ, so changes to it require templ generate to update events_templ.go
+  - Using a batch function with caching avoids N+1 queries for log_config lookups on the events list page
+---
