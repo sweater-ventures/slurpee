@@ -156,6 +156,7 @@ func secretCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 		})
 	}
 
+	slurpee.SecretCache.Flush()
 	renderSecretsPage(slurpee, w, r, "", "", pgtypeUUIDToString(secretID), plaintext)
 }
 
@@ -174,6 +175,7 @@ func secretDeleteHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 		return
 	}
 
+	slurpee.SecretCache.Flush()
 	http.Redirect(w, r, "/secrets", http.StatusSeeOther)
 }
 
@@ -297,6 +299,7 @@ func secretUpdateHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 		}
 	}
 
+	slurpee.SecretCache.Flush()
 	http.Redirect(w, r, "/secrets", http.StatusSeeOther)
 }
 

@@ -7,12 +7,12 @@ import (
 	"github.com/sweater-ventures/slurpee/db"
 )
 
-// ExtractLogProperties looks up the log_config for the given subject and extracts
-// the configured property values from the event's JSONB data. Returns nil if no
-// log_config exists or the data cannot be parsed.
-func ExtractLogProperties(ctx context.Context, querier db.Querier, subject string, data []byte) map[string]string {
-	logConfig, err := querier.GetLogConfigBySubject(ctx, subject)
-	if err != nil {
+// ExtractLogProperties looks up the log_config for the given subject (using the
+// app-level cache) and extracts the configured property values from the event's
+// JSONB data. Returns nil if no log_config exists or the data cannot be parsed.
+func ExtractLogProperties(ctx context.Context, slurpee *Application, subject string, data []byte) map[string]string {
+	logConfig, found := getLogConfig(ctx, slurpee, subject)
+	if !found {
 		return nil
 	}
 
@@ -39,23 +39,13 @@ func ExtractLogProperties(ctx context.Context, querier db.Querier, subject strin
 }
 
 // BatchExtractLogProperties extracts log properties for a batch of events efficiently
-// by caching log_config lookups per subject.
-func BatchExtractLogProperties(ctx context.Context, querier db.Querier, events []db.Event) []map[string]string {
-	cache := make(map[string]*db.LogConfig)
+// using the app-level log config cache.
+func BatchExtractLogProperties(ctx context.Context, slurpee *Application, events []db.Event) []map[string]string {
 	result := make([]map[string]string, len(events))
 
 	for i, event := range events {
-		lc, cached := cache[event.Subject]
-		if !cached {
-			config, err := querier.GetLogConfigBySubject(ctx, event.Subject)
-			if err != nil {
-				cache[event.Subject] = nil
-			} else {
-				cache[event.Subject] = &config
-				lc = &config
-			}
-		}
-		if lc == nil || len(lc.LogProperties) == 0 {
+		lc, found := getLogConfig(ctx, slurpee, event.Subject)
+		if !found || len(lc.LogProperties) == 0 {
 			continue
 		}
 
@@ -75,6 +65,21 @@ func BatchExtractLogProperties(ctx context.Context, querier db.Querier, events [
 		}
 	}
 	return result
+}
+
+// getLogConfig returns the LogConfig for a subject, using the app-level cache.
+func getLogConfig(ctx context.Context, slurpee *Application, subject string) (db.LogConfig, bool) {
+	lc, found, inCache := slurpee.LogConfigCache.Get(subject)
+	if inCache {
+		return lc, found
+	}
+	lc, err := slurpee.DB.GetLogConfigBySubject(ctx, subject)
+	if err != nil {
+		slurpee.LogConfigCache.Set(subject, db.LogConfig{}, false)
+		return db.LogConfig{}, false
+	}
+	slurpee.LogConfigCache.Set(subject, lc, true)
+	return lc, true
 }
 
 // formatPropertyValue converts an arbitrary JSON value to a display string.

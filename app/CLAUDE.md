@@ -38,4 +38,12 @@
 | #1184 | " | 🔵 | Event delivery dispatcher with worker pool and exponential backoff | ~638 |
 | #1181 | 8:12 PM | 🔵 | Comprehensive codebase exploration reveals mock-first testing architecture | ~541 |
 | #1177 | 8:11 PM | 🔵 | Database connection pooling configuration | ~269 |
+
+### Feb 9, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #1431 | 4:11 PM | 🔵 | Complete events list architecture with SSE live streaming and reconnection recovery | ~877 |
+| #1429 | 4:10 PM | 🔵 | Delivery system implements concurrent worker pool with exponential backoff and partial event resumption | ~782 |
+| #1428 | " | 🔵 | Application struct centralizes core components with delivery channel and event bus | ~419 |
 </claude-mem-context>

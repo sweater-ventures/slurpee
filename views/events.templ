@@ -23,7 +23,7 @@ func truncateID(id string) string {
 
 func statusBadgeClass(status string) string {
 	switch status {
-	case "delivered":
+	case "delivered", "recorded":
 		return "badge badge-success"
 	case "failed":
 		return "badge badge-error"
@@ -177,6 +177,7 @@ templ eventsFilterBar(subject, status, dateFrom, dateTo, content, traceID string
 					<option value="">All</option>
 					<option value="pending" selected?={ status == "pending" }>Pending</option>
 					<option value="delivered" selected?={ status == "delivered" }>Delivered</option>
+					<option value="recorded" selected?={ status == "recorded" }>Recorded</option>
 					<option value="failed" selected?={ status == "failed" }>Failed</option>
 					<option value="partial" selected?={ status == "partial" }>Partial</option>
 				</select>
@@ -313,6 +314,7 @@ templ liveStreamScript() {
 			function statusBadgeClass(status) {
 				switch (status) {
 					case "delivered":
+					case "recorded":
 						return "badge badge-success";
 					case "failed":
 						return "badge badge-error";

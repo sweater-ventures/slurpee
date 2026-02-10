@@ -180,8 +180,8 @@ func TestPatternMatching_WildcardDoesNotMatchUnrelated(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	// Event should be delivered (no matching subscriptions means it's marked delivered with no attempts)
-	event := waitForEventStatus(t, slurpee.DB, resp.ID, "delivered", 10*time.Second)
+	// Event should be recorded (no matching subscriptions means it's marked recorded with no attempts)
+	event := waitForEventStatus(t, slurpee.DB, resp.ID, "recorded", 10*time.Second)
 
 	mu.Lock()
 	count := receivedCount
@@ -191,8 +191,8 @@ func TestPatternMatching_WildcardDoesNotMatchUnrelated(t *testing.T) {
 		t.Fatalf("expected 0 deliveries (wildcard should not match unrelated subject), got %d", count)
 	}
 
-	if event.DeliveryStatus != "delivered" {
-		t.Errorf("expected delivery_status %q, got %q", "delivered", event.DeliveryStatus)
+	if event.DeliveryStatus != "recorded" {
+		t.Errorf("expected delivery_status %q, got %q", "recorded", event.DeliveryStatus)
 	}
 
 	// Verify no delivery attempts were recorded

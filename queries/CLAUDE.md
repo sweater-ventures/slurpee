@@ -29,4 +29,11 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #1180 | 8:12 PM | 🔵 | Event query patterns with advanced filtering | ~379 |
+
+### Feb 9, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #1431 | 4:11 PM | 🔵 | Complete events list architecture with SSE live streaming and reconnection recovery | ~877 |
+| #1426 | 4:09 PM | 🔵 | Events queries support advanced filtering, live streaming, and resumable delivery | ~508 |
 </claude-mem-context>

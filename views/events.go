@@ -134,7 +134,7 @@ func eventsListHandler(slurpee *app.Application, w http.ResponseWriter, r *http.
 		events = events[:eventsPerPage]
 	}
 
-	allProps := app.BatchExtractLogProperties(r.Context(), slurpee.DB, events)
+	allProps := app.BatchExtractLogProperties(r.Context(), slurpee, events)
 
 	rows := make([]EventRow, len(events))
 	for i, e := range events {
@@ -421,7 +421,7 @@ func eventCreateSubmitHandler(slurpee *app.Application, w http.ResponseWriter, r
 	}
 	api.LogEvent(r.Context(), slurpee, event)
 	// Publish 'created' message to the event bus for SSE clients
-	props := app.ExtractLogProperties(r.Context(), slurpee.DB, event.Subject, event.Data)
+	props := app.ExtractLogProperties(r.Context(), slurpee, event.Subject, event.Data)
 	app.PublishCreatedEvent(slurpee, event, props)
 	// Trigger async delivery
 	slurpee.DeliveryChan <- event
@@ -467,7 +467,7 @@ func eventsMissedHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 		return
 	}
 
-	allProps := app.BatchExtractLogProperties(r.Context(), slurpee.DB, events)
+	allProps := app.BatchExtractLogProperties(r.Context(), slurpee, events)
 
 	rows := make([]EventRow, len(events))
 	for i, e := range events {
