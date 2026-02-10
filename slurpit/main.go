@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -241,8 +242,54 @@ func runReceive(cmd *ReceiveCmd) {
 
 	fmt.Fprintf(os.Stderr, "Listening on %s for %s...\n", cmd.Listen, cmd.Duration)
 
-	// Wait for duration
-	time.Sleep(cmd.Duration)
+	// Live stats ticker
+	start := time.Now()
+	statsTicker := time.NewTicker(1 * time.Second)
+	defer statsTicker.Stop()
+
+	prevReceived := 0
+	done := time.After(cmd.Duration)
+
+statsLoop:
+	for {
+		select {
+		case <-done:
+			break statsLoop
+		case <-statsTicker.C:
+			mu.Lock()
+			cur := received
+			var minL, maxL, meanL time.Duration
+			if len(latencies) > 0 {
+				minL = latencies[0]
+				maxL = latencies[0]
+				var total time.Duration
+				for _, l := range latencies {
+					if l < minL {
+						minL = l
+					}
+					if l > maxL {
+						maxL = l
+					}
+					total += l
+				}
+				meanL = total / time.Duration(len(latencies))
+			}
+			mu.Unlock()
+
+			rate := cur - prevReceived
+			prevReceived = cur
+
+			if len(latencies) > 0 {
+				fmt.Fprintf(os.Stderr, "\rReceived: %d  Rate: %d/s  Latency min/max/mean: %.1f/%.1f/%.1f ms",
+					cur, rate,
+					float64(minL.Microseconds())/1000.0,
+					float64(maxL.Microseconds())/1000.0,
+					float64(meanL.Microseconds())/1000.0)
+			} else {
+				fmt.Fprintf(os.Stderr, "\rReceived: %d  Rate: %d/s  Latency: n/a", cur, rate)
+			}
+		}
+	}
 
 	// Graceful shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -266,5 +313,37 @@ func runReceive(cmd *ReceiveCmd) {
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "Receive complete: %d events received\n", received)
+	// Final summary
+	elapsed := time.Since(start)
+	fmt.Fprintf(os.Stderr, "\r%s\r", "                                                                                    ")
+	fmt.Fprintf(os.Stderr, "\n=== Receive Summary ===\n")
+	fmt.Fprintf(os.Stderr, "  Total received : %d events\n", received)
+	fmt.Fprintf(os.Stderr, "  Duration       : %.1fs\n", elapsed.Seconds())
+	if elapsed.Seconds() > 0 {
+		fmt.Fprintf(os.Stderr, "  Throughput     : %.1f events/sec\n", float64(received)/elapsed.Seconds())
+	}
+
+	if len(latencies) > 0 {
+		sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
+		var total time.Duration
+		for _, l := range latencies {
+			total += l
+		}
+		mean := total / time.Duration(len(latencies))
+		minL := latencies[0]
+		maxL := latencies[len(latencies)-1]
+		p50 := latencies[len(latencies)*50/100]
+		p95 := latencies[len(latencies)*95/100]
+		p99 := latencies[len(latencies)*99/100]
+
+		fmt.Fprintf(os.Stderr, "  Latency min    : %.1f ms\n", float64(minL.Microseconds())/1000.0)
+		fmt.Fprintf(os.Stderr, "  Latency max    : %.1f ms\n", float64(maxL.Microseconds())/1000.0)
+		fmt.Fprintf(os.Stderr, "  Latency mean   : %.1f ms\n", float64(mean.Microseconds())/1000.0)
+		fmt.Fprintf(os.Stderr, "  Latency p50    : %.1f ms\n", float64(p50.Microseconds())/1000.0)
+		fmt.Fprintf(os.Stderr, "  Latency p95    : %.1f ms\n", float64(p95.Microseconds())/1000.0)
+		fmt.Fprintf(os.Stderr, "  Latency p99    : %.1f ms\n", float64(p99.Microseconds())/1000.0)
+	} else {
+		fmt.Fprintf(os.Stderr, "  Latency        : no data (no events with valid sent_at)\n")
+	}
+	fmt.Fprintf(os.Stderr, "=======================\n")
 }
