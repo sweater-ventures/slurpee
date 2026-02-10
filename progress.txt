@@ -1,71 +1,26 @@
 # Ralph Progress Log
-Started: Mon Feb  9 16:34:04 MST 2026
+Started: Tue Feb 10 11:01:57 MST 2026
+---
 
 ## Codebase Patterns
-- templ files use tabs for indentation
-- BusMessage is published in two places: api/events.go (API) and views/events.go (UI) — and also in app/delivery.go (PublishCreatedEvent, updateEventStatus)
-- LogEvent in api/events.go handles structured logging with log_config properties
-- EventRow struct is defined in views/events.templ, not a .go file — templ generate regenerates the _templ.go
-- BatchExtractLogProperties caches log_config lookups per subject for efficiency
-- events.templ JavaScript `createEventRow` builds DOM elements for live mode rows
-- MissedEventsRows templ component renders rows fetched from /events/stream/missed
+- API route registration uses `init()` + `registerRoute` pattern in each file under `api/`
+- Path parameters use Go 1.22+ `r.PathValue("name")` with `req.SetPathValue()` in tests
+- Admin endpoints use `X-Slurpee-Admin-Secret` header, verified against `slurpee.Config.AdminSecret`
+- 404 detection uses `errors.Is(err, pgx.ErrNoRows)` pattern
+- Tests use `testutil.MockQuerier` + `testutil.NewTestApp(mockDB)` + `callHandler(t, slurpee, handler, req)`
+- UUID params: parse with `uuid.Parse()`, convert to `pgtype.UUID{Bytes: parsed, Valid: true}`
+- DELETE endpoints return `http.StatusNoContent` with no body (just `w.WriteHeader`)
+
 ---
 
-## 2026-02-09 4:40 PM MST - US-001
-- Created shared `ExtractLogProperties` helper in `app/log_properties.go` that accepts ctx, querier, subject, data and returns map[string]string
-- Created `BatchExtractLogProperties` for efficient batch extraction with per-subject log_config caching
-- Created `formatPropertyValue` to convert arbitrary JSON values to display strings
-- Refactored `LogEvent()` in `api/events.go` to use the shared helper instead of inline logic
-- Added `Properties map[string]string` field to `EventRow` struct in `views/events.templ`
-- Updated `eventsListHandler` in `views/events.go` to call `BatchExtractLogProperties` and populate EventRow.Properties
-- Files changed: app/log_properties.go (new), api/events.go, views/events.go, views/events.templ, views/events_templ.go
+## 2026-02-10 11:05 AM MST - US-001
+- Implemented DELETE /api/subscribers/{id} endpoint
+- Files changed:
+  - `api/subscribers.go` — added route registration, `deleteSubscriberHandler` function with admin auth, UUID parsing, existence check, cascade delete (subscriptions then subscriber)
+  - `api/subscribers_test.go` — added 5 tests: missing admin secret, wrong admin secret, invalid UUID, not found (404), success (204)
 - **Learnings for future iterations:**
-  - templ generate detects changes incrementally — struct-only changes in .templ files regenerate automatically
-  - The EventRow struct lives in events.templ, so changes to it require templ generate to update events_templ.go
-  - Using a batch function with caching avoids N+1 queries for log_config lookups on the events list page
----
-
-## 2026-02-09 4:45 PM MST - US-002
-- Added Properties column to events table between Timestamp and Status
-- Created `propertyBadges` templ component rendering sorted key=value badges with `badge-outline badge-sm` classes
-- Created `sortedKeys` helper for consistent property display order
-- Updated colspan from 4 to 5 in all empty/placeholder table rows (including JavaScript live mode placeholders)
-- Added Properties cell to MissedEventsRows template for column consistency
-- Files changed: views/events.templ, views/events_templ.go
-- **Learnings for future iterations:**
-  - When adding a column to the events table, must also update JavaScript colspan references in liveStreamScript
-  - The missed-events banner and placeholder rows all use colspan — search for all occurrences
-  - Property badges use `badge-outline badge-sm` for subtle look consistent with DaisyUI patterns
----
-
-## 2026-02-09 4:50 PM MST - US-003
-- Added `Properties map[string]string` field with `json:"properties,omitempty"` tag to BusMessage
-- Updated `PublishCreatedEvent` signature to accept `props map[string]string` parameter
-- Updated both call sites (api/events.go and views/events.go) to extract properties before publishing
-- Files changed: app/eventbus.go, app/delivery.go, api/events.go, views/events.go
-- **Learnings for future iterations:**
-  - PublishCreatedEvent is called from api/events.go and views/events.go — both need updating when signature changes
-  - Properties use `omitempty` JSON tag so null/empty properties don't appear in SSE JSON
----
-
-## 2026-02-09 4:55 PM MST - US-004
-- Updated JavaScript `createEventRow` function to read `data.properties` and render badge elements
-- Properties badges are sorted by key and use `badge-outline badge-sm mr-1` classes matching static row styling
-- Added `tdProps` element between timestamp and status in the DOM construction
-- Events with null/undefined properties render an empty Properties cell
-- Files changed: views/events.templ, views/events_templ.go
-- **Learnings for future iterations:**
-  - JavaScript `Object.keys().sort()` ensures consistent property order matching the Go `sortedKeys` helper
-  - Live mode rows must mirror exact column order of static templ rows
----
-
-## 2026-02-09 4:58 PM MST - US-005
-- Added `BatchExtractLogProperties` call to `eventsMissedHandler` for missed events
-- Populated EventRow.Properties for each missed event row
-- Missed events are rendered server-side by `MissedEventsRows` templ component which already includes Properties column from US-002
-- No JavaScript changes needed — `loadMissedEvents` inserts server-rendered HTML directly
-- Files changed: views/events.go
-- **Learnings for future iterations:**
-  - Missed events use server-side rendering (not client-side JSON), so property badges come from the templ template for free once EventRow.Properties is populated
-  - The loadMissedEvents JavaScript function works with HTML fragments, not JSON — different from live mode SSE
+  - `deleteSubscriberHandler` follows the same auth pattern as create/list handlers — copy the admin secret check block
+  - Must delete subscriptions before subscriber due to foreign key constraint (DeleteSubscriptionsForSubscriber then DeleteSubscriber)
+  - `callHandler` in events_test.go is shared across test files in the api package — no need to redefine
+  - Use `app.UuidToString(subscriber.ID)` to convert pgtype.UUID to string for test path values
 ---

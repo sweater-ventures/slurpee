@@ -18,7 +18,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "Follow existing patterns in api/subscribers.go for auth and error handling. The db.Querier already has DeleteSubscriber and DeleteSubscriptionsForSubscriber methods."
     },
     {

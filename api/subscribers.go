@@ -2,10 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sweater-ventures/slurpee/app"
 	"github.com/sweater-ventures/slurpee/db"
@@ -15,6 +17,7 @@ func init() {
 	registerRoute(func(slurpee *app.Application, router *http.ServeMux) {
 		router.Handle("POST /subscribers", routeHandler(slurpee, createSubscriberHandler))
 		router.Handle("GET /subscribers", routeHandler(slurpee, listSubscribersHandler))
+		router.Handle("DELETE /subscribers/{id}", routeHandler(slurpee, deleteSubscriberHandler))
 	})
 }
 
@@ -245,6 +248,51 @@ func listSubscribersHandler(slurpee *app.Application, w http.ResponseWriter, r *
 	}
 
 	writeJsonResponse(w, http.StatusOK, response)
+}
+
+func deleteSubscriberHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Request) {
+	// Verify admin secret
+	adminSecret := r.Header.Get("X-Slurpee-Admin-Secret")
+	if slurpee.Config.AdminSecret == "" || adminSecret != slurpee.Config.AdminSecret {
+		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Invalid or missing admin secret"})
+		return
+	}
+
+	idStr := r.PathValue("id")
+	parsed, err := uuid.Parse(idStr)
+	if err != nil {
+		writeJsonResponse(w, http.StatusBadRequest, map[string]string{"error": "id must be a valid UUID"})
+		return
+	}
+
+	subscriberID := pgtype.UUID{Bytes: parsed, Valid: true}
+
+	// Verify subscriber exists
+	_, err = slurpee.DB.GetSubscriberByID(r.Context(), subscriberID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeJsonResponse(w, http.StatusNotFound, map[string]string{"error": "subscriber not found"})
+			return
+		}
+		log(r.Context()).Error("Failed to get subscriber", "error", err)
+		writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete subscriber"})
+		return
+	}
+
+	// Delete subscriptions first, then the subscriber
+	if err := slurpee.DB.DeleteSubscriptionsForSubscriber(r.Context(), subscriberID); err != nil {
+		log(r.Context()).Error("Failed to delete subscriptions for subscriber", "error", err)
+		writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete subscriber"})
+		return
+	}
+
+	if err := slurpee.DB.DeleteSubscriber(r.Context(), subscriberID); err != nil {
+		log(r.Context()).Error("Failed to delete subscriber", "error", err)
+		writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete subscriber"})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func subscriptionToResponse(s db.Subscription) SubscriptionResponse {

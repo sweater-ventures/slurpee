@@ -1,0 +1,90 @@
+{
+  "project": "Slurpee Event Broker",
+  "branchName": "ralph/event-log-properties",
+  "description": "Display log_config properties as inline key=value badges on the events list page, including in live mode via SSE. Leverages existing log_config entries that map event subjects to property names extracted from event JSONB data.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Extract log_config properties in events list queries",
+      "description": "As a developer, I need the events list handler to extract configured log properties from each event's JSONB data using the log_config table, so the view layer has property data available to render.",
+      "acceptanceCriteria": [
+        "Create a shared helper function (e.g., ExtractLogProperties) that takes an event subject and data []byte, looks up log_config by subject, and returns a map[string]string of matching properties",
+        "Refactor existing LogEvent() in api/events.go to use this shared helper instead of duplicating the logic",
+        "Call the helper in the events list handler (eventsListHandler) for each event row",
+        "Add extracted properties to the EventRow struct as a map or slice of key/value pairs",
+        "Events with no matching log_config return nil/empty properties — no error",
+        "Event properties where the key exists in log_config but is missing from event data are omitted",
+        "go build ./... passes",
+        "Existing tests pass with go test ./... -short"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "The existing LogEvent() function in api/events.go already implements this pattern — extract the shared logic into a helper in the app package. The helper needs access to db.Querier for GetLogConfigBySubject. Consider accepting a context and querier as params."
+    },
+    {
+      "id": "US-002",
+      "title": "Display Properties column on events list page",
+      "description": "As an operator, I want to see a Properties column on the events list showing key=value badges for each event's configured log properties, so I can see important event data at a glance.",
+      "acceptanceCriteria": [
+        "Add a 'Properties' column to the events table header between 'Timestamp' and 'Status'",
+        "Each property renders as a compact DaisyUI badge showing key=value format",
+        "Events with no properties show an empty cell",
+        "Multiple properties display inline (wrapping if needed)",
+        "templ generate succeeds",
+        "go build ./... passes",
+        "Existing tests pass with go test ./... -short"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Use DaisyUI badge-ghost or badge-outline classes for a subtle look. The EventRow struct from US-001 provides the property data. templ files use tabs for indentation."
+    },
+    {
+      "id": "US-003",
+      "title": "Include log properties in EventBus messages",
+      "description": "As a developer, I need the EventBus publish path to include extracted log properties in BusMessage so SSE live mode can display properties on new event rows immediately.",
+      "acceptanceCriteria": [
+        "Add a Properties field (map[string]string) to BusMessage struct in app/eventbus.go",
+        "In api/events.go where BusMessageCreated is published (~line 165), use the shared helper from US-001 to extract properties and set them on the message",
+        "In views/events.go where BusMessageCreated is published (~line 408), also extract and set properties",
+        "If no log_config exists for the subject, Properties is nil (not an error)",
+        "go build ./... passes",
+        "Existing tests pass with go test ./... -short"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "BusMessage is published in two places: api/events.go (API event creation) and views/events.go (UI event creation). Both need to call the shared helper. The Properties field should use json tag 'properties,omitempty'."
+    },
+    {
+      "id": "US-004",
+      "title": "Render property badges in live mode SSE rows",
+      "description": "As an operator, I want live mode event rows to show the same property badges as static rows, so I get consistent information regardless of how events appear.",
+      "acceptanceCriteria": [
+        "SSE 'created' message JSON payload includes the properties field",
+        "JavaScript created handler in events.templ reads properties from the message",
+        "Properties render as badge elements matching the static page styling from US-002",
+        "Events with empty/null properties show an empty Properties cell",
+        "Live mode status_changed messages do not need to include properties",
+        "go build ./... passes",
+        "Existing tests pass with go test ./... -short"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "The JavaScript in events.templ builds table rows as HTML strings. Add a Properties td with badge spans generated from the message.properties object. Use Object.entries() to iterate the properties map."
+    },
+    {
+      "id": "US-005",
+      "title": "Include properties in missed events recovery",
+      "description": "As an operator, when I reconnect after a brief disconnection, missed events should include property data so recovered rows display properties correctly.",
+      "acceptanceCriteria": [
+        "The /events/missed endpoint handler extracts log properties for each missed event",
+        "Missed event response JSON includes properties field",
+        "JavaScript handler for missed events renders property badges identically to live and static rows",
+        "go build ./... passes",
+        "Existing tests pass with go test ./... -short"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "The eventsMissedHandler in views/events.go queries missed events and returns them as JSON. Add property extraction using the same shared helper from US-001."
+    }
+  ]
+}

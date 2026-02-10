@@ -6,10 +6,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/sweater-ventures/slurpee/app"
 	"github.com/sweater-ventures/slurpee/db"
 	"github.com/sweater-ventures/slurpee/testutil"
 )
@@ -510,5 +513,87 @@ func TestListSubscribers_SuccessResponseFormat(t *testing.T) {
 	assert.NotZero(t, subResp.CreatedAt)
 	assert.NotZero(t, subResp.UpdatedAt)
 
+	mockDB.AssertExpectations(t)
+}
+
+// --- DELETE /api/subscribers/{id} tests ---
+
+func TestDeleteSubscriber_MissingAdminSecret(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	subscriberID := uuid.Must(uuid.NewV7())
+	req := httptest.NewRequest(http.MethodDelete, "/subscribers/"+subscriberID.String(), nil)
+	req.SetPathValue("id", subscriberID.String())
+
+	rec := callHandler(t, slurpee, deleteSubscriberHandler, req)
+	testutil.AssertJSONError(t, rec, http.StatusUnauthorized, "Invalid or missing admin secret")
+}
+
+func TestDeleteSubscriber_WrongAdminSecret(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	subscriberID := uuid.Must(uuid.NewV7())
+	req := httptest.NewRequest(http.MethodDelete, "/subscribers/"+subscriberID.String(), nil)
+	req.SetPathValue("id", subscriberID.String())
+	testutil.WithAdminSecret(req, "wrong-admin-secret")
+
+	rec := callHandler(t, slurpee, deleteSubscriberHandler, req)
+	testutil.AssertJSONError(t, rec, http.StatusUnauthorized, "Invalid or missing admin secret")
+}
+
+func TestDeleteSubscriber_InvalidUUID(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	req := httptest.NewRequest(http.MethodDelete, "/subscribers/not-a-uuid", nil)
+	req.SetPathValue("id", "not-a-uuid")
+	testutil.WithAdminSecret(req, "test-admin-secret")
+
+	rec := callHandler(t, slurpee, deleteSubscriberHandler, req)
+	testutil.AssertJSONError(t, rec, http.StatusBadRequest, "id must be a valid UUID")
+}
+
+func TestDeleteSubscriber_NotFound(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	subscriberID := uuid.Must(uuid.NewV7())
+	mockDB.On("GetSubscriberByID", mock.Anything, pgtype.UUID{Bytes: subscriberID, Valid: true}).
+		Return(db.Subscriber{}, pgx.ErrNoRows)
+
+	req := httptest.NewRequest(http.MethodDelete, "/subscribers/"+subscriberID.String(), nil)
+	req.SetPathValue("id", subscriberID.String())
+	testutil.WithAdminSecret(req, "test-admin-secret")
+
+	rec := callHandler(t, slurpee, deleteSubscriberHandler, req)
+	testutil.AssertJSONError(t, rec, http.StatusNotFound, "subscriber not found")
+	mockDB.AssertExpectations(t)
+}
+
+func TestDeleteSubscriber_Success(t *testing.T) {
+	mockDB := new(testutil.MockQuerier)
+	slurpee := testutil.NewTestApp(mockDB)
+
+	subscriber := testutil.NewSubscriber(func(s *db.Subscriber) {
+		s.Name = "to-delete"
+	})
+
+	subscriberIDStr := app.UuidToString(subscriber.ID)
+	mockDB.On("GetSubscriberByID", mock.Anything, subscriber.ID).
+		Return(subscriber, nil)
+	mockDB.On("DeleteSubscriptionsForSubscriber", mock.Anything, subscriber.ID).
+		Return(nil)
+	mockDB.On("DeleteSubscriber", mock.Anything, subscriber.ID).
+		Return(nil)
+
+	req := httptest.NewRequest(http.MethodDelete, "/subscribers/"+subscriberIDStr, nil)
+	req.SetPathValue("id", subscriberIDStr)
+	testutil.WithAdminSecret(req, "test-admin-secret")
+
+	rec := callHandler(t, slurpee, deleteSubscriberHandler, req)
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	assert.Empty(t, rec.Body.String())
 	mockDB.AssertExpectations(t)
 }
