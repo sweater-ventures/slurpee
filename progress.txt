@@ -10,6 +10,16 @@ Started: Tue Feb 10 11:01:57 MST 2026
 - Tests use `testutil.MockQuerier` + `testutil.NewTestApp(mockDB)` + `callHandler(t, slurpee, handler, req)`
 - UUID params: parse with `uuid.Parse()`, convert to `pgtype.UUID{Bytes: parsed, Valid: true}`
 - DELETE endpoints return `http.StatusNoContent` with no body (just `w.WriteHeader`)
+- `go build ./slurpit` fails because output name collides with directory — use `go build -o /tmp/slurpit ./slurpit`
+- go-arg subcommands: pointer fields with `arg:"subcommand:name"` tag, check non-nil after MustParse
+- POST /api/events: headers `X-Slurpee-Secret-ID` + `X-Slurpee-Secret`, body `{"subject":"...","data":{...}}`, returns 201
+- Ticker-based rate control: `time.Second / time.Duration(rate)` for interval from events/sec
+- POST /api/subscribers: header `X-Slurpee-Admin-Secret`, body `{"name":"...","endpoint_url":"...","auth_secret":"...","subscriptions":[{"subject_pattern":"..."}]}`, returns 200 with `{"id":"uuid",...}`
+- DELETE /api/subscribers/{id}: header `X-Slurpee-Admin-Secret`, returns 204 No Content
+- Webhook event body: `{"data": {"sent_at": "RFC3339Nano"}}` — nested struct needed to parse
+- Thread-safe counters: use `sync.Mutex` to protect shared state in concurrent HTTP handlers
+- Live stats: use `select` with `time.After` + ticker instead of `time.Sleep` when needing concurrent display updates
+- Percentiles: `sort.Slice` then index `len*N/100` — safe for integer division when N<100
 
 ---
 
@@ -23,4 +33,66 @@ Started: Tue Feb 10 11:01:57 MST 2026
   - Must delete subscriptions before subscriber due to foreign key constraint (DeleteSubscriptionsForSubscriber then DeleteSubscriber)
   - `callHandler` in events_test.go is shared across test files in the api package — no need to redefine
   - Use `app.UuidToString(subscriber.ID)` to convert pgtype.UUID to string for test path values
+---
+
+## 2026-02-10 11:16 AM MST - US-002
+- Implemented CLI scaffolding in `slurpit/main.go` with go-arg subcommands
+- Files changed:
+  - `slurpit/main.go` — new file with SendCmd, ReceiveCmd structs, go-arg subcommand dispatch, placeholder runSend/runReceive functions
+- **Learnings for future iterations:**
+  - `go build ./slurpit` fails with "output already exists and is a directory" — use `go build -o /tmp/slurpit ./slurpit` or run from elsewhere
+  - go-arg subcommand pattern: define pointer fields in args struct with `arg:"subcommand:name"` tags, check which is non-nil after parse
+  - go-arg supports `time.Duration` directly as a field type (used for `--duration` flag)
+  - Required flags use `arg:"--name,required"` tag; defaults use `default:"value"` struct tag
+  - The `Description()` method on the args struct sets the program description in help output
+---
+
+## 2026-02-10 11:20 AM MST - US-003
+- Implemented send mode in `runSend()` — publishes events at configurable rate via POST /api/events
+- Files changed:
+  - `slurpit/main.go` — replaced placeholder `runSend` with full implementation: HTTP client, ticker-based rate control, JSON event body with `sent_at` timestamp, live progress with `\r`, final summary
+- **Learnings for future iterations:**
+  - POST /api/events expects headers `X-Slurpee-Secret-ID` and `X-Slurpee-Secret`, body `{"subject": "...", "data": {...}}`
+  - Returns 201 Created on success
+  - Use `time.Second / time.Duration(rate)` for ticker interval from events/sec rate
+  - `\r` on stderr for in-place line updates; clear line with spaces before final summary to avoid leftover characters
+  - `time.RFC3339Nano` for nanosecond-precision timestamps (required for latency calculation in US-005)
+---
+
+## 2026-02-10 11:31 AM MST - US-004
+- Implemented receive mode in `runReceive()` — auto-registers subscriber, runs webhook HTTP server, deregisters on shutdown
+- Files changed:
+  - `slurpit/main.go` — replaced placeholder `runReceive` with full implementation: subscriber registration via POST /api/subscribers, webhook server with header validation, duration-based timeout, graceful shutdown with DELETE cleanup
+- **Learnings for future iterations:**
+  - POST /api/subscribers expects `X-Slurpee-Admin-Secret` header, body with `name`, `endpoint_url`, `auth_secret`, and `subscriptions` array
+  - Response includes `id` field (string UUID) needed for DELETE cleanup
+  - Use `http.NewServeMux()` with `"POST /"` route pattern for webhook handler — Go 1.22+ method routing
+  - `server.Shutdown(ctx)` gracefully drains connections; pair with `ListenAndServe` in goroutine
+  - `math/rand.Intn` is sufficient for random suffix generation (no crypto needed for subscriber names)
+  - Webhook events arrive with `X-Event-ID` and `X-Event-Subject` headers — validate both
+  - The `received` counter is not thread-safe yet — will need sync.Mutex when adding latency tracking in US-005
+---
+
+## 2026-02-10 11:35 AM MST - US-005
+- Implemented latency calculation from sent_at timestamp in receiver webhook handler
+- Files changed:
+  - `slurpit/main.go` — added `sync` and `io` imports, `sync.Mutex`-protected `latencies` slice, body parsing in webhook handler to extract `sent_at`, latency computation as `receivedAt.Sub(sentAt)`, graceful handling of missing/unparseable timestamps
+- **Learnings for future iterations:**
+  - Capture `receivedAt := time.Now()` at the very start of the handler before any other work for accurate latency
+  - Webhook body contains `{"data": {"sent_at": "..."}}` — need nested struct or map to extract `sent_at`
+  - `received` counter and `latencies` slice share the same mutex since they're always updated together
+  - Warning messages for parse failures use `\n` prefix to avoid corrupting live stats line (US-006)
+  - Always increment `received` even when `sent_at` is missing/unparseable — it's still a received event, just not counted for latency
+---
+
+## 2026-02-10 11:38 AM MST - US-006
+- Implemented live terminal statistics display with 1-second update ticker and final summary with percentiles
+- Files changed:
+  - `slurpit/main.go` — added `sort` import, replaced `time.Sleep` with select-based stats loop using `time.NewTicker(1*time.Second)`, added live stats line with `\r` (total received, events/sec from 1s window, latency min/max/mean), added final summary block with total received, duration, throughput, latency min/max/mean/p50/p95/p99
+- **Learnings for future iterations:**
+  - Use `select` with `time.After(duration)` and `ticker.C` channels instead of `time.Sleep` to allow concurrent stats display during the wait period
+  - Percentile calculation: `sort.Slice` the latencies, then index with `len*N/100` — integer division makes this safe (never out of bounds for N<100)
+  - Clear the live stats line before printing summary by overwriting with spaces + `\r`
+  - Per-second rate: track `prevReceived` count and subtract on each tick — simple sliding window approximation
+  - `float64(d.Microseconds())/1000.0` gives ms with decimal precision vs `d.Milliseconds()` which truncates to int
 ---
