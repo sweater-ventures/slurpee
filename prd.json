@@ -103,7 +103,7 @@
         "go build ./slurpit compiles successfully"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Use a 1-second ticker in a goroutine for live stats. Track a rolling count for per-second rate. For percentiles: sort the slice, p95 index = len*0.95. Use fmt.Fprintf(os.Stderr, ...) with \\r for live updates so stdout stays clean."
     }
   ]
