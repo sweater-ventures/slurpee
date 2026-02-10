@@ -1,10 +1,26 @@
 # Ralph Progress Log
-Started: Mon Feb 10 11:00:00 MST 2026
+Started: Tue Feb 10 11:01:57 MST 2026
+---
 
 ## Codebase Patterns
-- templ files use tabs for indentation
-- API auth uses X-Slurpee-Secret header for event endpoints, X-Slurpee-Admin-Secret for subscriber endpoints
-- db.Querier already has DeleteSubscriber and DeleteSubscriptionsForSubscriber methods
-- Subscriber API handlers are in api/subscribers.go
-- Follow existing patterns in api/ for new endpoints
+- API route registration uses `init()` + `registerRoute` pattern in each file under `api/`
+- Path parameters use Go 1.22+ `r.PathValue("name")` with `req.SetPathValue()` in tests
+- Admin endpoints use `X-Slurpee-Admin-Secret` header, verified against `slurpee.Config.AdminSecret`
+- 404 detection uses `errors.Is(err, pgx.ErrNoRows)` pattern
+- Tests use `testutil.MockQuerier` + `testutil.NewTestApp(mockDB)` + `callHandler(t, slurpee, handler, req)`
+- UUID params: parse with `uuid.Parse()`, convert to `pgtype.UUID{Bytes: parsed, Valid: true}`
+- DELETE endpoints return `http.StatusNoContent` with no body (just `w.WriteHeader`)
+
+---
+
+## 2026-02-10 11:05 AM MST - US-001
+- Implemented DELETE /api/subscribers/{id} endpoint
+- Files changed:
+  - `api/subscribers.go` — added route registration, `deleteSubscriberHandler` function with admin auth, UUID parsing, existence check, cascade delete (subscriptions then subscriber)
+  - `api/subscribers_test.go` — added 5 tests: missing admin secret, wrong admin secret, invalid UUID, not found (404), success (204)
+- **Learnings for future iterations:**
+  - `deleteSubscriberHandler` follows the same auth pattern as create/list handlers — copy the admin secret check block
+  - Must delete subscriptions before subscriber due to foreign key constraint (DeleteSubscriptionsForSubscriber then DeleteSubscriber)
+  - `callHandler` in events_test.go is shared across test files in the api package — no need to redefine
+  - Use `app.UuidToString(subscriber.ID)` to convert pgtype.UUID to string for test path values
 ---
