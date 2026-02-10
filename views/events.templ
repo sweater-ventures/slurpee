@@ -2,8 +2,8 @@ package views
 
 import (
 	"fmt"
-	"sort"
 	"github.com/sweater-ventures/slurpee/components"
+	"sort"
 )
 
 type EventRow struct {
@@ -134,7 +134,7 @@ templ eventsFilterBar(subject, status, dateFrom, dateTo, content, traceID string
 		hx-push-url="true"
 		class="mb-6 p-4 bg-base-200 rounded-lg"
 	>
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 			<div class="form-control">
 				<label class="label">
 					<span class="label-text">Subject</span>
@@ -146,18 +146,6 @@ templ eventsFilterBar(subject, status, dateFrom, dateTo, content, traceID string
 					placeholder="e.g. order.created"
 					class="input input-bordered input-sm w-full"
 				/>
-			</div>
-			<div class="form-control">
-				<label class="label">
-					<span class="label-text">Status</span>
-				</label>
-				<select name="status" class="select select-bordered select-sm w-full">
-					<option value="">All</option>
-					<option value="pending" selected?={ status == "pending" }>Pending</option>
-					<option value="delivered" selected?={ status == "delivered" }>Delivered</option>
-					<option value="failed" selected?={ status == "failed" }>Failed</option>
-					<option value="partial" selected?={ status == "partial" }>Partial</option>
-				</select>
 			</div>
 			<div class="form-control">
 				<label class="label">
@@ -180,6 +168,18 @@ templ eventsFilterBar(subject, status, dateFrom, dateTo, content, traceID string
 					value={ dateTo }
 					class="input input-bordered input-sm w-full"
 				/>
+			</div>
+			<div class="form-control">
+				<label class="label">
+					<span class="label-text">Status</span>
+				</label>
+				<select name="status" class="select select-bordered select-sm w-full">
+					<option value="">All</option>
+					<option value="pending" selected?={ status == "pending" }>Pending</option>
+					<option value="delivered" selected?={ status == "delivered" }>Delivered</option>
+					<option value="failed" selected?={ status == "failed" }>Failed</option>
+					<option value="partial" selected?={ status == "partial" }>Partial</option>
+				</select>
 			</div>
 			<div class="form-control">
 				<label class="label">
