@@ -17,6 +17,7 @@ WHERE timestamp > $1::timestamptz
   AND ($2::text = '' OR subject LIKE $2)
   AND ($3::text = '' OR delivery_status = $3)
   AND ($4::jsonb IS NULL OR data @> $4)
+  AND ($5::text = '' OR trace_id::text = $5)
 `
 
 type CountEventsAfterTimestampParams struct {
@@ -24,6 +25,7 @@ type CountEventsAfterTimestampParams struct {
 	SubjectFilter  string
 	StatusFilter   string
 	DataFilter     []byte
+	TraceIDFilter  string
 }
 
 func (q *Queries) CountEventsAfterTimestamp(ctx context.Context, arg CountEventsAfterTimestampParams) (int64, error) {
@@ -32,6 +34,7 @@ func (q *Queries) CountEventsAfterTimestamp(ctx context.Context, arg CountEvents
 		arg.SubjectFilter,
 		arg.StatusFilter,
 		arg.DataFilter,
+		arg.TraceIDFilter,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -177,6 +180,7 @@ WHERE timestamp > $1::timestamptz
   AND ($2::text = '' OR subject LIKE $2)
   AND ($3::text = '' OR delivery_status = $3)
   AND ($4::jsonb IS NULL OR data @> $4)
+  AND ($5::text = '' OR trace_id::text = $5)
 ORDER BY timestamp DESC
 LIMIT 200
 `
@@ -186,6 +190,7 @@ type ListEventsAfterTimestampParams struct {
 	SubjectFilter  string
 	StatusFilter   string
 	DataFilter     []byte
+	TraceIDFilter  string
 }
 
 func (q *Queries) ListEventsAfterTimestamp(ctx context.Context, arg ListEventsAfterTimestampParams) ([]Event, error) {
@@ -194,6 +199,7 @@ func (q *Queries) ListEventsAfterTimestamp(ctx context.Context, arg ListEventsAf
 		arg.SubjectFilter,
 		arg.StatusFilter,
 		arg.DataFilter,
+		arg.TraceIDFilter,
 	)
 	if err != nil {
 		return nil, err
@@ -392,6 +398,7 @@ WHERE
   AND ($5::timestamptz IS NULL OR timestamp >= $5)
   AND ($6::timestamptz IS NULL OR timestamp <= $6)
   AND ($7::jsonb IS NULL OR data @> $7)
+  AND ($8::text = '' OR trace_id::text = $8)
 ORDER BY timestamp DESC LIMIT $1 OFFSET $2
 `
 
@@ -403,6 +410,7 @@ type SearchEventsFilteredParams struct {
 	StartTimeFilter pgtype.Timestamptz
 	EndTimeFilter   pgtype.Timestamptz
 	DataFilter      []byte
+	TraceIDFilter   string
 }
 
 func (q *Queries) SearchEventsFiltered(ctx context.Context, arg SearchEventsFilteredParams) ([]Event, error) {
@@ -414,6 +422,7 @@ func (q *Queries) SearchEventsFiltered(ctx context.Context, arg SearchEventsFilt
 		arg.StartTimeFilter,
 		arg.EndTimeFilter,
 		arg.DataFilter,
+		arg.TraceIDFilter,
 	)
 	if err != nil {
 		return nil, err

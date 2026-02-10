@@ -38,10 +38,11 @@ type eventFilters struct {
 	DateFrom string
 	DateTo   string
 	Content  string
+	TraceID  string
 }
 
 func (f eventFilters) hasAny() bool {
-	return f.Subject != "" || f.Status != "" || f.DateFrom != "" || f.DateTo != "" || f.Content != ""
+	return f.Subject != "" || f.Status != "" || f.DateFrom != "" || f.DateTo != "" || f.Content != "" || f.TraceID != ""
 }
 
 func parseFilters(r *http.Request) eventFilters {
@@ -51,6 +52,7 @@ func parseFilters(r *http.Request) eventFilters {
 		DateFrom: r.URL.Query().Get("date_from"),
 		DateTo:   r.URL.Query().Get("date_to"),
 		Content:  r.URL.Query().Get("content"),
+		TraceID:  r.URL.Query().Get("trace_id"),
 	}
 }
 
@@ -108,6 +110,11 @@ func eventsListHandler(slurpee *app.Application, w http.ResponseWriter, r *http.
 			}
 		}
 
+		// Trace ID filter: exact match
+		if filters.TraceID != "" {
+			params.TraceIDFilter = filters.TraceID
+		}
+
 		events, err = slurpee.DB.SearchEventsFiltered(r.Context(), params)
 	} else {
 		events, err = slurpee.DB.ListEvents(r.Context(), db.ListEventsParams{
@@ -142,9 +149,9 @@ func eventsListHandler(slurpee *app.Application, w http.ResponseWriter, r *http.
 
 	// If this is an HTMX request, return just the table partial
 	if r.Header.Get("HX-Request") == "true" {
-		err = EventsTablePartial(rows, page, hasNext, filters.Subject, filters.Status, filters.DateFrom, filters.DateTo, filters.Content).Render(r.Context(), w)
+		err = EventsTablePartial(rows, page, hasNext, filters.Subject, filters.Status, filters.DateFrom, filters.DateTo, filters.Content, filters.TraceID).Render(r.Context(), w)
 	} else {
-		err = EventsListTemplate(rows, page, hasNext, filters.Subject, filters.Status, filters.DateFrom, filters.DateTo, filters.Content).Render(r.Context(), w)
+		err = EventsListTemplate(rows, page, hasNext, filters.Subject, filters.Status, filters.DateFrom, filters.DateTo, filters.Content, filters.TraceID).Render(r.Context(), w)
 	}
 	if err != nil {
 		log(r.Context()).Error("Error rendering events list view", "err", err)
@@ -449,6 +456,9 @@ func eventsMissedHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 	if filters.Content != "" && json.Valid([]byte(filters.Content)) {
 		params.DataFilter = []byte(filters.Content)
 	}
+	if filters.TraceID != "" {
+		params.TraceIDFilter = filters.TraceID
+	}
 
 	events, err := slurpee.DB.ListEventsAfterTimestamp(r.Context(), params)
 	if err != nil {
@@ -513,6 +523,9 @@ func eventsStreamHandler(slurpee *app.Application, w http.ResponseWriter, r *htt
 				}
 				if filters.Content != "" && json.Valid([]byte(filters.Content)) {
 					params.DataFilter = []byte(filters.Content)
+				}
+				if filters.TraceID != "" {
+					params.TraceIDFilter = filters.TraceID
 				}
 				count, err := slurpee.DB.CountEventsAfterTimestamp(r.Context(), params)
 				if err == nil && count > 0 {
@@ -579,6 +592,7 @@ func matchesStreamFilters(msg app.BusMessage, filters eventFilters) bool {
 		}
 	}
 	// Content filter: not applicable to bus messages (they don't carry full event data)
+	// Trace ID filter: not applicable to bus messages (they don't carry trace_id)
 	return true
 }
 
