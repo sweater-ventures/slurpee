@@ -5,6 +5,7 @@ build/
 
 # project binary
 slurpee
+slurpit/slurpit
 
 # compressed files
 *.zst
