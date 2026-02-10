@@ -43,11 +43,4 @@
 |----|------|---|-------|------|
 | #1188 | 8:13 PM | 🔵 | Complete database Querier interface with 56 type-safe methods | ~478 |
 | #1174 | 8:11 PM | 🔵 | sqlc-generated database abstraction layer | ~234 |
-
-### Feb 9, 2026
-
-| ID | Time | T | Title | Read |
-|----|------|---|-------|------|
-| #1431 | 4:11 PM | 🔵 | Complete events list architecture with SSE live streaming and reconnection recovery | ~877 |
-| #1430 | 4:10 PM | 🔵 | Database schema models define core entities with UUID keys and JSONB filters | ~606 |
 </claude-mem-context>

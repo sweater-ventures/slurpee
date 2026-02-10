@@ -1,90 +1,110 @@
 {
   "project": "Slurpee Event Broker",
-  "branchName": "ralph/event-log-properties",
-  "description": "Display log_config properties as inline key=value badges on the events list page, including in live mode via SSE. Leverages existing log_config entries that map event subjects to property names extracted from event JSONB data.",
+  "branchName": "ralph/load-test-cli",
+  "description": "Load testing CLI tool (slurpit) for the Slurpee event broker with send and receive modes for end-to-end load testing with live terminal stats.",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Extract log_config properties in events list queries",
-      "description": "As a developer, I need the events list handler to extract configured log properties from each event's JSONB data using the log_config table, so the view layer has property data available to render.",
+      "title": "Add DELETE /api/subscribers/{id} endpoint",
+      "description": "As the slurpit receiver, I need an API endpoint to delete a subscriber so the tool can clean up after itself on shutdown.",
       "acceptanceCriteria": [
-        "Create a shared helper function (e.g., ExtractLogProperties) that takes an event subject and data []byte, looks up log_config by subject, and returns a map[string]string of matching properties",
-        "Refactor existing LogEvent() in api/events.go to use this shared helper instead of duplicating the logic",
-        "Call the helper in the events list handler (eventsListHandler) for each event row",
-        "Add extracted properties to the EventRow struct as a map or slice of key/value pairs",
-        "Events with no matching log_config return nil/empty properties — no error",
-        "Event properties where the key exists in log_config but is missing from event data are omitted",
+        "DELETE /api/subscribers/{id} endpoint added to the API router in api/subscribers.go",
+        "Requires X-Slurpee-Admin-Secret header (same auth as other subscriber endpoints)",
+        "Deletes the subscriber's subscriptions first (via DeleteSubscriptionsForSubscriber), then the subscriber (via DeleteSubscriber)",
+        "Returns HTTP 204 No Content on success",
+        "Returns HTTP 404 if subscriber ID not found",
+        "Returns HTTP 401/403 for missing/invalid admin secret",
         "go build ./... passes",
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "The existing LogEvent() function in api/events.go already implements this pattern — extract the shared logic into a helper in the app package. The helper needs access to db.Querier for GetLogConfigBySubject. Consider accepting a context and querier as params."
+      "passes": false,
+      "notes": "Follow existing patterns in api/subscribers.go for auth and error handling. The db.Querier already has DeleteSubscriber and DeleteSubscriptionsForSubscriber methods."
     },
     {
       "id": "US-002",
-      "title": "Display Properties column on events list page",
-      "description": "As an operator, I want to see a Properties column on the events list showing key=value badges for each event's configured log properties, so I can see important event data at a glance.",
+      "title": "CLI scaffolding with go-arg subcommands",
+      "description": "As a developer, I want a slurpit binary with send and receive subcommands so I can run either mode independently.",
       "acceptanceCriteria": [
-        "Add a 'Properties' column to the events table header between 'Timestamp' and 'Status'",
-        "Each property renders as a compact DaisyUI badge showing key=value format",
-        "Events with no properties show an empty cell",
-        "Multiple properties display inline (wrapping if needed)",
-        "templ generate succeeds",
-        "go build ./... passes",
-        "Existing tests pass with go test ./... -short"
+        "New slurpit/ directory at the project root with main.go",
+        "Uses go-arg with subcommand pattern: slurpit send [flags] and slurpit receive [flags]",
+        "Running with no subcommand prints usage/help",
+        "Running with --help on each subcommand shows available flags",
+        "Send subcommand struct has fields: URL, SecretID, Secret, Subject (default loadtest.event), Rate (default 10), Count (default 100)",
+        "Receive subcommand struct has fields: URL, AdminSecret, Listen (default :9090), EndpointURL, Subject (default loadtest.*), Duration (default 30s)",
+        "go build ./slurpit compiles successfully"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "Use DaisyUI badge-ghost or badge-outline classes for a subtle look. The EventRow struct from US-001 provides the property data. templ files use tabs for indentation."
+      "passes": false,
+      "notes": "Use github.com/alexflint/go-arg for CLI parsing — add it to go.mod. Define Send and Receive structs with arg tags. The main function should dispatch to placeholder functions."
     },
     {
       "id": "US-003",
-      "title": "Include log properties in EventBus messages",
-      "description": "As a developer, I need the EventBus publish path to include extracted log properties in BusMessage so SSE live mode can display properties on new event rows immediately.",
+      "title": "Send mode — publish events at a configurable rate",
+      "description": "As a tester, I want to send events to Slurpee at a specified rate so I can simulate production load.",
       "acceptanceCriteria": [
-        "Add a Properties field (map[string]string) to BusMessage struct in app/eventbus.go",
-        "In api/events.go where BusMessageCreated is published (~line 165), use the shared helper from US-001 to extract properties and set them on the message",
-        "In views/events.go where BusMessageCreated is published (~line 408), also extract and set properties",
-        "If no log_config exists for the subject, Properties is nil (not an error)",
-        "go build ./... passes",
-        "Existing tests pass with go test ./... -short"
+        "Events are sent via POST /api/events with proper X-Slurpee-Secret-ID and X-Slurpee-Secret headers",
+        "Each event's data payload includes a sent_at field with RFC 3339 nanosecond-precision timestamp",
+        "Events are sent at approximately the configured rate using a ticker or rate limiter",
+        "Sends exactly --count events then exits",
+        "Prints a running count of events sent updated in real-time on a single line using carriage return",
+        "On completion prints a summary: total sent, elapsed time, actual rate achieved, error count",
+        "Handles HTTP errors gracefully — logs failures without stopping the run",
+        "go build ./slurpit compiles successfully"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "BusMessage is published in two places: api/events.go (API event creation) and views/events.go (UI event creation). Both need to call the shared helper. The Properties field should use json tag 'properties,omitempty'."
+      "passes": false,
+      "notes": "Use time.NewTicker with interval 1/rate seconds. POST JSON body with subject, data containing sent_at. Use \\r for in-place line updates."
     },
     {
       "id": "US-004",
-      "title": "Render property badges in live mode SSE rows",
-      "description": "As an operator, I want live mode event rows to show the same property badges as static rows, so I get consistent information regardless of how events appear.",
+      "title": "Receive mode — webhook endpoint with auto-registration",
+      "description": "As a tester, I want the receiver to start an HTTP server and register itself as a Slurpee subscriber so I can measure delivery performance with zero manual setup.",
       "acceptanceCriteria": [
-        "SSE 'created' message JSON payload includes the properties field",
-        "JavaScript created handler in events.templ reads properties from the message",
-        "Properties render as badge elements matching the static page styling from US-002",
-        "Events with empty/null properties show an empty Properties cell",
-        "Live mode status_changed messages do not need to include properties",
-        "go build ./... passes",
-        "Existing tests pass with go test ./... -short"
+        "On startup registers a subscriber via POST /api/subscribers with configured endpoint URL and subject pattern",
+        "Subscriber name includes a random suffix (e.g. slurpit-receiver-a1b2c3)",
+        "Starts an HTTP server on --listen address that accepts POST webhook deliveries",
+        "Validates incoming webhooks have X-Event-ID and X-Event-Subject headers",
+        "Responds with HTTP 200 to acknowledge delivery",
+        "Runs for --duration then shuts down gracefully",
+        "On shutdown deregisters the subscriber via DELETE /api/subscribers/{id}",
+        "On shutdown prints a message indicating the run is complete",
+        "go build ./slurpit compiles successfully"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "The JavaScript in events.templ builds table rows as HTML strings. Add a Properties td with badge spans generated from the message.properties object. Use Object.entries() to iterate the properties map."
+      "passes": false,
+      "notes": "Register subscriber with POST /api/subscribers using X-Slurpee-Admin-Secret header. Parse subscriber ID from response for cleanup. Use context with timeout for duration. Use math/rand for random suffix."
     },
     {
       "id": "US-005",
-      "title": "Include properties in missed events recovery",
-      "description": "As an operator, when I reconnect after a brief disconnection, missed events should include property data so recovered rows display properties correctly.",
+      "title": "Latency calculation from sent_at timestamp",
+      "description": "As a tester, I want the receiver to calculate delivery latency by comparing the sent_at timestamp in the event data to the time the webhook was received.",
       "acceptanceCriteria": [
-        "The /events/missed endpoint handler extracts log properties for each missed event",
-        "Missed event response JSON includes properties field",
-        "JavaScript handler for missed events renders property badges identically to live and static rows",
-        "go build ./... passes",
-        "Existing tests pass with go test ./... -short"
+        "Parses sent_at from the incoming event data JSON payload",
+        "Calculates latency as time.Now() minus sent_at for each received event",
+        "Stores latency values in a thread-safe slice for statistical aggregation",
+        "Gracefully handles missing or unparseable sent_at — logs warning and skips that event for latency stats",
+        "go build ./slurpit compiles successfully"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "The eventsMissedHandler in views/events.go queries missed events and returns them as JSON. Add property extraction using the same shared helper from US-001."
+      "passes": false,
+      "notes": "Use sync.Mutex to protect the latency slice since webhook handler runs concurrently. Parse sent_at with time.Parse(time.RFC3339Nano, ...)."
+    },
+    {
+      "id": "US-006",
+      "title": "Live terminal statistics display",
+      "description": "As a tester, I want to see throughput and latency statistics updating live in my terminal so I can observe system behavior in real-time.",
+      "acceptanceCriteria": [
+        "Receiver prints a stats line that updates in place using carriage return every 1 second",
+        "Live stats include: total events received, events/sec (last 1s window), latency min/max/mean (rolling)",
+        "On completion prints a final summary block with: total events received, overall events/sec, latency min/max/mean/p50/p95/p99",
+        "Percentiles are calculated from all received events over the full run using sort and index lookup",
+        "Output is human-readable with aligned columns and units (ms for latency)",
+        "go build ./slurpit compiles successfully"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Use a 1-second ticker in a goroutine for live stats. Track a rolling count for per-second rate. For percentiles: sort the slice, p95 index = len*0.95. Use fmt.Fprintf(os.Stderr, ...) with \\r for live updates so stdout stays clean."
     }
   ]
 }
