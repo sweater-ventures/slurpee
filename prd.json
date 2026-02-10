@@ -35,7 +35,7 @@
         "go build ./slurpit compiles successfully"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Use github.com/alexflint/go-arg for CLI parsing — add it to go.mod. Define Send and Receive structs with arg tags. The main function should dispatch to placeholder functions."
     },
     {
@@ -53,7 +53,7 @@
         "go build ./slurpit compiles successfully"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Use time.NewTicker with interval 1/rate seconds. POST JSON body with subject, data containing sent_at. Use \\r for in-place line updates."
     },
     {

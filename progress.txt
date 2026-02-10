@@ -10,6 +10,10 @@ Started: Tue Feb 10 11:01:57 MST 2026
 - Tests use `testutil.MockQuerier` + `testutil.NewTestApp(mockDB)` + `callHandler(t, slurpee, handler, req)`
 - UUID params: parse with `uuid.Parse()`, convert to `pgtype.UUID{Bytes: parsed, Valid: true}`
 - DELETE endpoints return `http.StatusNoContent` with no body (just `w.WriteHeader`)
+- `go build ./slurpit` fails because output name collides with directory — use `go build -o /tmp/slurpit ./slurpit`
+- go-arg subcommands: pointer fields with `arg:"subcommand:name"` tag, check non-nil after MustParse
+- POST /api/events: headers `X-Slurpee-Secret-ID` + `X-Slurpee-Secret`, body `{"subject":"...","data":{...}}`, returns 201
+- Ticker-based rate control: `time.Second / time.Duration(rate)` for interval from events/sec
 
 ---
 
@@ -23,4 +27,28 @@ Started: Tue Feb 10 11:01:57 MST 2026
   - Must delete subscriptions before subscriber due to foreign key constraint (DeleteSubscriptionsForSubscriber then DeleteSubscriber)
   - `callHandler` in events_test.go is shared across test files in the api package — no need to redefine
   - Use `app.UuidToString(subscriber.ID)` to convert pgtype.UUID to string for test path values
+---
+
+## 2026-02-10 11:16 AM MST - US-002
+- Implemented CLI scaffolding in `slurpit/main.go` with go-arg subcommands
+- Files changed:
+  - `slurpit/main.go` — new file with SendCmd, ReceiveCmd structs, go-arg subcommand dispatch, placeholder runSend/runReceive functions
+- **Learnings for future iterations:**
+  - `go build ./slurpit` fails with "output already exists and is a directory" — use `go build -o /tmp/slurpit ./slurpit` or run from elsewhere
+  - go-arg subcommand pattern: define pointer fields in args struct with `arg:"subcommand:name"` tags, check which is non-nil after parse
+  - go-arg supports `time.Duration` directly as a field type (used for `--duration` flag)
+  - Required flags use `arg:"--name,required"` tag; defaults use `default:"value"` struct tag
+  - The `Description()` method on the args struct sets the program description in help output
+---
+
+## 2026-02-10 11:20 AM MST - US-003
+- Implemented send mode in `runSend()` — publishes events at configurable rate via POST /api/events
+- Files changed:
+  - `slurpit/main.go` — replaced placeholder `runSend` with full implementation: HTTP client, ticker-based rate control, JSON event body with `sent_at` timestamp, live progress with `\r`, final summary
+- **Learnings for future iterations:**
+  - POST /api/events expects headers `X-Slurpee-Secret-ID` and `X-Slurpee-Secret`, body `{"subject": "...", "data": {...}}`
+  - Returns 201 Created on success
+  - Use `time.Second / time.Duration(rate)` for ticker interval from events/sec rate
+  - `\r` on stderr for in-place line updates; clear line with spaces before final summary to avoid leftover characters
+  - `time.RFC3339Nano` for nanosecond-precision timestamps (required for latency calculation in US-005)
 ---
