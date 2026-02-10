@@ -29,6 +29,7 @@ WHERE
   AND (sqlc.narg(start_time_filter)::timestamptz IS NULL OR timestamp >= sqlc.narg(start_time_filter))
   AND (sqlc.narg(end_time_filter)::timestamptz IS NULL OR timestamp <= sqlc.narg(end_time_filter))
   AND (sqlc.narg(data_filter)::jsonb IS NULL OR data @> sqlc.narg(data_filter))
+  AND (sqlc.arg(trace_id_filter)::text = '' OR trace_id::text = sqlc.arg(trace_id_filter))
 ORDER BY timestamp DESC LIMIT $1 OFFSET $2;
 
 -- name: CountEventsAfterTimestamp :one
@@ -36,7 +37,8 @@ SELECT count(*) FROM events
 WHERE timestamp > sqlc.arg(after_timestamp)::timestamptz
   AND (sqlc.arg(subject_filter)::text = '' OR subject LIKE sqlc.arg(subject_filter))
   AND (sqlc.arg(status_filter)::text = '' OR delivery_status = sqlc.arg(status_filter))
-  AND (sqlc.narg(data_filter)::jsonb IS NULL OR data @> sqlc.narg(data_filter));
+  AND (sqlc.narg(data_filter)::jsonb IS NULL OR data @> sqlc.narg(data_filter))
+  AND (sqlc.arg(trace_id_filter)::text = '' OR trace_id::text = sqlc.arg(trace_id_filter));
 
 -- name: ListEventsAfterTimestamp :many
 SELECT * FROM events
@@ -44,6 +46,7 @@ WHERE timestamp > sqlc.arg(after_timestamp)::timestamptz
   AND (sqlc.arg(subject_filter)::text = '' OR subject LIKE sqlc.arg(subject_filter))
   AND (sqlc.arg(status_filter)::text = '' OR delivery_status = sqlc.arg(status_filter))
   AND (sqlc.narg(data_filter)::jsonb IS NULL OR data @> sqlc.narg(data_filter))
+  AND (sqlc.arg(trace_id_filter)::text = '' OR trace_id::text = sqlc.arg(trace_id_filter))
 ORDER BY timestamp DESC
 LIMIT 200;
 

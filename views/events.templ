@@ -36,7 +36,7 @@ func statusBadgeClass(status string) string {
 	}
 }
 
-func filterQueryString(subject, status, dateFrom, dateTo, content string, page int) string {
+func filterQueryString(subject, status, dateFrom, dateTo, content, traceID string, page int) string {
 	q := fmt.Sprintf("page=%d", page)
 	if subject != "" {
 		q += "&subject=" + subject
@@ -52,6 +52,9 @@ func filterQueryString(subject, status, dateFrom, dateTo, content string, page i
 	}
 	if content != "" {
 		q += "&content=" + content
+	}
+	if traceID != "" {
+		q += "&trace_id=" + traceID
 	}
 	return q
 }
@@ -71,7 +74,7 @@ templ propertyBadges(props map[string]string) {
 	}
 }
 
-templ EventsListTemplate(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content string) {
+templ EventsListTemplate(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content, traceID string) {
 	@components.SimplePage("Events", "/events") {
 		<div class="flex justify-end items-center gap-2 mb-6">
 			<button id="live-toggle-btn" class="btn btn-outline btn-success btn-sm" onclick="toggleLiveMode()">
@@ -79,9 +82,9 @@ templ EventsListTemplate(events []EventRow, page int, hasNext bool, subject, sta
 			</button>
 			<button class="btn btn-primary" onclick="document.getElementById('create-event-modal').showModal()">New Event</button>
 		</div>
-		@eventsFilterBar(subject, status, dateFrom, dateTo, content)
+		@eventsFilterBar(subject, status, dateFrom, dateTo, content, traceID)
 		<div id="events-results">
-			@eventsTableAndPagination(events, page, hasNext, subject, status, dateFrom, dateTo, content)
+			@eventsTableAndPagination(events, page, hasNext, subject, status, dateFrom, dateTo, content, traceID)
 		</div>
 		<dialog id="create-event-modal" class="modal">
 			<div class="modal-box max-w-2xl">
@@ -120,18 +123,18 @@ templ EventsListTemplate(events []EventRow, page int, hasNext bool, subject, sta
 	}
 }
 
-templ EventsTablePartial(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content string) {
-	@eventsTableAndPagination(events, page, hasNext, subject, status, dateFrom, dateTo, content)
+templ EventsTablePartial(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content, traceID string) {
+	@eventsTableAndPagination(events, page, hasNext, subject, status, dateFrom, dateTo, content, traceID)
 }
 
-templ eventsFilterBar(subject, status, dateFrom, dateTo, content string) {
+templ eventsFilterBar(subject, status, dateFrom, dateTo, content, traceID string) {
 	<form
 		hx-get="/events"
 		hx-target="#events-results"
 		hx-push-url="true"
 		class="mb-6 p-4 bg-base-200 rounded-lg"
 	>
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
 			<div class="form-control">
 				<label class="label">
 					<span class="label-text">Subject</span>
@@ -190,6 +193,18 @@ templ eventsFilterBar(subject, status, dateFrom, dateTo, content string) {
 					class="input input-bordered input-sm w-full"
 				/>
 			</div>
+			<div class="form-control">
+				<label class="label">
+					<span class="label-text">Trace ID</span>
+				</label>
+				<input
+					type="text"
+					name="trace_id"
+					value={ traceID }
+					placeholder="e.g. 550e8400-..."
+					class="input input-bordered input-sm w-full font-mono"
+				/>
+			</div>
 		</div>
 		<div class="flex gap-2 mt-4">
 			<button type="submit" class="btn btn-primary btn-sm">Search</button>
@@ -198,7 +213,7 @@ templ eventsFilterBar(subject, status, dateFrom, dateTo, content string) {
 	</form>
 }
 
-templ eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content string) {
+templ eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content, traceID string) {
 	<div class="overflow-x-auto">
 		<table class="table table-zebra w-full">
 			<thead>
@@ -235,8 +250,8 @@ templ eventsTableAndPagination(events []EventRow, page int, hasNext bool, subjec
 	<div class="flex justify-center gap-2 mt-6">
 		if page > 1 {
 			<a
-				href={ templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page-1)) }
-				hx-get={ "/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page-1) }
+				href={ templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, traceID, page-1)) }
+				hx-get={ "/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, traceID, page-1) }
 				hx-target="#events-results"
 				hx-push-url="true"
 				class="btn btn-outline btn-sm"
@@ -245,8 +260,8 @@ templ eventsTableAndPagination(events []EventRow, page int, hasNext bool, subjec
 		<span class="btn btn-ghost btn-sm no-animation">{ fmt.Sprintf("Page %d", page) }</span>
 		if hasNext {
 			<a
-				href={ templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page+1)) }
-				hx-get={ "/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page+1) }
+				href={ templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, traceID, page+1)) }
+				hx-get={ "/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, traceID, page+1) }
 				hx-target="#events-results"
 				hx-push-url="true"
 				class="btn btn-outline btn-sm"
