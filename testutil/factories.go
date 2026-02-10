@@ -131,12 +131,13 @@ func NewTestApp(mockDB *MockQuerier, opts ...AppOpt) *app.Application {
 			DeliveryWorkers:   2,
 			DeliveryChanSize:  100,
 		},
-		DB:             mockDB,
-		DeliveryChan:   make(chan db.Event, 100),
-		EventBus:       app.NewEventBus(),
-		Sessions:       app.NewSessionStore(),
-		SecretCache:    app.NewCache[pgtype.UUID, db.ApiSecret](),
-		LogConfigCache: app.NewCache[string, db.LogConfig](),
+		DB:                mockDB,
+		DeliveryChan:      make(chan db.Event, 100),
+		EventBus:          app.NewEventBus(),
+		Sessions:          app.NewSessionStore(),
+		SecretCache:       app.NewCache[pgtype.UUID, db.ApiSecret](),
+		LogConfigCache:    app.NewCache[string, db.LogConfig](),
+		SubscriptionCache: app.NewSubscriptionCache(mockDB),
 	}
 	for _, opt := range opts {
 		opt(a)

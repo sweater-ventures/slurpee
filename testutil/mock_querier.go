@@ -120,6 +120,11 @@ func (m *MockQuerier) ListAllApiSecretHashes(ctx context.Context) ([]db.ListAllA
 	return args.Get(0).([]db.ListAllApiSecretHashesRow), args.Error(1)
 }
 
+func (m *MockQuerier) ListAllSubscriptions(ctx context.Context) ([]db.Subscription, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]db.Subscription), args.Error(1)
+}
+
 func (m *MockQuerier) ListApiSecrets(ctx context.Context) ([]db.ListApiSecretsRow, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]db.ListApiSecretsRow), args.Error(1)

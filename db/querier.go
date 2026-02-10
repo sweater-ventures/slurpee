@@ -32,6 +32,7 @@ type Querier interface {
 	InsertDeliveryAttempt(ctx context.Context, arg InsertDeliveryAttemptParams) (DeliveryAttempt, error)
 	InsertEvent(ctx context.Context, arg InsertEventParams) (Event, error)
 	ListAllApiSecretHashes(ctx context.Context) ([]ListAllApiSecretHashesRow, error)
+	ListAllSubscriptions(ctx context.Context) ([]Subscription, error)
 	ListApiSecrets(ctx context.Context) ([]ListApiSecretsRow, error)
 	ListApiSecretsForSubscriber(ctx context.Context, subscriberID pgtype.UUID) ([]ApiSecret, error)
 	ListDeliveryAttemptsForEvent(ctx context.Context, eventID pgtype.UUID) ([]DeliveryAttempt, error)

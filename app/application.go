@@ -10,15 +10,16 @@ import (
 )
 
 type Application struct {
-	Config         config.AppConfig
-	DB             db.Querier
-	DeliveryChan   chan db.Event
-	EventBus       *EventBus
-	Sessions       *SessionStore
-	SecretCache    *Cache[pgtype.UUID, db.ApiSecret]
-	LogConfigCache *Cache[string, db.LogConfig]
-	dbconn         *pgxpool.Pool
-	stopDelivery   func()
+	Config            config.AppConfig
+	DB                db.Querier
+	DeliveryChan      chan db.Event
+	EventBus          *EventBus
+	Sessions          *SessionStore
+	SecretCache       *Cache[pgtype.UUID, db.ApiSecret]
+	LogConfigCache    *Cache[string, db.LogConfig]
+	SubscriptionCache *SubscriptionCache
+	dbconn            *pgxpool.Pool
+	stopDelivery      func()
 }
 
 func NewApp(config *config.AppConfig) (*Application, error) {
@@ -30,15 +31,16 @@ func NewApp(config *config.AppConfig) (*Application, error) {
 	}
 
 	return &Application{
-		Config:         *config,
-		DB:             queries,
-		DeliveryChan:   make(chan db.Event, config.DeliveryChanSize),
-		EventBus:       NewEventBus(),
-		Sessions:       NewSessionStore(),
-		SecretCache:    NewCache[pgtype.UUID, db.ApiSecret](),
-		LogConfigCache: NewCache[string, db.LogConfig](),
-		dbconn:         conn,
-		stopDelivery:   func() {},
+		Config:            *config,
+		DB:                queries,
+		DeliveryChan:      make(chan db.Event, config.DeliveryChanSize),
+		EventBus:          NewEventBus(),
+		Sessions:          NewSessionStore(),
+		SecretCache:       NewCache[pgtype.UUID, db.ApiSecret](),
+		LogConfigCache:    NewCache[string, db.LogConfig](),
+		SubscriptionCache: NewSubscriptionCache(queries),
+		dbconn:            conn,
+		stopDelivery:      func() {},
 	}, nil
 }
 

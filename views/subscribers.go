@@ -69,6 +69,8 @@ func subscriberCreateHandler(slurpee *app.Application, w http.ResponseWriter, r 
 		return
 	}
 
+	slurpee.SubscriptionCache.Flush()
+
 	http.Redirect(w, r, "/subscribers/"+pgtypeUUIDToString(sub.ID), http.StatusSeeOther)
 }
 
@@ -167,6 +169,8 @@ func subscriberUpdateHandler(slurpee *app.Application, w http.ResponseWriter, r 
 		return
 	}
 
+	slurpee.SubscriptionCache.Flush()
+
 	detail, subRows, err := buildSubscriberDetailView(slurpee, r, pgID)
 	if err != nil {
 		return
@@ -234,6 +238,8 @@ func subscriptionCreateHandler(slurpee *app.Application, w http.ResponseWriter, 
 		return
 	}
 
+	slurpee.SubscriptionCache.Flush()
+
 	detail, subRows, err := buildSubscriberDetailView(slurpee, r, pgID)
 	if err != nil {
 		return
@@ -268,6 +274,8 @@ func subscriptionDeleteHandler(slurpee *app.Application, w http.ResponseWriter, 
 		renderSubscriberDetailWithError(slurpee, w, r, pgID, "Failed to delete subscription")
 		return
 	}
+
+	slurpee.SubscriptionCache.Flush()
 
 	detail, subRows, err := buildSubscriberDetailView(slurpee, r, pgID)
 	if err != nil {
