@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -53,7 +56,57 @@ func main() {
 }
 
 func runSend(cmd *SendCmd) {
-	fmt.Println("send mode not yet implemented")
+	client := &http.Client{Timeout: 10 * time.Second}
+	interval := time.Second / time.Duration(cmd.Rate)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	var sent, errors int
+	start := time.Now()
+
+	for i := 0; i < cmd.Count; i++ {
+		<-ticker.C
+
+		body, _ := json.Marshal(map[string]any{
+			"subject": cmd.Subject,
+			"data": map[string]any{
+				"sent_at": time.Now().UTC().Format(time.RFC3339Nano),
+			},
+		})
+
+		req, err := http.NewRequest(http.MethodPost, cmd.URL+"/api/events", bytes.NewReader(body))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "\nerror creating request: %v\n", err)
+			errors++
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Slurpee-Secret-ID", cmd.SecretID)
+		req.Header.Set("X-Slurpee-Secret", cmd.Secret)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "\nerror sending event: %v\n", err)
+			errors++
+			continue
+		}
+		resp.Body.Close()
+
+		if resp.StatusCode != http.StatusCreated {
+			fmt.Fprintf(os.Stderr, "\nunexpected status %d for event %d\n", resp.StatusCode, i+1)
+			errors++
+			continue
+		}
+
+		sent++
+		fmt.Fprintf(os.Stderr, "\rSent: %d/%d  Errors: %d", sent, cmd.Count, errors)
+	}
+
+	elapsed := time.Since(start)
+	actualRate := float64(sent) / elapsed.Seconds()
+	fmt.Fprintf(os.Stderr, "\r%s\r", "                                                  ")
+	fmt.Fprintf(os.Stderr, "Send complete: %d/%d sent, %d errors, %.1fs elapsed, %.1f events/sec\n",
+		sent, cmd.Count, errors, elapsed.Seconds(), actualRate)
 }
 
 func runReceive(cmd *ReceiveCmd) {
