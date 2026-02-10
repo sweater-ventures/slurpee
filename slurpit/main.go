@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/alexflint/go-arg"
@@ -162,12 +164,16 @@ func runReceive(cmd *ReceiveCmd) {
 
 	fmt.Fprintf(os.Stderr, "Registered subscriber %s (ID: %s)\n", subscriberName, subResp.ID)
 
-	// Track received events
+	// Track received events and latencies (thread-safe)
+	var mu sync.Mutex
 	var received int
+	var latencies []time.Duration
 
 	// Start webhook HTTP server
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /", func(w http.ResponseWriter, r *http.Request) {
+		receivedAt := time.Now()
+
 		eventID := r.Header.Get("X-Event-ID")
 		eventSubject := r.Header.Get("X-Event-Subject")
 
@@ -176,7 +182,48 @@ func runReceive(cmd *ReceiveCmd) {
 			return
 		}
 
+		// Parse body to extract sent_at for latency calculation
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "\nwarning: failed to read event body: %v\n", err)
+			mu.Lock()
+			received++
+			mu.Unlock()
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		var payload struct {
+			Data struct {
+				SentAt string `json:"sent_at"`
+			} `json:"data"`
+		}
+
+		mu.Lock()
 		received++
+		if err := json.Unmarshal(body, &payload); err != nil || payload.Data.SentAt == "" {
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "\nwarning: failed to parse event data: %v\n", err)
+			} else {
+				fmt.Fprintf(os.Stderr, "\nwarning: event missing sent_at field\n")
+			}
+			mu.Unlock()
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		sentAt, err := time.Parse(time.RFC3339Nano, payload.Data.SentAt)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "\nwarning: failed to parse sent_at timestamp: %v\n", err)
+			mu.Unlock()
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		latency := receivedAt.Sub(sentAt)
+		latencies = append(latencies, latency)
+		mu.Unlock()
+
 		w.WriteHeader(http.StatusOK)
 	})
 
