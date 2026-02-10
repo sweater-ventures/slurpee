@@ -10,3 +10,9 @@ slurpit/slurpit
 # compressed files
 *.zst
 *.gz
+
+CLAUDE.md
+prd.json
+progress.txt
+archive/
+ralph.sh
