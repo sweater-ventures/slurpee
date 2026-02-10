@@ -1,78 +1,71 @@
 # Ralph Progress Log
-Started: Mon Feb  9 11:58:30 MST 2026
----
+Started: Mon Feb  9 16:34:04 MST 2026
 
 ## Codebase Patterns
-- Use `::bigint` cast on `COUNT(*)` in sqlc queries so generated Go type is `int64` (not `interface{}`)
-- `COUNT(*) FILTER (WHERE ...)` is valid PostgreSQL syntax for conditional aggregation
-- Two mock querier implementations exist: `testutil/mock_querier.go` and `app/delivery_test.go` (import cycle prevention). Both must be updated when adding new queries.
-- sqlc generates prepared query constants, param structs, and row structs — run `sqlc generate` then `go build` to verify
-- `StartDispatcher` returns `*DispatcherState` with `inflightWg`, `taskQueue`, `registry` — needed for direct task enqueuing (e.g., partial event resumption)
-- `ResumeUnfinishedDeliveries(slurpee, ds)` handles both pending (via DeliveryChan) and partial (via direct taskQueue) events
-
-## 2026-02-09 12:00pm - US-001
-- Added `GetResumableEvents` query to `queries/events.sql`: selects events with delivery_status IN ('pending', 'partial') ordered by timestamp ASC
-- Added `GetDeliverySummaryForEvent` query to `queries/delivery_attempts.sql`: groups delivery attempts by subscriber_id with COUNT FILTER for failed/succeeded counts
-- Ran `sqlc generate` — produced `GetDeliverySummaryForEventRow` struct with `SubscriberID pgtype.UUID`, `FailedCount int64`, `SucceededCount int64`
-- Updated both mock querier implementations (testutil + app/delivery_test.go) with new interface methods
-- Files changed: queries/events.sql, queries/delivery_attempts.sql, db/events.sql.go, db/delivery_attempts.sql.go, db/querier.go, testutil/mock_querier.go, app/delivery_test.go
-- **Learnings for future iterations:**
-  - Two mock querier files must stay in sync with db.Querier interface
-  - The `::bigint` cast trick works well — sqlc maps it to Go `int64`
-  - `COUNT(*) FILTER (WHERE status = 'x')` avoids subqueries for per-group conditional counts
+- templ files use tabs for indentation
+- BusMessage is published in two places: api/events.go (API) and views/events.go (UI) — and also in app/delivery.go (PublishCreatedEvent, updateEventStatus)
+- LogEvent in api/events.go handles structured logging with log_config properties
+- EventRow struct is defined in views/events.templ, not a .go file — templ generate regenerates the _templ.go
+- BatchExtractLogProperties caches log_config lookups per subject for efficiency
+- events.templ JavaScript `createEventRow` builds DOM elements for live mode rows
+- MissedEventsRows templ component renders rows fetched from /events/stream/missed
 ---
 
-## 2026-02-09 12:05pm - US-002
-- Added `ResumeUnfinishedDeliveries` function in `app/delivery.go`
-- Queries `GetResumableEvents`, feeds pending events into `DeliveryChan` in a goroutine (avoids blocking if channel buffer is full)
-- Logs at INFO level with counts when events need resuming, DEBUG when nothing to resume
-- Called from `main.go` after `StartDispatcher` but before HTTP server starts
-- Files changed: app/delivery.go, main.go
+## 2026-02-09 4:40 PM MST - US-001
+- Created shared `ExtractLogProperties` helper in `app/log_properties.go` that accepts ctx, querier, subject, data and returns map[string]string
+- Created `BatchExtractLogProperties` for efficient batch extraction with per-subject log_config caching
+- Created `formatPropertyValue` to convert arbitrary JSON values to display strings
+- Refactored `LogEvent()` in `api/events.go` to use the shared helper instead of inline logic
+- Added `Properties map[string]string` field to `EventRow` struct in `views/events.templ`
+- Updated `eventsListHandler` in `views/events.go` to call `BatchExtractLogProperties` and populate EventRow.Properties
+- Files changed: app/log_properties.go (new), api/events.go, views/events.go, views/events.templ, views/events_templ.go
 - **Learnings for future iterations:**
-  - Pending events go through normal `dispatchEvent` path via `DeliveryChan` — no special handling needed
-  - Use goroutine for channel sends to avoid blocking startup if buffer is smaller than event count
-  - Partial events (US-003) will need direct task creation — cannot reuse `dispatchEvent` which starts at attemptNum=0
+  - templ generate detects changes incrementally — struct-only changes in .templ files regenerate automatically
+  - The EventRow struct lives in events.templ, so changes to it require templ generate to update events_templ.go
+  - Using a batch function with caching avoids N+1 queries for log_config lookups on the events list page
 ---
 
-## 2026-02-09 12:10pm - US-003
-- Refactored `StartDispatcher` to return `*DispatcherState` struct exposing `inflightWg`, `taskQueue`, and `registry`
-- Extended `ResumeUnfinishedDeliveries` to accept `*DispatcherState` and handle partial events
-- Added `resumePartialEvent` function that: queries delivery summary, re-runs subscription matching with filter/dedup logic, skips already-succeeded subscribers, sets `attemptNum` to count of prior failed attempts
-- Partial event tasks go directly into `taskQueue` (not `DeliveryChan`) with their own `eventTracker`
-- Updated `main.go` to capture `DispatcherState` return value and pass it to resume function
-- Files changed: app/delivery.go, main.go
+## 2026-02-09 4:45 PM MST - US-002
+- Added Properties column to events table between Timestamp and Status
+- Created `propertyBadges` templ component rendering sorted key=value badges with `badge-outline badge-sm` classes
+- Created `sortedKeys` helper for consistent property display order
+- Updated colspan from 4 to 5 in all empty/placeholder table rows (including JavaScript live mode placeholders)
+- Added Properties cell to MissedEventsRows template for column consistency
+- Files changed: views/events.templ, views/events_templ.go
 - **Learnings for future iterations:**
-  - `StartDispatcher` now returns `*DispatcherState` — callers that don't need it can ignore the return value
-  - The partial event resume logic mirrors `dispatchEvent` but with delivery history cross-referencing
-  - `summaryMap` keyed by `[16]byte` (UUID bytes) is the fastest lookup pattern for UUID maps
+  - When adding a column to the events table, must also update JavaScript colspan references in liveStreamScript
+  - The missed-events banner and placeholder rows all use colspan — search for all occurrences
+  - Property badges use `badge-outline badge-sm` for subtle look consistent with DaisyUI patterns
 ---
 
-## 2026-02-09 12:15pm - US-004
-- Created `tests/e2e/startup_resume_test.go` with `TestStartupResume_PendingEvent`
-- Test inserts event directly with `delivery_status='pending'`, seeds subscriber+subscription, then calls `ResumeUnfinishedDeliveries`
-- Verifies: mock endpoint received exactly 1 request, event status transitions to 'delivered', delivery_attempts has 'succeeded' row
-- Uses `atomic.Int32` for request counting (thread-safe)
-- Files changed: tests/e2e/startup_resume_test.go
+## 2026-02-09 4:50 PM MST - US-003
+- Added `Properties map[string]string` field with `json:"properties,omitempty"` tag to BusMessage
+- Updated `PublishCreatedEvent` signature to accept `props map[string]string` parameter
+- Updated both call sites (api/events.go and views/events.go) to extract properties before publishing
+- Files changed: app/eventbus.go, app/delivery.go, api/events.go, views/events.go
 - **Learnings for future iterations:**
-  - E2E tests don't call `Close()` or `StopDelivery` — goroutines leak after test, matching existing test patterns
-  - `StartDispatcher` must be called before `ResumeUnfinishedDeliveries` for workers to process tasks
-  - Direct DB insert with `InsertEvent` simulates a pre-shutdown event that was never dispatched
+  - PublishCreatedEvent is called from api/events.go and views/events.go — both need updating when signature changes
+  - Properties use `omitempty` JSON tag so null/empty properties don't appear in SSE JSON
 ---
 
-## 2026-02-09 12:20pm - US-005
-- Added `TestStartupResume_PartialEvent` to `tests/e2e/startup_resume_test.go`
-- Sets up two subscribers (A with succeeded history, B with 2 failed attempts)
-- Inserts event with `delivery_status='partial'` and 3 delivery_attempts rows directly in DB
-- Calls `ResumeUnfinishedDeliveries` and verifies:
-  - Subscriber A receives 0 requests (already succeeded)
-  - Subscriber B receives exactly 1 new request
-  - Total delivery_attempts for B = 3 (2 prior + 1 new)
-  - Newest attempt for B has status='succeeded'
-  - Event reaches 'delivered' status
-- Logs confirm attempt=3 for subscriber B (continuing from 2 prior failures)
-- Files changed: tests/e2e/startup_resume_test.go
+## 2026-02-09 4:55 PM MST - US-004
+- Updated JavaScript `createEventRow` function to read `data.properties` and render badge elements
+- Properties badges are sorted by key and use `badge-outline badge-sm mr-1` classes matching static row styling
+- Added `tdProps` element between timestamp and status in the DOM construction
+- Events with null/undefined properties render an empty Properties cell
+- Files changed: views/events.templ, views/events_templ.go
 - **Learnings for future iterations:**
-  - Set subscription `maxRetries` high enough to allow continued attempts (default MaxRetries=2 would exhaust immediately with attemptNum=2)
-  - `InsertDeliveryAttempt` can be used to seed prior delivery history for testing
-  - `atomic.Int32` works well for thread-safe mock endpoint request counting
+  - JavaScript `Object.keys().sort()` ensures consistent property order matching the Go `sortedKeys` helper
+  - Live mode rows must mirror exact column order of static templ rows
+---
+
+## 2026-02-09 4:58 PM MST - US-005
+- Added `BatchExtractLogProperties` call to `eventsMissedHandler` for missed events
+- Populated EventRow.Properties for each missed event row
+- Missed events are rendered server-side by `MissedEventsRows` templ component which already includes Properties column from US-002
+- No JavaScript changes needed — `loadMissedEvents` inserts server-rendered HTML directly
+- Files changed: views/events.go
+- **Learnings for future iterations:**
+  - Missed events use server-side rendering (not client-side JSON), so property badges come from the templ template for free once EventRow.Properties is populated
+  - The loadMissedEvents JavaScript function works with HTML fragments, not JSON — different from live mode SSE
 ---

@@ -769,13 +769,14 @@ func resumePartialEvent(ctx context.Context, slurpee *Application, event db.Even
 }
 
 // PublishCreatedEvent publishes a 'created' bus message for SSE clients.
-func PublishCreatedEvent(slurpee *Application, event db.Event) {
+func PublishCreatedEvent(slurpee *Application, event db.Event, props map[string]string) {
 	slurpee.EventBus.Publish(BusMessage{
 		Type:           BusMessageCreated,
 		EventID:        UuidToString(event.ID),
 		Subject:        event.Subject,
 		DeliveryStatus: event.DeliveryStatus,
 		Timestamp:      event.Timestamp.Time,
+		Properties:     props,
 	})
 }
 

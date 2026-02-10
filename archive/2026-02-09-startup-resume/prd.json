@@ -18,7 +18,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "The existing LogEvent() function in api/events.go already implements this pattern — extract the shared logic into a helper in the app package. The helper needs access to db.Querier for GetLogConfigBySubject. Consider accepting a context and querier as params."
     },
     {
@@ -35,7 +35,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "Use DaisyUI badge-ghost or badge-outline classes for a subtle look. The EventRow struct from US-001 provides the property data. templ files use tabs for indentation."
     },
     {
@@ -51,7 +51,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "BusMessage is published in two places: api/events.go (API event creation) and views/events.go (UI event creation). Both need to call the shared helper. The Properties field should use json tag 'properties,omitempty'."
     },
     {
@@ -68,7 +68,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "The JavaScript in events.templ builds table rows as HTML strings. Add a Properties td with badge spans generated from the message.properties object. Use Object.entries() to iterate the properties map."
     },
     {
@@ -83,7 +83,7 @@
         "Existing tests pass with go test ./... -short"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "The eventsMissedHandler in views/events.go queries missed events and returns them as JSON. Add property extraction using the same shared helper from US-001."
     }
   ]

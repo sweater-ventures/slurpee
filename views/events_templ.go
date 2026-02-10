@@ -11,6 +11,7 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"fmt"
 	"github.com/sweater-ventures/slurpee/components"
+	"sort"
 )
 
 type EventRow struct {
@@ -18,6 +19,7 @@ type EventRow struct {
 	Subject        string
 	Timestamp      string
 	DeliveryStatus string
+	Properties     map[string]string
 }
 
 func truncateID(id string) string {
@@ -62,7 +64,16 @@ func filterQueryString(subject, status, dateFrom, dateTo, content string, page i
 	return q
 }
 
-func EventsListTemplate(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content string) templ.Component {
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func propertyBadges(props map[string]string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -83,7 +94,64 @@ func EventsListTemplate(events []EventRow, page int, hasNext bool, subject, stat
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var2 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		for _, k := range sortedKeys(props) {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<span class=\"badge badge-outline badge-sm mr-1\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var2 string
+			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(k)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 70, Col: 53}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "=")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var3 string
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props[k])
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 70, Col: 66}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		return nil
+	})
+}
+
+func EventsListTemplate(events []EventRow, page int, hasNext bool, subject, status, dateFrom, dateTo, content string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var4 == nil {
+			templ_7745c5c3_Var4 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Var5 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -95,7 +163,7 @@ func EventsListTemplate(events []EventRow, page int, hasNext bool, subject, stat
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex justify-end items-center gap-2 mb-6\"><button id=\"live-toggle-btn\" class=\"btn btn-outline btn-success btn-sm\" onclick=\"toggleLiveMode()\">Go Live</button> <button class=\"btn btn-primary\" onclick=\"document.getElementById('create-event-modal').showModal()\">New Event</button></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"flex justify-end items-center gap-2 mb-6\"><button id=\"live-toggle-btn\" class=\"btn btn-outline btn-success btn-sm\" onclick=\"toggleLiveMode()\">Go Live</button> <button class=\"btn btn-primary\" onclick=\"document.getElementById('create-event-modal').showModal()\">New Event</button></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -103,7 +171,7 @@ func EventsListTemplate(events []EventRow, page int, hasNext bool, subject, stat
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " <div id=\"events-results\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, " <div id=\"events-results\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -111,20 +179,20 @@ func EventsListTemplate(events []EventRow, page int, hasNext bool, subject, stat
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><dialog id=\"create-event-modal\" class=\"modal\"><div class=\"modal-box max-w-2xl\"><h3 class=\"text-lg font-bold\">Create New Event</h3><form method=\"POST\" action=\"/events/new\" class=\"mt-4\"><div class=\"form-control mb-4\"><label class=\"label\"><span class=\"label-text\">Subject <span class=\"text-error\">*</span></span></label> <input type=\"text\" name=\"subject\" placeholder=\"e.g. order.created\" class=\"input input-bordered w-full\" required></div><div class=\"form-control mb-4\"><label class=\"label\"><span class=\"label-text\">Data (JSON) <span class=\"text-error\">*</span></span></label> <textarea name=\"data\" rows=\"8\" placeholder=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div><dialog id=\"create-event-modal\" class=\"modal\"><div class=\"modal-box max-w-2xl\"><h3 class=\"text-lg font-bold\">Create New Event</h3><form method=\"POST\" action=\"/events/new\" class=\"mt-4\"><div class=\"form-control mb-4\"><label class=\"label\"><span class=\"label-text\">Subject <span class=\"text-error\">*</span></span></label> <input type=\"text\" name=\"subject\" placeholder=\"e.g. order.created\" class=\"input input-bordered w-full\" required></div><div class=\"form-control mb-4\"><label class=\"label\"><span class=\"label-text\">Data (JSON) <span class=\"text-error\">*</span></span></label> <textarea name=\"data\" rows=\"8\" placeholder=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(`{"key": "value"}`)
+			var templ_7745c5c3_Var6 string
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(`{"key": "value"}`)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 83, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 100, Col: 69}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" class=\"textarea textarea-bordered w-full font-mono text-sm\" required></textarea></div><div class=\"form-control mb-4\"><label class=\"label\"><span class=\"label-text\">Trace ID <span class=\"text-base-content/40\">(optional UUID)</span></span></label> <input type=\"text\" name=\"trace_id\" placeholder=\"e.g. 550e8400-e29b-41d4-a716-446655440000\" class=\"input input-bordered w-full font-mono\"></div><div class=\"modal-action\"><button type=\"button\" class=\"btn btn-ghost\" onclick=\"document.getElementById('create-event-modal').close()\">Cancel</button> <button type=\"submit\" class=\"btn btn-primary\">Create Event</button></div></form></div><form method=\"dialog\" class=\"modal-backdrop\"><button>close</button></form></dialog><div id=\"toast-container\" class=\"fixed bottom-4 right-4 z-50 flex flex-col gap-2\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"textarea textarea-bordered w-full font-mono text-sm\" required></textarea></div><div class=\"form-control mb-4\"><label class=\"label\"><span class=\"label-text\">Trace ID <span class=\"text-base-content/40\">(optional UUID)</span></span></label> <input type=\"text\" name=\"trace_id\" placeholder=\"e.g. 550e8400-e29b-41d4-a716-446655440000\" class=\"input input-bordered w-full font-mono\"></div><div class=\"modal-action\"><button type=\"button\" class=\"btn btn-ghost\" onclick=\"document.getElementById('create-event-modal').close()\">Cancel</button> <button type=\"submit\" class=\"btn btn-primary\">Create Event</button></div></form></div><form method=\"dialog\" class=\"modal-backdrop\"><button>close</button></form></dialog><div id=\"toast-container\" class=\"fixed bottom-4 right-4 z-50 flex flex-col gap-2\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -134,7 +202,7 @@ func EventsListTemplate(events []EventRow, page int, hasNext bool, subject, stat
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = components.SimplePage("Events", "/events").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = components.SimplePage("Events", "/events").Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -158,9 +226,9 @@ func EventsTablePartial(events []EventRow, page int, hasNext bool, subject, stat
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var4 == nil {
-			templ_7745c5c3_Var4 = templ.NopComponent
+		templ_7745c5c3_Var7 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var7 == nil {
+			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = eventsTableAndPagination(events, page, hasNext, subject, status, dateFrom, dateTo, content).Render(ctx, templ_7745c5c3_Buffer)
@@ -187,117 +255,117 @@ func eventsFilterBar(subject, status, dateFrom, dateTo, content string) templ.Co
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var5 == nil {
-			templ_7745c5c3_Var5 = templ.NopComponent
+		templ_7745c5c3_Var8 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var8 == nil {
+			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<form hx-get=\"/events\" hx-target=\"#events-results\" hx-push-url=\"true\" class=\"mb-6 p-4 bg-base-200 rounded-lg\"><div class=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4\"><div class=\"form-control\"><label class=\"label\"><span class=\"label-text\">Subject</span></label> <input type=\"text\" name=\"subject\" value=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(subject)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 125, Col: 20}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" placeholder=\"e.g. order.created\" class=\"input input-bordered input-sm w-full\"></div><div class=\"form-control\"><label class=\"label\"><span class=\"label-text\">Status</span></label> <select name=\"status\" class=\"select select-bordered select-sm w-full\"><option value=\"\">All</option> <option value=\"pending\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if status == "pending" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, ">Pending</option> <option value=\"delivered\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if status == "delivered" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, ">Delivered</option> <option value=\"failed\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if status == "failed" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, ">Failed</option> <option value=\"partial\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if status == "partial" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, ">Partial</option></select></div><div class=\"form-control\"><label class=\"label\"><span class=\"label-text\">From Date</span></label> <input type=\"date\" name=\"date_from\" value=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(dateFrom)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 149, Col: 21}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" class=\"input input-bordered input-sm w-full\"></div><div class=\"form-control\"><label class=\"label\"><span class=\"label-text\">To Date</span></label> <input type=\"date\" name=\"date_to\" value=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(dateTo)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 160, Col: 19}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" class=\"input input-bordered input-sm w-full\"></div><div class=\"form-control\"><label class=\"label\"><span class=\"label-text\">Content (JSON)</span></label> <input type=\"text\" name=\"content\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<form hx-get=\"/events\" hx-target=\"#events-results\" hx-push-url=\"true\" class=\"mb-6 p-4 bg-base-200 rounded-lg\"><div class=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4\"><div class=\"form-control\"><label class=\"label\"><span class=\"label-text\">Subject</span></label> <input type=\"text\" name=\"subject\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
-		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(content)
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(subject)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 171, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 142, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\" placeholder=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" placeholder=\"e.g. order.created\" class=\"input input-bordered input-sm w-full\"></div><div class=\"form-control\"><label class=\"label\"><span class=\"label-text\">Status</span></label> <select name=\"status\" class=\"select select-bordered select-sm w-full\"><option value=\"\">All</option> <option value=\"pending\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if status == "pending" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, " selected")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, ">Pending</option> <option value=\"delivered\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if status == "delivered" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, " selected")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, ">Delivered</option> <option value=\"failed\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if status == "failed" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, " selected")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, ">Failed</option> <option value=\"partial\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if status == "partial" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, " selected")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, ">Partial</option></select></div><div class=\"form-control\"><label class=\"label\"><span class=\"label-text\">From Date</span></label> <input type=\"date\" name=\"date_from\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var10 string
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(`{"key":"value"}`)
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(dateFrom)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 172, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 166, Col: 21}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" class=\"input input-bordered input-sm w-full\"></div></div><div class=\"flex gap-2 mt-4\"><button type=\"submit\" class=\"btn btn-primary btn-sm\">Search</button> <a href=\"/events\" class=\"btn btn-ghost btn-sm\">Clear</a></div></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" class=\"input input-bordered input-sm w-full\"></div><div class=\"form-control\"><label class=\"label\"><span class=\"label-text\">To Date</span></label> <input type=\"date\" name=\"date_to\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var11 string
+		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(dateTo)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 177, Col: 19}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\" class=\"input input-bordered input-sm w-full\"></div><div class=\"form-control\"><label class=\"label\"><span class=\"label-text\">Content (JSON)</span></label> <input type=\"text\" name=\"content\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var12 string
+		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(content)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 188, Col: 20}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" placeholder=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var13 string
+		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(`{"key":"value"}`)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 189, Col: 36}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" class=\"input input-bordered input-sm w-full\"></div></div><div class=\"flex gap-2 mt-4\"><button type=\"submit\" class=\"btn btn-primary btn-sm\">Search</button> <a href=\"/events\" class=\"btn btn-ghost btn-sm\">Clear</a></div></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -321,17 +389,17 @@ func eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var11 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var11 == nil {
-			templ_7745c5c3_Var11 = templ.NopComponent
+		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var14 == nil {
+			templ_7745c5c3_Var14 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"overflow-x-auto\"><table class=\"table table-zebra w-full\"><thead><tr><th>Subject</th><th>Event ID</th><th>Timestamp</th><th>Status</th></tr></thead> <tbody>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div class=\"overflow-x-auto\"><table class=\"table table-zebra w-full\"><thead><tr><th>Subject</th><th>Event ID</th><th>Timestamp</th><th>Properties</th><th>Status</th></tr></thead> <tbody>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(events) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<tr><td colspan=\"4\" class=\"text-center text-base-content/60 py-8\">No events found</td></tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<tr><td colspan=\"5\" class=\"text-center text-base-content/60 py-8\">No events found</td></tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -341,180 +409,190 @@ func eventsTableAndPagination(events []EventRow, page int, hasNext bool, subject
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<tr class=\"hover cursor-pointer\" onclick=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<tr class=\"hover cursor-pointer\" onclick=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var12 templ.ComponentScript = goToEvent(event.ID)
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12.Call)
+			var templ_7745c5c3_Var15 templ.ComponentScript = goToEvent(event.ID)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15.Call)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\"><td class=\"font-mono\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\"><td class=\"font-mono\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var13 string
-			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(event.Subject)
+			var templ_7745c5c3_Var16 string
+			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(event.Subject)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 203, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 221, Col: 43}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</td><td class=\"font-mono text-sm\">")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var14 string
-			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(truncateID(event.ID))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 204, Col: 58}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</td><td>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var15 string
-			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(event.Timestamp)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 205, Col: 27}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</td><td>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var16 = []any{statusBadgeClass(event.DeliveryStatus)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var16...)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<span class=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</td><td class=\"font-mono text-sm\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var17 string
-			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var16).String())
+			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(truncateID(event.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 1, Col: 0}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 222, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</td><td>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var18 string
-			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(event.DeliveryStatus)
+			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(event.Timestamp)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 206, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 223, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</span></td></tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</td><td>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</tbody></table></div><div class=\"flex justify-center gap-2 mt-6\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if page > 1 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<a href=\"")
+			if len(event.Properties) > 0 {
+				templ_7745c5c3_Err = propertyBadges(event.Properties).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</td><td>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var19 templ.SafeURL
-			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page-1)))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 215, Col: 108}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
+			var templ_7745c5c3_Var19 = []any{statusBadgeClass(event.DeliveryStatus)}
+			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var19...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\" hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<span class=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var20 string
-			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page-1))
+			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var19).String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 216, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 1, Col: 0}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" hx-target=\"#events-results\" hx-push-url=\"true\" class=\"btn btn-outline btn-sm\">Previous</a> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var21 string
+			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(event.DeliveryStatus)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 229, Col: 87}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</span></td></tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<span class=\"btn btn-ghost btn-sm no-animation\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</tbody></table></div><div class=\"flex justify-center gap-2 mt-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var21 string
-		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("Page %d", page))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 222, Col: 80}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</span> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if hasNext {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<a href=\"")
+		if page > 1 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<a href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var22 templ.SafeURL
-			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page+1)))
+			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page-1)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 225, Col: 108}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 238, Col: 108}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\" hx-get=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var23 string
-			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page+1))
+			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page-1))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 226, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 239, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" hx-target=\"#events-results\" hx-push-url=\"true\" class=\"btn btn-outline btn-sm\">Next</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" hx-target=\"#events-results\" hx-push-url=\"true\" class=\"btn btn-outline btn-sm\">Previous</a> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<span class=\"btn btn-ghost btn-sm no-animation\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var24 string
+		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("Page %d", page))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 245, Col: 80}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if hasNext {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var25 templ.SafeURL
+			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page+1)))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 248, Col: 108}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" hx-get=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var26 string
+			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs("/events?" + filterQueryString(subject, status, dateFrom, dateTo, content, page+1))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 249, Col: 95}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\" hx-target=\"#events-results\" hx-push-url=\"true\" class=\"btn btn-outline btn-sm\">Next</a>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -538,9 +616,9 @@ func MissedEventsRows(events []EventRow) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var24 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var24 == nil {
-			templ_7745c5c3_Var24 = templ.NopComponent
+		templ_7745c5c3_Var27 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var27 == nil {
+			templ_7745c5c3_Var27 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		for _, event := range events {
@@ -548,103 +626,113 @@ func MissedEventsRows(events []EventRow) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<tr class=\"hover cursor-pointer bg-info/10\" data-event-id=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var25 string
-			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(event.ID)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 237, Col: 70}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" onclick=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var26 templ.ComponentScript = goToEvent(event.ID)
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26.Call)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\"><td class=\"font-mono\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var27 string
-			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(event.Subject)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 238, Col: 40}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</td><td class=\"font-mono text-sm\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<tr class=\"hover cursor-pointer bg-info/10\" data-event-id=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var28 string
-			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(truncateID(event.ID))
+			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(event.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 239, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 260, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</td><td>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "\" onclick=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var29 string
-			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(event.Timestamp)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 240, Col: 24}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
+			var templ_7745c5c3_Var29 templ.ComponentScript = goToEvent(event.ID)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29.Call)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</td><td>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "\"><td class=\"font-mono\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var30 = []any{statusBadgeClass(event.DeliveryStatus)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var30...)
+			var templ_7745c5c3_Var30 string
+			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(event.Subject)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 261, Col: 40}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<span class=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</td><td class=\"font-mono text-sm\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var31 string
-			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var30).String())
+			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(truncateID(event.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 1, Col: 0}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 262, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</td><td>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var32 string
-			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(event.DeliveryStatus)
+			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(event.Timestamp)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 241, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 263, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</span></td></tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</td><td>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if len(event.Properties) > 0 {
+				templ_7745c5c3_Err = propertyBadges(event.Properties).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</td><td>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var33 = []any{statusBadgeClass(event.DeliveryStatus)}
+			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var33...)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<span class=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var34 string
+			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var33).String())
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 1, Col: 0}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var35 string
+			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(event.DeliveryStatus)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/events.templ`, Line: 269, Col: 84}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "</span></td></tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -669,12 +757,12 @@ func liveStreamScript() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var33 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var33 == nil {
-			templ_7745c5c3_Var33 = templ.NopComponent
+		templ_7745c5c3_Var36 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var36 == nil {
+			templ_7745c5c3_Var36 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<script>\n\t\t(function () {\n\t\t\tvar evtSource = null;\n\t\t\tvar isLive = false;\n\t\t\tvar MAX_ROWS = 100;\n\t\t\tvar lastReconnectNanos = null;\n\n\t\t\tfunction getFilterForm() {\n\t\t\t\treturn document.querySelector('form[hx-get=\"/events\"]');\n\t\t\t}\n\n\t\t\tfunction getFilterParams() {\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (!form) return \"\";\n\t\t\t\tvar params = new URLSearchParams(new FormData(form));\n\t\t\t\t// Remove empty values\n\t\t\t\tvar clean = new URLSearchParams();\n\t\t\t\tparams.forEach(function (v, k) {\n\t\t\t\t\tif (v) clean.append(k, v);\n\t\t\t\t});\n\t\t\t\treturn clean.toString();\n\t\t\t}\n\n\t\t\tfunction statusBadgeClass(status) {\n\t\t\t\tswitch (status) {\n\t\t\t\t\tcase \"delivered\":\n\t\t\t\t\t\treturn \"badge badge-success\";\n\t\t\t\t\tcase \"failed\":\n\t\t\t\t\t\treturn \"badge badge-error\";\n\t\t\t\t\tcase \"pending\":\n\t\t\t\t\t\treturn \"badge badge-warning\";\n\t\t\t\t\tcase \"partial\":\n\t\t\t\t\t\treturn \"badge badge-info\";\n\t\t\t\t\tdefault:\n\t\t\t\t\t\treturn \"badge badge-ghost\";\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction truncateID(id) {\n\t\t\t\tif (id && id.length > 8) return id.substring(0, 8) + \"...\";\n\t\t\t\treturn id || \"\";\n\t\t\t}\n\n\t\t\tfunction formatTimestamp(ts) {\n\t\t\t\tvar d = new Date(ts);\n\t\t\t\tif (isNaN(d.getTime())) return ts;\n\t\t\t\tvar pad = function (n) {\n\t\t\t\t\treturn n < 10 ? \"0\" + n : n;\n\t\t\t\t};\n\t\t\t\treturn (\n\t\t\t\t\td.getUTCFullYear() +\n\t\t\t\t\t\"-\" +\n\t\t\t\t\tpad(d.getUTCMonth() + 1) +\n\t\t\t\t\t\"-\" +\n\t\t\t\t\tpad(d.getUTCDate()) +\n\t\t\t\t\t\" \" +\n\t\t\t\t\tpad(d.getUTCHours()) +\n\t\t\t\t\t\":\" +\n\t\t\t\t\tpad(d.getUTCMinutes()) +\n\t\t\t\t\t\":\" +\n\t\t\t\t\tpad(d.getUTCSeconds()) +\n\t\t\t\t\t\" UTC\"\n\t\t\t\t);\n\t\t\t}\n\n\t\t\tfunction createEventRow(data) {\n\t\t\t\tvar tr = document.createElement(\"tr\");\n\t\t\t\ttr.className = \"hover cursor-pointer\";\n\t\t\t\ttr.setAttribute(\"data-event-id\", data.event_id);\n\t\t\t\ttr.onclick = function () {\n\t\t\t\t\twindow.location.href = \"/events/\" + data.event_id;\n\t\t\t\t};\n\n\t\t\t\tvar tdSubject = document.createElement(\"td\");\n\t\t\t\ttdSubject.className = \"font-mono\";\n\t\t\t\ttdSubject.textContent = data.subject || \"\";\n\n\t\t\t\tvar tdID = document.createElement(\"td\");\n\t\t\t\ttdID.className = \"font-mono text-sm\";\n\t\t\t\ttdID.textContent = truncateID(data.event_id);\n\n\t\t\t\tvar tdTimestamp = document.createElement(\"td\");\n\t\t\t\ttdTimestamp.textContent = formatTimestamp(data.timestamp);\n\n\t\t\t\tvar tdStatus = document.createElement(\"td\");\n\t\t\t\tvar badge = document.createElement(\"span\");\n\t\t\t\tbadge.className = statusBadgeClass(data.delivery_status);\n\t\t\t\tbadge.textContent = data.delivery_status || \"\";\n\t\t\t\ttdStatus.appendChild(badge);\n\n\t\t\t\ttr.appendChild(tdSubject);\n\t\t\t\ttr.appendChild(tdID);\n\t\t\t\ttr.appendChild(tdTimestamp);\n\t\t\t\ttr.appendChild(tdStatus);\n\t\t\t\treturn tr;\n\t\t\t}\n\n\t\t\tfunction updateStatusBadge(data) {\n\t\t\t\tvar row = document.querySelector(\n\t\t\t\t\t'#events-results tr[data-event-id=\"' + data.event_id + '\"]',\n\t\t\t\t);\n\t\t\t\tif (!row) return;\n\t\t\t\tvar badge = row.querySelector(\"td:last-child span\");\n\t\t\t\tif (badge) {\n\t\t\t\t\tbadge.className = statusBadgeClass(data.delivery_status);\n\t\t\t\t\tbadge.textContent = data.delivery_status || \"\";\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction showDeliveryToast(data) {\n\t\t\t\tvar container = document.getElementById(\"toast-container\");\n\t\t\t\tif (!container) return;\n\n\t\t\t\tvar toast = document.createElement(\"div\");\n\t\t\t\ttoast.className = \"alert alert-sm shadow-lg max-w-sm animate-fade-in\";\n\n\t\t\t\tconsole.log(\"Delivery attempt status:\", data.attempt_status);\n\t\t\t\tvar isSuccess = data.attempt_status === \"succeeded\";\n\t\t\t\tif (isSuccess) {\n\t\t\t\t\ttoast.classList.add(\"alert-success\");\n\t\t\t\t\ttoast.textContent = \"Delivered to \" + data.subscriber_endpoint;\n\t\t\t\t} else {\n\t\t\t\t\ttoast.classList.add(\"alert-error\");\n\t\t\t\t\tvar msg = \"Failed delivery to \" + data.subscriber_endpoint;\n\t\t\t\t\tif (data.response_status_code) {\n\t\t\t\t\t\tmsg += \" - \" + data.response_status_code;\n\t\t\t\t\t}\n\t\t\t\t\ttoast.textContent = msg;\n\t\t\t\t}\n\n\t\t\t\tcontainer.appendChild(toast);\n\n\t\t\t\tsetTimeout(function () {\n\t\t\t\t\ttoast.style.opacity = \"0\";\n\t\t\t\t\ttoast.style.transition = \"opacity 0.3s\";\n\t\t\t\t\tsetTimeout(function () {\n\t\t\t\t\t\tif (toast.parentNode) toast.parentNode.removeChild(toast);\n\t\t\t\t\t}, 300);\n\t\t\t\t}, 3000);\n\t\t\t}\n\n\t\t\tfunction showMissedBanner(count, afterNanos) {\n\t\t\t\tremoveMissedBanner();\n\t\t\t\tvar tbody = document.querySelector(\"#events-results tbody\");\n\t\t\t\tif (!tbody) return;\n\t\t\t\tvar tr = document.createElement(\"tr\");\n\t\t\t\ttr.id = \"missed-banner\";\n\t\t\t\tvar td = document.createElement(\"td\");\n\t\t\t\ttd.setAttribute(\"colspan\", \"4\");\n\t\t\t\ttd.className = \"py-3 px-4 bg-warning/20 text-warning-content\";\n\t\t\t\ttd.innerHTML =\n\t\t\t\t\t'<div class=\"flex items-center justify-between\">' +\n\t\t\t\t\t\"<span>You missed <strong>\" +\n\t\t\t\t\tcount +\n\t\t\t\t\t\"</strong> event\" +\n\t\t\t\t\t(count !== 1 ? \"s\" : \"\") +\n\t\t\t\t\t\" while away</span>\" +\n\t\t\t\t\t'<div class=\"flex gap-2\">' +\n\t\t\t\t\t'<button class=\"btn btn-warning btn-xs\" id=\"load-missed-btn\">Load</button>' +\n\t\t\t\t\t'<button class=\"btn btn-ghost btn-xs\" id=\"dismiss-missed-btn\">\\u2715</button>' +\n\t\t\t\t\t\"</div></div>\";\n\t\t\t\ttbody.insertBefore(tr, tbody.firstChild);\n\n\t\t\t\tdocument\n\t\t\t\t\t.getElementById(\"load-missed-btn\")\n\t\t\t\t\t.addEventListener(\"click\", function () {\n\t\t\t\t\t\tloadMissedEvents(afterNanos);\n\t\t\t\t\t});\n\t\t\t\tdocument\n\t\t\t\t\t.getElementById(\"dismiss-missed-btn\")\n\t\t\t\t\t.addEventListener(\"click\", function () {\n\t\t\t\t\t\tremoveMissedBanner();\n\t\t\t\t\t});\n\t\t\t}\n\n\t\t\tfunction removeMissedBanner() {\n\t\t\t\tvar banner = document.getElementById(\"missed-banner\");\n\t\t\t\tif (banner) banner.parentNode.removeChild(banner);\n\t\t\t}\n\n\t\t\tfunction loadMissedEvents(afterNanos) {\n\t\t\t\tremoveMissedBanner();\n\t\t\t\tvar url = \"/events/stream/missed?after=\" + afterNanos;\n\t\t\t\tvar params = getFilterParams();\n\t\t\t\tif (params) url += \"&\" + params;\n\n\t\t\t\tfetch(url)\n\t\t\t\t\t.then(function (resp) {\n\t\t\t\t\t\treturn resp.text();\n\t\t\t\t\t})\n\t\t\t\t\t.then(function (html) {\n\t\t\t\t\t\tif (!html.trim()) return;\n\t\t\t\t\t\tvar tbody = document.querySelector(\"#events-results tbody\");\n\t\t\t\t\t\tif (!tbody) return;\n\t\t\t\t\t\t// Remove \"Waiting for events...\" placeholder if present\n\t\t\t\t\t\tvar placeholder = tbody.querySelector('td[colspan=\"4\"]');\n\t\t\t\t\t\tif (placeholder) {\n\t\t\t\t\t\t\tplaceholder.closest(\"tr\").remove();\n\t\t\t\t\t\t}\n\t\t\t\t\t\t// Insert missed rows at the top of the table\n\t\t\t\t\t\tvar temp = document.createElement(\"tbody\");\n\t\t\t\t\t\ttemp.innerHTML = html;\n\t\t\t\t\t\tvar rows = Array.prototype.slice.call(temp.children);\n\t\t\t\t\t\tfor (var i = rows.length - 1; i >= 0; i--) {\n\t\t\t\t\t\t\ttbody.insertBefore(rows[i], tbody.firstChild);\n\t\t\t\t\t\t}\n\t\t\t\t\t\t// Enforce max rows\n\t\t\t\t\t\twhile (tbody.children.length > MAX_ROWS) {\n\t\t\t\t\t\t\ttbody.removeChild(tbody.lastChild);\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t}\n\n\t\t\tfunction reconnectWithFilters() {\n\t\t\t\t// Close existing connection\n\t\t\t\tif (evtSource) {\n\t\t\t\t\tevtSource.close();\n\t\t\t\t\tevtSource = null;\n\t\t\t\t}\n\n\t\t\t\t// Reset reconnection state\n\t\t\t\tlastReconnectNanos = null;\n\t\t\t\tremoveMissedBanner();\n\n\t\t\t\t// Clear table for fresh stream\n\t\t\t\tvar tbody = document.querySelector(\"#events-results tbody\");\n\t\t\t\tif (tbody) {\n\t\t\t\t\ttbody.innerHTML =\n\t\t\t\t\t\t'<tr><td colspan=\"4\" class=\"text-center text-base-content/60 py-8\">Waiting for events...</td></tr>';\n\t\t\t\t}\n\n\t\t\t\t// Open new connection with current filter params\n\t\t\t\tvar url = \"/events/stream\";\n\t\t\t\tvar params = getFilterParams();\n\t\t\t\tif (params) url += \"?\" + params;\n\n\t\t\t\tevtSource = new EventSource(url);\n\t\t\t\tattachEventSourceHandlers(evtSource);\n\t\t\t}\n\n\t\t\tfunction attachEventSourceHandlers(source) {\n\t\t\t\tvar receivedFirst = false;\n\n\t\t\t\tsource.onmessage = function (e) {\n\t\t\t\t\tvar data;\n\t\t\t\t\ttry {\n\t\t\t\t\t\tdata = JSON.parse(e.data);\n\t\t\t\t\t} catch (_) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\n\t\t\t\t\t// Track last event ID for reconnection\n\t\t\t\t\tif (e.lastEventId) {\n\t\t\t\t\t\tvar parts = e.lastEventId.split(\":\");\n\t\t\t\t\t\tif (parts.length === 2) {\n\t\t\t\t\t\t\tlastReconnectNanos = parts[1];\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tif (data.type === \"created\") {\n\t\t\t\t\t\tvar tbody = document.querySelector(\"#events-results tbody\");\n\t\t\t\t\t\tif (!receivedFirst) {\n\t\t\t\t\t\t\treceivedFirst = true;\n\t\t\t\t\t\t\tif (tbody) tbody.innerHTML = \"\";\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tvar row = createEventRow(data);\n\t\t\t\t\t\tif (tbody) {\n\t\t\t\t\t\t\t// Insert after the missed banner if present\n\t\t\t\t\t\t\tvar banner = document.getElementById(\"missed-banner\");\n\t\t\t\t\t\t\tif (banner && banner.nextSibling) {\n\t\t\t\t\t\t\t\ttbody.insertBefore(row, banner.nextSibling);\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\ttbody.insertBefore(row, tbody.firstChild);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\twhile (tbody.children.length > MAX_ROWS) {\n\t\t\t\t\t\t\t\ttbody.removeChild(tbody.lastChild);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t} else if (data.type === \"status_changed\") {\n\t\t\t\t\t\tupdateStatusBadge(data);\n\t\t\t\t\t} else if (data.type === \"delivery_attempt\") {\n\t\t\t\t\t\tshowDeliveryToast(data);\n\t\t\t\t\t}\n\t\t\t\t};\n\n\t\t\t\t// Listen for named 'missed' events (reconnection indicator)\n\t\t\t\tsource.addEventListener(\"missed\", function (e) {\n\t\t\t\t\tvar data;\n\t\t\t\t\ttry {\n\t\t\t\t\t\tdata = JSON.parse(e.data);\n\t\t\t\t\t} catch (_) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tif (data.count && data.count > 0 && lastReconnectNanos) {\n\t\t\t\t\t\tshowMissedBanner(data.count, lastReconnectNanos);\n\t\t\t\t\t}\n\t\t\t\t});\n\n\t\t\t\tsource.onerror = function () {\n\t\t\t\t\t// EventSource auto-reconnects; no action needed\n\t\t\t\t};\n\t\t\t}\n\n\t\t\tfunction startLive() {\n\t\t\t\tisLive = true;\n\n\t\t\t\t// Update button\n\t\t\t\tvar btn = document.getElementById(\"live-toggle-btn\");\n\t\t\t\tbtn.className = \"btn btn-error btn-sm\";\n\t\t\t\tbtn.innerHTML =\n\t\t\t\t\t'<span class=\"inline-block w-2 h-2 rounded-full bg-success animate-pulse mr-2\"></span>Stop';\n\n\t\t\t\t// Clear table body and set up for live mode\n\t\t\t\tvar tbody = document.querySelector(\"#events-results tbody\");\n\t\t\t\tif (tbody) {\n\t\t\t\t\ttbody.innerHTML =\n\t\t\t\t\t\t'<tr><td colspan=\"4\" class=\"text-center text-base-content/60 py-8\">Waiting for events...</td></tr>';\n\t\t\t\t}\n\n\t\t\t\t// Hide pagination\n\t\t\t\tvar pagination = document.querySelector(\n\t\t\t\t\t\"#events-results .flex.justify-center\",\n\t\t\t\t);\n\t\t\t\tif (pagination) pagination.style.display = \"none\";\n\n\t\t\t\t// Open EventSource with current filter params\n\t\t\t\tvar url = \"/events/stream\";\n\t\t\t\tvar params = getFilterParams();\n\t\t\t\tif (params) url += \"?\" + params;\n\n\t\t\t\tevtSource = new EventSource(url);\n\t\t\t\tattachEventSourceHandlers(evtSource);\n\n\t\t\t\t// Intercept filter form submit during live mode\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) {\n\t\t\t\t\tform.addEventListener(\"submit\", liveSearchHandler);\n\t\t\t\t}\n\n\t\t\t\t// Intercept Clear link during live mode\n\t\t\t\tvar clearLink = document.querySelector(\n\t\t\t\t\t'form[hx-get=\"/events\"] a[href=\"/events\"]',\n\t\t\t\t);\n\t\t\t\tif (clearLink) {\n\t\t\t\t\tclearLink.addEventListener(\"click\", liveClearHandler);\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction stopLive() {\n\t\t\t\tif (evtSource) {\n\t\t\t\t\tevtSource.close();\n\t\t\t\t\tevtSource = null;\n\t\t\t\t}\n\t\t\t\tisLive = false;\n\n\t\t\t\t// Remove live mode event listeners\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) {\n\t\t\t\t\tform.removeEventListener(\"submit\", liveSearchHandler);\n\t\t\t\t}\n\t\t\t\tvar clearLink = document.querySelector(\n\t\t\t\t\t'form[hx-get=\"/events\"] a[href=\"/events\"]',\n\t\t\t\t);\n\t\t\t\tif (clearLink) {\n\t\t\t\t\tclearLink.removeEventListener(\"click\", liveClearHandler);\n\t\t\t\t}\n\n\t\t\t\t// Restore button\n\t\t\t\tvar btn = document.getElementById(\"live-toggle-btn\");\n\t\t\t\tbtn.className = \"btn btn-outline btn-success btn-sm\";\n\t\t\t\tbtn.innerHTML = \"Go Live\";\n\n\t\t\t\t// Reload the normal paginated view\n\t\t\t\thtmx.ajax(\"GET\", \"/events\", {\n\t\t\t\t\ttarget: \"#events-results\",\n\t\t\t\t\tswap: \"innerHTML\",\n\t\t\t\t});\n\t\t\t}\n\n\t\t\tfunction liveSearchHandler(e) {\n\t\t\t\te.preventDefault();\n\t\t\t\te.stopPropagation();\n\t\t\t\treconnectWithFilters();\n\t\t\t}\n\n\t\t\tfunction liveClearHandler(e) {\n\t\t\t\te.preventDefault();\n\t\t\t\te.stopPropagation();\n\t\t\t\t// Reset form fields\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) form.reset();\n\t\t\t\treconnectWithFilters();\n\t\t\t}\n\n\t\t\twindow.toggleLiveMode = function () {\n\t\t\t\tif (isLive) {\n\t\t\t\t\tstopLive();\n\t\t\t\t} else {\n\t\t\t\t\tstartLive();\n\t\t\t\t}\n\t\t\t};\n\t\t})();\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<script>\n\t\t(function () {\n\t\t\tvar evtSource = null;\n\t\t\tvar isLive = false;\n\t\t\tvar MAX_ROWS = 100;\n\t\t\tvar lastReconnectNanos = null;\n\n\t\t\tfunction getFilterForm() {\n\t\t\t\treturn document.querySelector('form[hx-get=\"/events\"]');\n\t\t\t}\n\n\t\t\tfunction getFilterParams() {\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (!form) return \"\";\n\t\t\t\tvar params = new URLSearchParams(new FormData(form));\n\t\t\t\t// Remove empty values\n\t\t\t\tvar clean = new URLSearchParams();\n\t\t\t\tparams.forEach(function (v, k) {\n\t\t\t\t\tif (v) clean.append(k, v);\n\t\t\t\t});\n\t\t\t\treturn clean.toString();\n\t\t\t}\n\n\t\t\tfunction statusBadgeClass(status) {\n\t\t\t\tswitch (status) {\n\t\t\t\t\tcase \"delivered\":\n\t\t\t\t\t\treturn \"badge badge-success\";\n\t\t\t\t\tcase \"failed\":\n\t\t\t\t\t\treturn \"badge badge-error\";\n\t\t\t\t\tcase \"pending\":\n\t\t\t\t\t\treturn \"badge badge-warning\";\n\t\t\t\t\tcase \"partial\":\n\t\t\t\t\t\treturn \"badge badge-info\";\n\t\t\t\t\tdefault:\n\t\t\t\t\t\treturn \"badge badge-ghost\";\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction truncateID(id) {\n\t\t\t\tif (id && id.length > 8) return id.substring(0, 8) + \"...\";\n\t\t\t\treturn id || \"\";\n\t\t\t}\n\n\t\t\tfunction formatTimestamp(ts) {\n\t\t\t\tvar d = new Date(ts);\n\t\t\t\tif (isNaN(d.getTime())) return ts;\n\t\t\t\tvar pad = function (n) {\n\t\t\t\t\treturn n < 10 ? \"0\" + n : n;\n\t\t\t\t};\n\t\t\t\treturn (\n\t\t\t\t\td.getUTCFullYear() +\n\t\t\t\t\t\"-\" +\n\t\t\t\t\tpad(d.getUTCMonth() + 1) +\n\t\t\t\t\t\"-\" +\n\t\t\t\t\tpad(d.getUTCDate()) +\n\t\t\t\t\t\" \" +\n\t\t\t\t\tpad(d.getUTCHours()) +\n\t\t\t\t\t\":\" +\n\t\t\t\t\tpad(d.getUTCMinutes()) +\n\t\t\t\t\t\":\" +\n\t\t\t\t\tpad(d.getUTCSeconds()) +\n\t\t\t\t\t\" UTC\"\n\t\t\t\t);\n\t\t\t}\n\n\t\t\tfunction createEventRow(data) {\n\t\t\t\tvar tr = document.createElement(\"tr\");\n\t\t\t\ttr.className = \"hover cursor-pointer\";\n\t\t\t\ttr.setAttribute(\"data-event-id\", data.event_id);\n\t\t\t\ttr.onclick = function () {\n\t\t\t\t\twindow.location.href = \"/events/\" + data.event_id;\n\t\t\t\t};\n\n\t\t\t\tvar tdSubject = document.createElement(\"td\");\n\t\t\t\ttdSubject.className = \"font-mono\";\n\t\t\t\ttdSubject.textContent = data.subject || \"\";\n\n\t\t\t\tvar tdID = document.createElement(\"td\");\n\t\t\t\ttdID.className = \"font-mono text-sm\";\n\t\t\t\ttdID.textContent = truncateID(data.event_id);\n\n\t\t\t\tvar tdTimestamp = document.createElement(\"td\");\n\t\t\t\ttdTimestamp.textContent = formatTimestamp(data.timestamp);\n\n\t\t\t\tvar tdProps = document.createElement(\"td\");\n\t\t\t\tif (data.properties) {\n\t\t\t\t\tvar keys = Object.keys(data.properties).sort();\n\t\t\t\t\tfor (var i = 0; i < keys.length; i++) {\n\t\t\t\t\t\tvar propBadge = document.createElement(\"span\");\n\t\t\t\t\t\tpropBadge.className = \"badge badge-outline badge-sm mr-1\";\n\t\t\t\t\t\tpropBadge.textContent = keys[i] + \"=\" + data.properties[keys[i]];\n\t\t\t\t\t\ttdProps.appendChild(propBadge);\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\tvar tdStatus = document.createElement(\"td\");\n\t\t\t\tvar badge = document.createElement(\"span\");\n\t\t\t\tbadge.className = statusBadgeClass(data.delivery_status);\n\t\t\t\tbadge.textContent = data.delivery_status || \"\";\n\t\t\t\ttdStatus.appendChild(badge);\n\n\t\t\t\ttr.appendChild(tdSubject);\n\t\t\t\ttr.appendChild(tdID);\n\t\t\t\ttr.appendChild(tdTimestamp);\n\t\t\t\ttr.appendChild(tdProps);\n\t\t\t\ttr.appendChild(tdStatus);\n\t\t\t\treturn tr;\n\t\t\t}\n\n\t\t\tfunction updateStatusBadge(data) {\n\t\t\t\tvar row = document.querySelector(\n\t\t\t\t\t'#events-results tr[data-event-id=\"' + data.event_id + '\"]',\n\t\t\t\t);\n\t\t\t\tif (!row) return;\n\t\t\t\tvar badge = row.querySelector(\"td:last-child span\");\n\t\t\t\tif (badge) {\n\t\t\t\t\tbadge.className = statusBadgeClass(data.delivery_status);\n\t\t\t\t\tbadge.textContent = data.delivery_status || \"\";\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction showDeliveryToast(data) {\n\t\t\t\tvar container = document.getElementById(\"toast-container\");\n\t\t\t\tif (!container) return;\n\n\t\t\t\tvar toast = document.createElement(\"div\");\n\t\t\t\ttoast.className = \"alert alert-sm shadow-lg max-w-sm animate-fade-in\";\n\n\t\t\t\tconsole.log(\"Delivery attempt status:\", data.attempt_status);\n\t\t\t\tvar isSuccess = data.attempt_status === \"succeeded\";\n\t\t\t\tif (isSuccess) {\n\t\t\t\t\ttoast.classList.add(\"alert-success\");\n\t\t\t\t\ttoast.textContent = \"Delivered to \" + data.subscriber_endpoint;\n\t\t\t\t} else {\n\t\t\t\t\ttoast.classList.add(\"alert-error\");\n\t\t\t\t\tvar msg = \"Failed delivery to \" + data.subscriber_endpoint;\n\t\t\t\t\tif (data.response_status_code) {\n\t\t\t\t\t\tmsg += \" - \" + data.response_status_code;\n\t\t\t\t\t}\n\t\t\t\t\ttoast.textContent = msg;\n\t\t\t\t}\n\n\t\t\t\tcontainer.appendChild(toast);\n\n\t\t\t\tsetTimeout(function () {\n\t\t\t\t\ttoast.style.opacity = \"0\";\n\t\t\t\t\ttoast.style.transition = \"opacity 0.3s\";\n\t\t\t\t\tsetTimeout(function () {\n\t\t\t\t\t\tif (toast.parentNode) toast.parentNode.removeChild(toast);\n\t\t\t\t\t}, 300);\n\t\t\t\t}, 3000);\n\t\t\t}\n\n\t\t\tfunction showMissedBanner(count, afterNanos) {\n\t\t\t\tremoveMissedBanner();\n\t\t\t\tvar tbody = document.querySelector(\"#events-results tbody\");\n\t\t\t\tif (!tbody) return;\n\t\t\t\tvar tr = document.createElement(\"tr\");\n\t\t\t\ttr.id = \"missed-banner\";\n\t\t\t\tvar td = document.createElement(\"td\");\n\t\t\t\ttd.setAttribute(\"colspan\", \"5\");\n\t\t\t\ttd.className = \"py-3 px-4 bg-warning/20 text-warning-content\";\n\t\t\t\ttd.innerHTML =\n\t\t\t\t\t'<div class=\"flex items-center justify-between\">' +\n\t\t\t\t\t\"<span>You missed <strong>\" +\n\t\t\t\t\tcount +\n\t\t\t\t\t\"</strong> event\" +\n\t\t\t\t\t(count !== 1 ? \"s\" : \"\") +\n\t\t\t\t\t\" while away</span>\" +\n\t\t\t\t\t'<div class=\"flex gap-2\">' +\n\t\t\t\t\t'<button class=\"btn btn-warning btn-xs\" id=\"load-missed-btn\">Load</button>' +\n\t\t\t\t\t'<button class=\"btn btn-ghost btn-xs\" id=\"dismiss-missed-btn\">\\u2715</button>' +\n\t\t\t\t\t\"</div></div>\";\n\t\t\t\ttbody.insertBefore(tr, tbody.firstChild);\n\n\t\t\t\tdocument\n\t\t\t\t\t.getElementById(\"load-missed-btn\")\n\t\t\t\t\t.addEventListener(\"click\", function () {\n\t\t\t\t\t\tloadMissedEvents(afterNanos);\n\t\t\t\t\t});\n\t\t\t\tdocument\n\t\t\t\t\t.getElementById(\"dismiss-missed-btn\")\n\t\t\t\t\t.addEventListener(\"click\", function () {\n\t\t\t\t\t\tremoveMissedBanner();\n\t\t\t\t\t});\n\t\t\t}\n\n\t\t\tfunction removeMissedBanner() {\n\t\t\t\tvar banner = document.getElementById(\"missed-banner\");\n\t\t\t\tif (banner) banner.parentNode.removeChild(banner);\n\t\t\t}\n\n\t\t\tfunction loadMissedEvents(afterNanos) {\n\t\t\t\tremoveMissedBanner();\n\t\t\t\tvar url = \"/events/stream/missed?after=\" + afterNanos;\n\t\t\t\tvar params = getFilterParams();\n\t\t\t\tif (params) url += \"&\" + params;\n\n\t\t\t\tfetch(url)\n\t\t\t\t\t.then(function (resp) {\n\t\t\t\t\t\treturn resp.text();\n\t\t\t\t\t})\n\t\t\t\t\t.then(function (html) {\n\t\t\t\t\t\tif (!html.trim()) return;\n\t\t\t\t\t\tvar tbody = document.querySelector(\"#events-results tbody\");\n\t\t\t\t\t\tif (!tbody) return;\n\t\t\t\t\t\t// Remove \"Waiting for events...\" placeholder if present\n\t\t\t\t\t\tvar placeholder = tbody.querySelector('td[colspan=\"5\"]');\n\t\t\t\t\t\tif (placeholder) {\n\t\t\t\t\t\t\tplaceholder.closest(\"tr\").remove();\n\t\t\t\t\t\t}\n\t\t\t\t\t\t// Insert missed rows at the top of the table\n\t\t\t\t\t\tvar temp = document.createElement(\"tbody\");\n\t\t\t\t\t\ttemp.innerHTML = html;\n\t\t\t\t\t\tvar rows = Array.prototype.slice.call(temp.children);\n\t\t\t\t\t\tfor (var i = rows.length - 1; i >= 0; i--) {\n\t\t\t\t\t\t\ttbody.insertBefore(rows[i], tbody.firstChild);\n\t\t\t\t\t\t}\n\t\t\t\t\t\t// Enforce max rows\n\t\t\t\t\t\twhile (tbody.children.length > MAX_ROWS) {\n\t\t\t\t\t\t\ttbody.removeChild(tbody.lastChild);\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t}\n\n\t\t\tfunction reconnectWithFilters() {\n\t\t\t\t// Close existing connection\n\t\t\t\tif (evtSource) {\n\t\t\t\t\tevtSource.close();\n\t\t\t\t\tevtSource = null;\n\t\t\t\t}\n\n\t\t\t\t// Reset reconnection state\n\t\t\t\tlastReconnectNanos = null;\n\t\t\t\tremoveMissedBanner();\n\n\t\t\t\t// Clear table for fresh stream\n\t\t\t\tvar tbody = document.querySelector(\"#events-results tbody\");\n\t\t\t\tif (tbody) {\n\t\t\t\t\ttbody.innerHTML =\n\t\t\t\t\t\t'<tr><td colspan=\"5\" class=\"text-center text-base-content/60 py-8\">Waiting for events...</td></tr>';\n\t\t\t\t}\n\n\t\t\t\t// Open new connection with current filter params\n\t\t\t\tvar url = \"/events/stream\";\n\t\t\t\tvar params = getFilterParams();\n\t\t\t\tif (params) url += \"?\" + params;\n\n\t\t\t\tevtSource = new EventSource(url);\n\t\t\t\tattachEventSourceHandlers(evtSource);\n\t\t\t}\n\n\t\t\tfunction attachEventSourceHandlers(source) {\n\t\t\t\tvar receivedFirst = false;\n\n\t\t\t\tsource.onmessage = function (e) {\n\t\t\t\t\tvar data;\n\t\t\t\t\ttry {\n\t\t\t\t\t\tdata = JSON.parse(e.data);\n\t\t\t\t\t} catch (_) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\n\t\t\t\t\t// Track last event ID for reconnection\n\t\t\t\t\tif (e.lastEventId) {\n\t\t\t\t\t\tvar parts = e.lastEventId.split(\":\");\n\t\t\t\t\t\tif (parts.length === 2) {\n\t\t\t\t\t\t\tlastReconnectNanos = parts[1];\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tif (data.type === \"created\") {\n\t\t\t\t\t\tvar tbody = document.querySelector(\"#events-results tbody\");\n\t\t\t\t\t\tif (!receivedFirst) {\n\t\t\t\t\t\t\treceivedFirst = true;\n\t\t\t\t\t\t\tif (tbody) tbody.innerHTML = \"\";\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tvar row = createEventRow(data);\n\t\t\t\t\t\tif (tbody) {\n\t\t\t\t\t\t\t// Insert after the missed banner if present\n\t\t\t\t\t\t\tvar banner = document.getElementById(\"missed-banner\");\n\t\t\t\t\t\t\tif (banner && banner.nextSibling) {\n\t\t\t\t\t\t\t\ttbody.insertBefore(row, banner.nextSibling);\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\ttbody.insertBefore(row, tbody.firstChild);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\twhile (tbody.children.length > MAX_ROWS) {\n\t\t\t\t\t\t\t\ttbody.removeChild(tbody.lastChild);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t} else if (data.type === \"status_changed\") {\n\t\t\t\t\t\tupdateStatusBadge(data);\n\t\t\t\t\t} else if (data.type === \"delivery_attempt\") {\n\t\t\t\t\t\tshowDeliveryToast(data);\n\t\t\t\t\t}\n\t\t\t\t};\n\n\t\t\t\t// Listen for named 'missed' events (reconnection indicator)\n\t\t\t\tsource.addEventListener(\"missed\", function (e) {\n\t\t\t\t\tvar data;\n\t\t\t\t\ttry {\n\t\t\t\t\t\tdata = JSON.parse(e.data);\n\t\t\t\t\t} catch (_) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tif (data.count && data.count > 0 && lastReconnectNanos) {\n\t\t\t\t\t\tshowMissedBanner(data.count, lastReconnectNanos);\n\t\t\t\t\t}\n\t\t\t\t});\n\n\t\t\t\tsource.onerror = function () {\n\t\t\t\t\t// EventSource auto-reconnects; no action needed\n\t\t\t\t};\n\t\t\t}\n\n\t\t\tfunction startLive() {\n\t\t\t\tisLive = true;\n\n\t\t\t\t// Update button\n\t\t\t\tvar btn = document.getElementById(\"live-toggle-btn\");\n\t\t\t\tbtn.className = \"btn btn-error btn-sm\";\n\t\t\t\tbtn.innerHTML =\n\t\t\t\t\t'<span class=\"inline-block w-2 h-2 rounded-full bg-success animate-pulse mr-2\"></span>Stop';\n\n\t\t\t\t// Clear table body and set up for live mode\n\t\t\t\tvar tbody = document.querySelector(\"#events-results tbody\");\n\t\t\t\tif (tbody) {\n\t\t\t\t\ttbody.innerHTML =\n\t\t\t\t\t\t'<tr><td colspan=\"5\" class=\"text-center text-base-content/60 py-8\">Waiting for events...</td></tr>';\n\t\t\t\t}\n\n\t\t\t\t// Hide pagination\n\t\t\t\tvar pagination = document.querySelector(\n\t\t\t\t\t\"#events-results .flex.justify-center\",\n\t\t\t\t);\n\t\t\t\tif (pagination) pagination.style.display = \"none\";\n\n\t\t\t\t// Open EventSource with current filter params\n\t\t\t\tvar url = \"/events/stream\";\n\t\t\t\tvar params = getFilterParams();\n\t\t\t\tif (params) url += \"?\" + params;\n\n\t\t\t\tevtSource = new EventSource(url);\n\t\t\t\tattachEventSourceHandlers(evtSource);\n\n\t\t\t\t// Intercept filter form submit during live mode\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) {\n\t\t\t\t\tform.addEventListener(\"submit\", liveSearchHandler);\n\t\t\t\t}\n\n\t\t\t\t// Intercept Clear link during live mode\n\t\t\t\tvar clearLink = document.querySelector(\n\t\t\t\t\t'form[hx-get=\"/events\"] a[href=\"/events\"]',\n\t\t\t\t);\n\t\t\t\tif (clearLink) {\n\t\t\t\t\tclearLink.addEventListener(\"click\", liveClearHandler);\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction stopLive() {\n\t\t\t\tif (evtSource) {\n\t\t\t\t\tevtSource.close();\n\t\t\t\t\tevtSource = null;\n\t\t\t\t}\n\t\t\t\tisLive = false;\n\n\t\t\t\t// Remove live mode event listeners\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) {\n\t\t\t\t\tform.removeEventListener(\"submit\", liveSearchHandler);\n\t\t\t\t}\n\t\t\t\tvar clearLink = document.querySelector(\n\t\t\t\t\t'form[hx-get=\"/events\"] a[href=\"/events\"]',\n\t\t\t\t);\n\t\t\t\tif (clearLink) {\n\t\t\t\t\tclearLink.removeEventListener(\"click\", liveClearHandler);\n\t\t\t\t}\n\n\t\t\t\t// Restore button\n\t\t\t\tvar btn = document.getElementById(\"live-toggle-btn\");\n\t\t\t\tbtn.className = \"btn btn-outline btn-success btn-sm\";\n\t\t\t\tbtn.innerHTML = \"Go Live\";\n\n\t\t\t\t// Reload the normal paginated view\n\t\t\t\thtmx.ajax(\"GET\", \"/events\", {\n\t\t\t\t\ttarget: \"#events-results\",\n\t\t\t\t\tswap: \"innerHTML\",\n\t\t\t\t});\n\t\t\t}\n\n\t\t\tfunction liveSearchHandler(e) {\n\t\t\t\te.preventDefault();\n\t\t\t\te.stopPropagation();\n\t\t\t\treconnectWithFilters();\n\t\t\t}\n\n\t\t\tfunction liveClearHandler(e) {\n\t\t\t\te.preventDefault();\n\t\t\t\te.stopPropagation();\n\t\t\t\t// Reset form fields\n\t\t\t\tvar form = getFilterForm();\n\t\t\t\tif (form) form.reset();\n\t\t\t\treconnectWithFilters();\n\t\t\t}\n\n\t\t\twindow.toggleLiveMode = function () {\n\t\t\t\tif (isLive) {\n\t\t\t\t\tstopLive();\n\t\t\t\t} else {\n\t\t\t\t\tstartLive();\n\t\t\t\t}\n\t\t\t};\n\t\t})();\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
