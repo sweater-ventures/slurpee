@@ -87,7 +87,7 @@
         "go build ./slurpit compiles successfully"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Use sync.Mutex to protect the latency slice since webhook handler runs concurrently. Parse sent_at with time.Parse(time.RFC3339Nano, ...)."
     },
     {

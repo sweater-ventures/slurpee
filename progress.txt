@@ -16,6 +16,8 @@ Started: Tue Feb 10 11:01:57 MST 2026
 - Ticker-based rate control: `time.Second / time.Duration(rate)` for interval from events/sec
 - POST /api/subscribers: header `X-Slurpee-Admin-Secret`, body `{"name":"...","endpoint_url":"...","auth_secret":"...","subscriptions":[{"subject_pattern":"..."}]}`, returns 200 with `{"id":"uuid",...}`
 - DELETE /api/subscribers/{id}: header `X-Slurpee-Admin-Secret`, returns 204 No Content
+- Webhook event body: `{"data": {"sent_at": "RFC3339Nano"}}` — nested struct needed to parse
+- Thread-safe counters: use `sync.Mutex` to protect shared state in concurrent HTTP handlers
 
 ---
 
@@ -67,4 +69,16 @@ Started: Tue Feb 10 11:01:57 MST 2026
   - `math/rand.Intn` is sufficient for random suffix generation (no crypto needed for subscriber names)
   - Webhook events arrive with `X-Event-ID` and `X-Event-Subject` headers — validate both
   - The `received` counter is not thread-safe yet — will need sync.Mutex when adding latency tracking in US-005
+---
+
+## 2026-02-10 11:35 AM MST - US-005
+- Implemented latency calculation from sent_at timestamp in receiver webhook handler
+- Files changed:
+  - `slurpit/main.go` — added `sync` and `io` imports, `sync.Mutex`-protected `latencies` slice, body parsing in webhook handler to extract `sent_at`, latency computation as `receivedAt.Sub(sentAt)`, graceful handling of missing/unparseable timestamps
+- **Learnings for future iterations:**
+  - Capture `receivedAt := time.Now()` at the very start of the handler before any other work for accurate latency
+  - Webhook body contains `{"data": {"sent_at": "..."}}` — need nested struct or map to extract `sent_at`
+  - `received` counter and `latencies` slice share the same mutex since they're always updated together
+  - Warning messages for parse failures use `\n` prefix to avoid corrupting live stats line (US-006)
+  - Always increment `received` even when `sent_at` is missing/unparseable — it's still a received event, just not counted for latency
 ---
