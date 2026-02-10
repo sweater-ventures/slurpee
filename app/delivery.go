@@ -165,7 +165,7 @@ func dispatchEvent(slurpee *Application, event db.Event, inflightWg *sync.WaitGr
 	logger := slog.Default().With("event_id", UuidToString(event.ID), "subject", event.Subject)
 
 	// Find all subscriptions whose subject_pattern matches the event subject
-	subscriptions, err := slurpee.DB.GetSubscriptionsMatchingSubject(ctx, event.Subject)
+	subscriptions, err := slurpee.SubscriptionCache.GetMatchingSubscriptions(ctx, event.Subject)
 	if err != nil {
 		logger.Error("Failed to find matching subscriptions", "error", err)
 		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "failed")
@@ -187,7 +187,7 @@ func dispatchEvent(slurpee *Application, event db.Event, inflightWg *sync.WaitGr
 	// Load subscriber details for each unique subscriber
 	subscribers := make(map[pgtype.UUID]db.Subscriber)
 	for subID := range subscriberSubs {
-		subscriber, err := slurpee.DB.GetSubscriberByID(ctx, subID)
+		subscriber, err := slurpee.SubscriptionCache.GetSubscriberByID(ctx, subID)
 		if err != nil {
 			logger.Error("Failed to get subscriber", "error", err, "subscriber_id", UuidToString(subID))
 			continue
@@ -664,7 +664,7 @@ func resumePartialEvent(ctx context.Context, slurpee *Application, event db.Even
 	}
 
 	// Re-run subscription matching (same logic as dispatchEvent)
-	subscriptions, err := slurpee.DB.GetSubscriptionsMatchingSubject(ctx, event.Subject)
+	subscriptions, err := slurpee.SubscriptionCache.GetMatchingSubscriptions(ctx, event.Subject)
 	if err != nil {
 		logger.Error("Failed to find matching subscriptions for partial event", "error", err)
 		return
@@ -685,7 +685,7 @@ func resumePartialEvent(ctx context.Context, slurpee *Application, event db.Even
 	// Load subscriber details
 	subscribers := make(map[pgtype.UUID]db.Subscriber)
 	for subID := range subscriberSubs {
-		subscriber, err := slurpee.DB.GetSubscriberByID(ctx, subID)
+		subscriber, err := slurpee.SubscriptionCache.GetSubscriberByID(ctx, subID)
 		if err != nil {
 			logger.Error("Failed to get subscriber", "error", err, "subscriber_id", UuidToString(subID))
 			continue

@@ -143,6 +143,38 @@ func (q *Queries) GetSubscriptionsMatchingSubject(ctx context.Context, subjectPa
 	return items, nil
 }
 
+const listAllSubscriptions = `-- name: ListAllSubscriptions :many
+SELECT id, subscriber_id, subject_pattern, filter, max_retries, created_at, updated_at FROM subscriptions ORDER BY created_at
+`
+
+func (q *Queries) ListAllSubscriptions(ctx context.Context) ([]Subscription, error) {
+	rows, err := q.db.Query(ctx, listAllSubscriptions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Subscription
+	for rows.Next() {
+		var i Subscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.SubscriberID,
+			&i.SubjectPattern,
+			&i.Filter,
+			&i.MaxRetries,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSubscribers = `-- name: ListSubscribers :many
 SELECT id, name, endpoint_url, auth_secret, max_parallel, created_at, updated_at FROM subscribers ORDER BY created_at DESC
 `

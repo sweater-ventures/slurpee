@@ -185,6 +185,8 @@ func createSubscriberHandler(slurpee *app.Application, w http.ResponseWriter, r 
 		}
 	}
 
+	slurpee.SubscriptionCache.Flush()
+
 	log(r.Context()).Info("Subscriber registered",
 		"subscriber_id", app.UuidToString(subscriber.ID),
 		"name", subscriber.Name,
@@ -291,6 +293,8 @@ func deleteSubscriberHandler(slurpee *app.Application, w http.ResponseWriter, r 
 		writeJsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete subscriber"})
 		return
 	}
+
+	slurpee.SubscriptionCache.Flush()
 
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -105,6 +105,10 @@ func (m *deliveryMockQuerier) ListAllApiSecretHashes(ctx context.Context) ([]db.
 	args := m.Called(ctx)
 	return args.Get(0).([]db.ListAllApiSecretHashesRow), args.Error(1)
 }
+func (m *deliveryMockQuerier) ListAllSubscriptions(ctx context.Context) ([]db.Subscription, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]db.Subscription), args.Error(1)
+}
 func (m *deliveryMockQuerier) ListApiSecrets(ctx context.Context) ([]db.ListApiSecretsRow, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]db.ListApiSecretsRow), args.Error(1)
@@ -270,10 +274,11 @@ func newDeliveryTestApp(mockDB *deliveryMockQuerier) *Application {
 			DeliveryWorkers:   2,
 			DeliveryChanSize:  100,
 		},
-		DB:           mockDB,
-		DeliveryChan: make(chan db.Event, 100),
-		EventBus:     NewEventBus(),
-		Sessions:     NewSessionStore(),
+		DB:                mockDB,
+		DeliveryChan:      make(chan db.Event, 100),
+		EventBus:          NewEventBus(),
+		Sessions:          NewSessionStore(),
+		SubscriptionCache: NewSubscriptionCache(mockDB),
 	}
 }
 
@@ -481,10 +486,10 @@ func TestDispatchEvent_FindsMatchingSubscriptionsAndEnqueuesTasks(t *testing.T) 
 		s.SubjectPattern = "orders.*"
 	})
 
-	mockDB.On("GetSubscriptionsMatchingSubject", mock.Anything, "orders.created").
+	mockDB.On("ListSubscribers", mock.Anything).
+		Return([]db.Subscriber{subscriber}, nil)
+	mockDB.On("ListAllSubscriptions", mock.Anything).
 		Return([]db.Subscription{subscription}, nil)
-	mockDB.On("GetSubscriberByID", mock.Anything, subscriber.ID).
-		Return(subscriber, nil)
 
 	var inflightWg sync.WaitGroup
 	taskQueue := make(chan deliveryTask, 100)
@@ -526,10 +531,10 @@ func TestDispatchEvent_SkipsSubscriptionsWhoseFiltersDontMatch(t *testing.T) {
 		s.Filter = []byte(`{"type":"payment"}`)
 	})
 
-	mockDB.On("GetSubscriptionsMatchingSubject", mock.Anything, "orders.created").
+	mockDB.On("ListSubscribers", mock.Anything).
+		Return([]db.Subscriber{subscriber}, nil)
+	mockDB.On("ListAllSubscriptions", mock.Anything).
 		Return([]db.Subscription{matchingSub, nonMatchingSub}, nil)
-	mockDB.On("GetSubscriberByID", mock.Anything, subscriber.ID).
-		Return(subscriber, nil)
 
 	var inflightWg sync.WaitGroup
 	taskQueue := make(chan deliveryTask, 100)
@@ -552,7 +557,9 @@ func TestDispatchEvent_NoMatchingSubscriptions_MarksDelivered(t *testing.T) {
 		e.Subject = "orders.created"
 	})
 
-	mockDB.On("GetSubscriptionsMatchingSubject", mock.Anything, "orders.created").
+	mockDB.On("ListSubscribers", mock.Anything).
+		Return([]db.Subscriber{}, nil)
+	mockDB.On("ListAllSubscriptions", mock.Anything).
 		Return([]db.Subscription{}, nil)
 	mockDB.On("UpdateEventDeliveryStatus", mock.Anything, mock.AnythingOfType("db.UpdateEventDeliveryStatusParams")).
 		Return(db.Event{}, nil)
@@ -575,8 +582,8 @@ func TestDispatchEvent_SubscriptionDbError_MarksFailed(t *testing.T) {
 		e.Subject = "orders.created"
 	})
 
-	mockDB.On("GetSubscriptionsMatchingSubject", mock.Anything, "orders.created").
-		Return([]db.Subscription(nil), assert.AnError)
+	mockDB.On("ListSubscribers", mock.Anything).
+		Return([]db.Subscriber(nil), assert.AnError)
 	mockDB.On("UpdateEventDeliveryStatus", mock.Anything, mock.AnythingOfType("db.UpdateEventDeliveryStatusParams")).
 		Return(db.Event{}, nil)
 
@@ -605,10 +612,10 @@ func TestDispatchEvent_UsesSubscriptionMaxRetries(t *testing.T) {
 		s.MaxRetries = pgtype.Int4{Int32: 10, Valid: true}
 	})
 
-	mockDB.On("GetSubscriptionsMatchingSubject", mock.Anything, "orders.created").
+	mockDB.On("ListSubscribers", mock.Anything).
+		Return([]db.Subscriber{subscriber}, nil)
+	mockDB.On("ListAllSubscriptions", mock.Anything).
 		Return([]db.Subscription{subscription}, nil)
-	mockDB.On("GetSubscriberByID", mock.Anything, subscriber.ID).
-		Return(subscriber, nil)
 
 	var inflightWg sync.WaitGroup
 	taskQueue := make(chan deliveryTask, 100)
@@ -646,12 +653,10 @@ func TestDispatchEvent_MultipleSubscribers(t *testing.T) {
 		s.SubjectPattern = "orders.*"
 	})
 
-	mockDB.On("GetSubscriptionsMatchingSubject", mock.Anything, "orders.created").
+	mockDB.On("ListSubscribers", mock.Anything).
+		Return([]db.Subscriber{sub1, sub2}, nil)
+	mockDB.On("ListAllSubscriptions", mock.Anything).
 		Return([]db.Subscription{subscription1, subscription2}, nil)
-	mockDB.On("GetSubscriberByID", mock.Anything, sub1.ID).
-		Return(sub1, nil)
-	mockDB.On("GetSubscriberByID", mock.Anything, sub2.ID).
-		Return(sub2, nil)
 
 	var inflightWg sync.WaitGroup
 	taskQueue := make(chan deliveryTask, 100)

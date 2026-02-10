@@ -58,5 +58,8 @@ UPDATE subscriptions SET
 WHERE id = $1
 RETURNING *;
 
+-- name: ListAllSubscriptions :many
+SELECT * FROM subscriptions ORDER BY created_at;
+
 -- name: DeleteSubscription :exec
 DELETE FROM subscriptions WHERE id = $1;
