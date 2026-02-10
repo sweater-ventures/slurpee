@@ -14,6 +14,8 @@ Started: Tue Feb 10 11:01:57 MST 2026
 - go-arg subcommands: pointer fields with `arg:"subcommand:name"` tag, check non-nil after MustParse
 - POST /api/events: headers `X-Slurpee-Secret-ID` + `X-Slurpee-Secret`, body `{"subject":"...","data":{...}}`, returns 201
 - Ticker-based rate control: `time.Second / time.Duration(rate)` for interval from events/sec
+- POST /api/subscribers: header `X-Slurpee-Admin-Secret`, body `{"name":"...","endpoint_url":"...","auth_secret":"...","subscriptions":[{"subject_pattern":"..."}]}`, returns 200 with `{"id":"uuid",...}`
+- DELETE /api/subscribers/{id}: header `X-Slurpee-Admin-Secret`, returns 204 No Content
 
 ---
 
@@ -51,4 +53,18 @@ Started: Tue Feb 10 11:01:57 MST 2026
   - Use `time.Second / time.Duration(rate)` for ticker interval from events/sec rate
   - `\r` on stderr for in-place line updates; clear line with spaces before final summary to avoid leftover characters
   - `time.RFC3339Nano` for nanosecond-precision timestamps (required for latency calculation in US-005)
+---
+
+## 2026-02-10 11:31 AM MST - US-004
+- Implemented receive mode in `runReceive()` — auto-registers subscriber, runs webhook HTTP server, deregisters on shutdown
+- Files changed:
+  - `slurpit/main.go` — replaced placeholder `runReceive` with full implementation: subscriber registration via POST /api/subscribers, webhook server with header validation, duration-based timeout, graceful shutdown with DELETE cleanup
+- **Learnings for future iterations:**
+  - POST /api/subscribers expects `X-Slurpee-Admin-Secret` header, body with `name`, `endpoint_url`, `auth_secret`, and `subscriptions` array
+  - Response includes `id` field (string UUID) needed for DELETE cleanup
+  - Use `http.NewServeMux()` with `"POST /"` route pattern for webhook handler — Go 1.22+ method routing
+  - `server.Shutdown(ctx)` gracefully drains connections; pair with `ListenAndServe` in goroutine
+  - `math/rand.Intn` is sufficient for random suffix generation (no crypto needed for subscriber names)
+  - Webhook events arrive with `X-Event-ID` and `X-Event-Subject` headers — validate both
+  - The `received` counter is not thread-safe yet — will need sync.Mutex when adding latency tracking in US-005
 ---
