@@ -63,6 +63,7 @@ func loggingCreateHandler(slurpee *app.Application, w http.ResponseWriter, r *ht
 		return
 	}
 
+	slurpee.LogConfigCache.Flush()
 	renderLoggingWithSuccess(slurpee, w, r, "Logging configuration added")
 }
 
@@ -95,6 +96,7 @@ func loggingUpdateHandler(slurpee *app.Application, w http.ResponseWriter, r *ht
 		return
 	}
 
+	slurpee.LogConfigCache.Flush()
 	renderLoggingWithSuccess(slurpee, w, r, "Logging configuration updated")
 }
 
@@ -112,6 +114,7 @@ func loggingDeleteHandler(slurpee *app.Application, w http.ResponseWriter, r *ht
 		return
 	}
 
+	slurpee.LogConfigCache.Flush()
 	renderLoggingWithSuccess(slurpee, w, r, "Logging configuration deleted")
 }
 

@@ -30,11 +30,25 @@ func HashSecret(plaintext string) (string, error) {
 	return string(hash), nil
 }
 
-// ValidateSecretByID fetches a single secret by UUID and validates the plaintext
-// against its stored hash. Returns the full ApiSecret record or an error.
-func ValidateSecretByID(ctx context.Context, queries db.Querier, secretID uuid.UUID, plaintext string) (db.ApiSecret, error) {
-	secret, err := queries.GetApiSecretByID(ctx, pgtype.UUID{Bytes: secretID, Valid: true})
-	if err != nil {
+// ValidateSecretByID fetches a single secret by UUID (using the app-level cache)
+// and validates the plaintext against its stored hash. Returns the full ApiSecret
+// record or an error.
+func ValidateSecretByID(ctx context.Context, slurpee *Application, secretID uuid.UUID, plaintext string) (db.ApiSecret, error) {
+	pgID := pgtype.UUID{Bytes: secretID, Valid: true}
+
+	secret, found, inCache := slurpee.SecretCache.Get(pgID)
+	if !inCache {
+		var err error
+		secret, err = slurpee.DB.GetApiSecretByID(ctx, pgID)
+		if err != nil {
+			slurpee.SecretCache.Set(pgID, db.ApiSecret{}, false)
+			return db.ApiSecret{}, fmt.Errorf("secret not found")
+		}
+		slurpee.SecretCache.Set(pgID, secret, true)
+		found = true
+	}
+
+	if !found {
 		return db.ApiSecret{}, fmt.Errorf("secret not found")
 	}
 	if bcrypt.CompareHashAndPassword([]byte(secret.SecretHash), []byte(plaintext)) != nil {

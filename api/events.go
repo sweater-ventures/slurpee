@@ -44,7 +44,7 @@ type EventResponse struct {
 
 func LogEvent(ctx context.Context, slurpee *app.Application, event db.Event) {
 	logAttrs := []any{"event_id", app.UuidToString(event.ID), "subject", event.Subject}
-	props := app.ExtractLogProperties(ctx, slurpee.DB, event.Subject, event.Data)
+	props := app.ExtractLogProperties(ctx, slurpee, event.Subject, event.Data)
 	for k, v := range props {
 		logAttrs = append(logAttrs, k, v)
 	}
@@ -71,7 +71,7 @@ func createEventHandler(slurpee *app.Application, w http.ResponseWriter, r *http
 		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Missing or invalid API secret"})
 		return
 	}
-	matchedSecret, err := app.ValidateSecretByID(r.Context(), slurpee.DB, secretID, secretHeader)
+	matchedSecret, err := app.ValidateSecretByID(r.Context(), slurpee, secretID, secretHeader)
 	if err != nil {
 		slog.Warn("Invalid API secret on POST /api/events", "remote_addr", r.RemoteAddr)
 		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Missing or invalid API secret"})
@@ -157,7 +157,7 @@ func createEventHandler(slurpee *app.Application, w http.ResponseWriter, r *http
 
 	LogEvent(r.Context(), slurpee, event)
 	// Publish 'created' message to the event bus for SSE clients
-	props := app.ExtractLogProperties(r.Context(), slurpee.DB, event.Subject, event.Data)
+	props := app.ExtractLogProperties(r.Context(), slurpee, event.Subject, event.Data)
 	app.PublishCreatedEvent(slurpee, event, props)
 	// Send to delivery dispatcher for asynchronous delivery
 	slurpee.DeliveryChan <- event
@@ -184,7 +184,7 @@ func getEventHandler(slurpee *app.Application, w http.ResponseWriter, r *http.Re
 		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Missing or invalid API secret"})
 		return
 	}
-	if _, err := app.ValidateSecretByID(r.Context(), slurpee.DB, secretID, secretHeader); err != nil {
+	if _, err := app.ValidateSecretByID(r.Context(), slurpee, secretID, secretHeader); err != nil {
 		slog.Warn("Invalid API secret on GET /api/events/{id}", "remote_addr", r.RemoteAddr)
 		writeJsonResponse(w, http.StatusUnauthorized, map[string]string{"error": "Missing or invalid API secret"})
 		return

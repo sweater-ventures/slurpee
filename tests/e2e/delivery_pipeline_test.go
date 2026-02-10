@@ -192,11 +192,11 @@ func TestDeliveryPipeline_NoMatchingSubscriptions(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	// Wait for the event status to become 'delivered' (no subscribers to deliver to)
-	event := waitForEventStatus(t, slurpee.DB, resp.ID, "delivered", 10*time.Second)
+	// Wait for the event status to become 'recorded' (no subscribers to deliver to)
+	event := waitForEventStatus(t, slurpee.DB, resp.ID, "recorded", 10*time.Second)
 
-	if event.DeliveryStatus != "delivered" {
-		t.Errorf("expected event delivery_status %q, got %q", "delivered", event.DeliveryStatus)
+	if event.DeliveryStatus != "recorded" {
+		t.Errorf("expected event delivery_status %q, got %q", "recorded", event.DeliveryStatus)
 	}
 
 	// Verify no delivery attempts were recorded

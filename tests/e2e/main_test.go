@@ -161,10 +161,12 @@ func newTestApp(t *testing.T) *app.Application {
 			DeliveryChanSize:  100,
 			MaxParallel:       1,
 		},
-		DB:           queries,
-		DeliveryChan: make(chan db.Event, 100),
-		EventBus:     app.NewEventBus(),
-		Sessions:     app.NewSessionStore(),
+		DB:             queries,
+		DeliveryChan:   make(chan db.Event, 100),
+		EventBus:       app.NewEventBus(),
+		Sessions:       app.NewSessionStore(),
+		SecretCache:    app.NewCache[pgtype.UUID, db.ApiSecret](),
+		LogConfigCache: app.NewCache[string, db.LogConfig](),
 	}
 }
 

@@ -174,7 +174,7 @@ func dispatchEvent(slurpee *Application, event db.Event, inflightWg *sync.WaitGr
 
 	if len(subscriptions) == 0 {
 		logger.Info("No matching subscriptions for event")
-		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "delivered")
+		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "recorded")
 		return
 	}
 
@@ -671,8 +671,8 @@ func resumePartialEvent(ctx context.Context, slurpee *Application, event db.Even
 	}
 
 	if len(subscriptions) == 0 {
-		logger.Warn("No matching subscriptions for partial event, marking as delivered")
-		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "delivered")
+		logger.Warn("No matching subscriptions for partial event, marking as recorded")
+		updateEventStatus(ctx, slurpee, event.ID, event.RetryCount, "recorded")
 		return
 	}
 
