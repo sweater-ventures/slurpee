@@ -1,78 +1,14 @@
 # Ralph Progress Log
-Started: Mon Feb  9 11:58:30 MST 2026
+Started: Sun Feb  9 16:15:00 MST 2026
 ---
 
 ## Codebase Patterns
 - Use `::bigint` cast on `COUNT(*)` in sqlc queries so generated Go type is `int64` (not `interface{}`)
-- `COUNT(*) FILTER (WHERE ...)` is valid PostgreSQL syntax for conditional aggregation
 - Two mock querier implementations exist: `testutil/mock_querier.go` and `app/delivery_test.go` (import cycle prevention). Both must be updated when adding new queries.
 - sqlc generates prepared query constants, param structs, and row structs — run `sqlc generate` then `go build` to verify
-- `StartDispatcher` returns `*DispatcherState` with `inflightWg`, `taskQueue`, `registry` — needed for direct task enqueuing (e.g., partial event resumption)
-- `ResumeUnfinishedDeliveries(slurpee, ds)` handles both pending (via DeliveryChan) and partial (via direct taskQueue) events
-
-## 2026-02-09 12:00pm - US-001
-- Added `GetResumableEvents` query to `queries/events.sql`: selects events with delivery_status IN ('pending', 'partial') ordered by timestamp ASC
-- Added `GetDeliverySummaryForEvent` query to `queries/delivery_attempts.sql`: groups delivery attempts by subscriber_id with COUNT FILTER for failed/succeeded counts
-- Ran `sqlc generate` — produced `GetDeliverySummaryForEventRow` struct with `SubscriberID pgtype.UUID`, `FailedCount int64`, `SucceededCount int64`
-- Updated both mock querier implementations (testutil + app/delivery_test.go) with new interface methods
-- Files changed: queries/events.sql, queries/delivery_attempts.sql, db/events.sql.go, db/delivery_attempts.sql.go, db/querier.go, testutil/mock_querier.go, app/delivery_test.go
-- **Learnings for future iterations:**
-  - Two mock querier files must stay in sync with db.Querier interface
-  - The `::bigint` cast trick works well — sqlc maps it to Go `int64`
-  - `COUNT(*) FILTER (WHERE status = 'x')` avoids subqueries for per-group conditional counts
----
-
-## 2026-02-09 12:05pm - US-002
-- Added `ResumeUnfinishedDeliveries` function in `app/delivery.go`
-- Queries `GetResumableEvents`, feeds pending events into `DeliveryChan` in a goroutine (avoids blocking if channel buffer is full)
-- Logs at INFO level with counts when events need resuming, DEBUG when nothing to resume
-- Called from `main.go` after `StartDispatcher` but before HTTP server starts
-- Files changed: app/delivery.go, main.go
-- **Learnings for future iterations:**
-  - Pending events go through normal `dispatchEvent` path via `DeliveryChan` — no special handling needed
-  - Use goroutine for channel sends to avoid blocking startup if buffer is smaller than event count
-  - Partial events (US-003) will need direct task creation — cannot reuse `dispatchEvent` which starts at attemptNum=0
----
-
-## 2026-02-09 12:10pm - US-003
-- Refactored `StartDispatcher` to return `*DispatcherState` struct exposing `inflightWg`, `taskQueue`, and `registry`
-- Extended `ResumeUnfinishedDeliveries` to accept `*DispatcherState` and handle partial events
-- Added `resumePartialEvent` function that: queries delivery summary, re-runs subscription matching with filter/dedup logic, skips already-succeeded subscribers, sets `attemptNum` to count of prior failed attempts
-- Partial event tasks go directly into `taskQueue` (not `DeliveryChan`) with their own `eventTracker`
-- Updated `main.go` to capture `DispatcherState` return value and pass it to resume function
-- Files changed: app/delivery.go, main.go
-- **Learnings for future iterations:**
-  - `StartDispatcher` now returns `*DispatcherState` — callers that don't need it can ignore the return value
-  - The partial event resume logic mirrors `dispatchEvent` but with delivery history cross-referencing
-  - `summaryMap` keyed by `[16]byte` (UUID bytes) is the fastest lookup pattern for UUID maps
----
-
-## 2026-02-09 12:15pm - US-004
-- Created `tests/e2e/startup_resume_test.go` with `TestStartupResume_PendingEvent`
-- Test inserts event directly with `delivery_status='pending'`, seeds subscriber+subscription, then calls `ResumeUnfinishedDeliveries`
-- Verifies: mock endpoint received exactly 1 request, event status transitions to 'delivered', delivery_attempts has 'succeeded' row
-- Uses `atomic.Int32` for request counting (thread-safe)
-- Files changed: tests/e2e/startup_resume_test.go
-- **Learnings for future iterations:**
-  - E2E tests don't call `Close()` or `StopDelivery` — goroutines leak after test, matching existing test patterns
-  - `StartDispatcher` must be called before `ResumeUnfinishedDeliveries` for workers to process tasks
-  - Direct DB insert with `InsertEvent` simulates a pre-shutdown event that was never dispatched
----
-
-## 2026-02-09 12:20pm - US-005
-- Added `TestStartupResume_PartialEvent` to `tests/e2e/startup_resume_test.go`
-- Sets up two subscribers (A with succeeded history, B with 2 failed attempts)
-- Inserts event with `delivery_status='partial'` and 3 delivery_attempts rows directly in DB
-- Calls `ResumeUnfinishedDeliveries` and verifies:
-  - Subscriber A receives 0 requests (already succeeded)
-  - Subscriber B receives exactly 1 new request
-  - Total delivery_attempts for B = 3 (2 prior + 1 new)
-  - Newest attempt for B has status='succeeded'
-  - Event reaches 'delivered' status
-- Logs confirm attempt=3 for subscriber B (continuing from 2 prior failures)
-- Files changed: tests/e2e/startup_resume_test.go
-- **Learnings for future iterations:**
-  - Set subscription `maxRetries` high enough to allow continued attempts (default MaxRetries=2 would exhaust immediately with attemptNum=2)
-  - `InsertDeliveryAttempt` can be used to seed prior delivery history for testing
-  - `atomic.Int32` works well for thread-safe mock endpoint request counting
----
+- templ files use tabs for indentation — Edit tool shows them as spaces but must match tabs exactly
+- BusMessage is published in two places: `api/events.go` (API creation) and `views/events.go` (UI creation)
+- Existing `LogEvent()` in `api/events.go` shows the pattern for extracting log_config properties from event data
+- DaisyUI badge components: `badge badge-ghost`, `badge badge-outline`, `badge badge-sm`
+- EventBus SSE live mode: `eventsStreamHandler` in `views/events.go`, JS in `views/events.templ`
+- Missed events recovery: `eventsMissedHandler` in `views/events.go`
