@@ -32,3 +32,8 @@
   --depth: 1;
   --noise: 0;
 }
+
+.modal-box {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.1), 0 0 40px rgba(255, 255, 255, 0.05);
+}
