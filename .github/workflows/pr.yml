@@ -1,0 +1,56 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install tools
+        run: |
+          go install github.com/a-h/templ/cmd/templ@latest
+
+      - name: Generate templ
+        run: templ generate
+
+      - name: Build
+        run: go build ./...
+
+      - name: Unit tests
+        run: go test ./api/... ./app/... -v -count=1 2>&1 | tee unit-tests.txt
+
+      - name: E2E tests
+        run: go test ./tests/e2e/... -v -count=1 2>&1 | tee e2e-tests.txt
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Test Results
+          path: unit-tests.txt,e2e-tests.txt
+          reporter: go-test
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t slurpee:pr-${{ github.event.pull_request.number }} .
