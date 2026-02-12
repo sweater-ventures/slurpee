@@ -32,17 +32,17 @@ jobs:
         run: go build ./...
 
       - name: Unit tests
-        run: go test ./api/... ./app/... -v -count=1 -json | tee unit-tests.json
+        run: go test ./api/... ./app/... -v -count=1 -json | tee tests-unit.json
 
       - name: E2E tests
-        run: go test ./tests/e2e/... -v -count=1 -json | tee e2e-tests.json
+        run: go test ./tests/e2e/... -v -count=1 -json | tee tests-e2e.json
 
       - name: Publish test results
         uses: dorny/test-reporter@v2
         if: always()
         with:
           name: Test Results
-          path: unit-tests.json,e2e-tests.json
+          path: tests-*.json
           reporter: golang-json
 
   docker:
