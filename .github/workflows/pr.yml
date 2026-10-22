@@ -25,6 +25,9 @@ jobs:
         # go.mod's tool directive pins the generator to the templ runtime version.
         run: go tool templ generate
 
+      - name: Check generated templ is committed
+        run: git diff --exit-code -- '*_templ.go'
+
       - name: Build
         run: go build ./...
 
