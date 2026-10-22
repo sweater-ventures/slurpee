@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS build
+FROM golang:1.26.10-alpine AS build
 
 RUN apk add --no-cache make gzip zstd
 
@@ -9,7 +9,7 @@ COPY . .
 RUN go tool templ generate && make
 RUN go install github.com/rubenv/sql-migrate/sql-migrate@v1.8.1
 
-FROM alpine:3.21
+FROM alpine:3.23
 
 WORKDIR /app
 COPY --from=build /go/bin/sql-migrate /usr/local/bin/
